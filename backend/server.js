@@ -957,7 +957,11 @@ async function startServer() {
         await database.createTables();
 
         // Initialize Redis connection
-        await redis.initialize();
+        try {
+            await redis.initialize();
+        } catch (redisError) {
+            console.warn('⚠️  Redis initialization failed, continuing without cache:', redisError.message);
+        }
 
         // Start server
         httpServer.listen(PORT, () => {
@@ -1004,4 +1008,5 @@ process.on('SIGTERM', async () => {
 startServer();
 
 module.exports = app;
+
 

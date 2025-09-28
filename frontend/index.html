@@ -38,7 +38,7 @@
     <link rel="icon" type="image/png" href="/public/icon-192.png" />
 
     <!-- Apple Mobile Web App -->
-    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <!--<meta name="apple-mobile-web-app-capable" content="yes" />-->
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="TravelMind.ai" />
 
@@ -159,7 +159,7 @@
     });
 
     // Register service worker for PWA functionality
-    if ('serviceWorker' in navigator) {
+    /*<if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('/sw.js')
                 .then((registration) => {
@@ -169,7 +169,7 @@
                     console.log('SW registration failed: ', registrationError);
                 });
         });
-    }
+    }*/
 
     // Handle install prompt for PWA
     let deferredPrompt;

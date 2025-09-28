@@ -1463,7 +1463,7 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
 };
 
 // ===================================
-// MEMORY MODE COMPONENT
+// MEMORY MODE COMPONENT - FIXED
 // ===================================
 const MemoryMode = ({ user, token, memories, setMemories, trips, dashboardData, sendChatMessage }) => {
     const [activeTab, setActiveTab] = useState('overview');
@@ -1478,22 +1478,6 @@ const MemoryMode = ({ user, token, memories, setMemories, trips, dashboardData, 
         { id: 'insights', label: 'Insights', icon: Globe }
     ];
 
-    // Mock dashboard data if not available
-    const mockDashboardData = {
-        trips: { total_trips: trips.length },
-        memories: {
-            total_memories: memories.length,
-            avg_rating: 4.2,
-            active_days: 12
-        },
-        recentActivity: [
-            { activity: 'Created memory: Sagrada Familia Visit', type: 'memory', created_at: new Date() },
-            { activity: 'Planned trip to Barcelona', type: 'trip', created_at: new Date() }
-        ]
-    };
-
-    const displayData = dashboardData || mockDashboardData;
-
     const generateTravelStory = async (tripId = null) => {
         setLoadingStory(true);
         try {
@@ -1501,38 +1485,13 @@ const MemoryMode = ({ user, token, memories, setMemories, trips, dashboardData, 
             const response = await fetch(url, {
                 headers: { Authorization: `Bearer ${token}` }
             });
+            const data = await response.json();
 
-            if (response.ok) {
-                const data = await response.json();
-                if (data.success) {
-                    setTravelStory(data.data);
-                } else {
-                    // Generate mock story
-                    setTravelStory({
-                        story: `My journey through Barcelona has been nothing short of magical. From the moment I stepped into the Gothic Quarter, I was transported into a world where medieval architecture meets modern vibrant life.\n\nThe highlight of my trip was undoubtedly visiting the Sagrada Família. Standing before Gaudí's masterpiece, I was overwhelmed by the intricate details and the way light danced through the stained glass windows. It's a place where spirituality and artistry converge in the most beautiful way.\n\nWandering through Park Güell felt like exploring a fairy tale. The colorful mosaics and organic shapes created by Gaudí made me see the world through an artist's eyes. Every corner revealed a new perspective, a new way of understanding the harmony between nature and human creativity.\n\nThe food scene in Barcelona exceeded all my expectations. From the bustling La Boquería Market with its explosion of colors and aromas, to the intimate tapas bars hidden in narrow alleyways, every meal was an adventure. The locals' passion for their cuisine was infectious, and I found myself trying dishes I never would have considered before.\n\nAs I reflect on this journey, I realize that Barcelona didn't just show me beautiful sights – it changed the way I see beauty itself. The city taught me that art isn't confined to museums; it lives in the streets, in the people, in the very rhythm of daily life.`,
-                        memories: memories,
-                        generatedAt: new Date().toISOString(),
-                        wordCount: 234
-                    });
-                }
-            } else {
-                // Generate mock story
-                setTravelStory({
-                    story: `My journey through Barcelona has been nothing short of magical. From the moment I stepped into the Gothic Quarter, I was transported into a world where medieval architecture meets modern vibrant life.\n\nThe highlight of my trip was undoubtedly visiting the Sagrada Família. Standing before Gaudí's masterpiece, I was overwhelmed by the intricate details and the way light danced through the stained glass windows. It's a place where spirituality and artistry converge in the most beautiful way.\n\nWandering through Park Güell felt like exploring a fairy tale. The colorful mosaics and organic shapes created by Gaudí made me see the world through an artist's eyes. Every corner revealed a new perspective, a new way of understanding the harmony between nature and human creativity.\n\nThe food scene in Barcelona exceeded all my expectations. From the bustling La Boquería Market with its explosion of colors and aromas, to the intimate tapas bars hidden in narrow alleyways, every meal was an adventure. The locals' passion for their cuisine was infectious, and I found myself trying dishes I never would have considered before.\n\nAs I reflect on this journey, I realize that Barcelona didn't just show me beautiful sights – it changed the way I see beauty itself. The city taught me that art isn't confined to museums; it lives in the streets, in the people, in the very rhythm of daily life.`,
-                    memories: memories,
-                    generatedAt: new Date().toISOString(),
-                    wordCount: 234
-                });
+            if (data.success) {
+                setTravelStory(data.data);
             }
         } catch (error) {
             console.error('Story generation error:', error);
-            // Generate mock story
-            setTravelStory({
-                story: `My journey through Barcelona has been nothing short of magical. From the moment I stepped into the Gothic Quarter, I was transported into a world where medieval architecture meets modern vibrant life.\n\nThe highlight of my trip was undoubtedly visiting the Sagrada Família. Standing before Gaudí's masterpiece, I was overwhelmed by the intricate details and the way light danced through the stained glass windows. It's a place where spirituality and artistry converge in the most beautiful way.\n\nWandering through Park Güell felt like exploring a fairy tale. The colorful mosaics and organic shapes created by Gaudí made me see the world through an artist's eyes. Every corner revealed a new perspective, a new way of understanding the harmony between nature and human creativity.\n\nThe food scene in Barcelona exceeded all my expectations. From the bustling La Boquería Market with its explosion of colors and aromas, to the intimate tapas bars hidden in narrow alleyways, every meal was an adventure. The locals' passion for their cuisine was infectious, and I found myself trying dishes I never would have considered before.\n\nAs I reflect on this journey, I realize that Barcelona didn't just show me beautiful sights – it changed the way I see beauty itself. The city taught me that art isn't confined to museums; it lives in the streets, in the people, in the very rhythm of daily life.`,
-                memories: memories,
-                generatedAt: new Date().toISOString(),
-                wordCount: 234
-            });
         } finally {
             setLoadingStory(false);
         }
@@ -1575,44 +1534,15 @@ const MemoryMode = ({ user, token, memories, setMemories, trips, dashboardData, 
                     body: submitData
                 });
 
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.success) {
-                        setMemories(prev => [data.data, ...prev]);
-                        setShowCreateMemory(false);
-                        sendChatMessage(`I just created a new memory: ${formData.title}. Can you help me reflect on this experience?`);
-                    }
-                } else {
-                    // Create memory anyway for demo
-                    const newMemory = {
-                        id: Date.now(),
-                        title: formData.title,
-                        description: formData.description,
-                        rating: formData.rating,
-                        memory_type: formData.type,
-                        memory_date: new Date().toISOString(),
-                        tags: formData.tags,
-                        photos: photos.map(photo => ({ url: URL.createObjectURL(photo), name: photo.name }))
-                    };
-                    setMemories(prev => [newMemory, ...prev]);
+                const data = await response.json();
+
+                if (data.success) {
+                    setMemories(prev => [data.data, ...prev]);
                     setShowCreateMemory(false);
                     sendChatMessage(`I just created a new memory: ${formData.title}. Can you help me reflect on this experience?`);
                 }
             } catch (error) {
                 console.error('Memory creation error:', error);
-                // Create memory anyway for demo
-                const newMemory = {
-                    id: Date.now(),
-                    title: formData.title,
-                    description: formData.description,
-                    rating: formData.rating,
-                    memory_type: formData.type,
-                    memory_date: new Date().toISOString(),
-                    tags: formData.tags,
-                    photos: photos.map(photo => ({ url: URL.createObjectURL(photo), name: photo.name }))
-                };
-                setMemories(prev => [newMemory, ...prev]);
-                setShowCreateMemory(false);
             } finally {
                 setLoading(false);
             }
@@ -1628,7 +1558,7 @@ const MemoryMode = ({ user, token, memories, setMemories, trips, dashboardData, 
                                 onClick={() => setShowCreateMemory(false)}
                                 className="text-gray-400 hover:text-gray-600"
                             >
-                                <X className="w-6 h-6" />
+                                ✕
                             </button>
                         </div>
 
@@ -1819,7 +1749,7 @@ const MemoryMode = ({ user, token, memories, setMemories, trips, dashboardData, 
                                     <div className="flex items-center justify-between">
                                         <div>
                                             <p className="text-blue-100 text-sm">Total Trips</p>
-                                            <p className="text-3xl font-bold">{displayData.trips?.total_trips || 0}</p>
+                                            <p className="text-3xl font-bold">{dashboardData?.trips?.total_trips || 0}</p>
                                         </div>
                                         <Plane className="w-8 h-8 text-blue-200" />
                                     </div>
@@ -1829,7 +1759,7 @@ const MemoryMode = ({ user, token, memories, setMemories, trips, dashboardData, 
                                     <div className="flex items-center justify-between">
                                         <div>
                                             <p className="text-green-100 text-sm">Memories</p>
-                                            <p className="text-3xl font-bold">{displayData.memories?.total_memories || 0}</p>
+                                            <p className="text-3xl font-bold">{dashboardData?.memories?.total_memories || memories.length}</p>
                                         </div>
                                         <Camera className="w-8 h-8 text-green-200" />
                                     </div>
@@ -1839,7 +1769,7 @@ const MemoryMode = ({ user, token, memories, setMemories, trips, dashboardData, 
                                     <div className="flex items-center justify-between">
                                         <div>
                                             <p className="text-purple-100 text-sm">Avg Rating</p>
-                                            <p className="text-3xl font-bold">{displayData.memories?.avg_rating?.toFixed(1) || '0.0'}</p>
+                                            <p className="text-3xl font-bold">{dashboardData?.memories?.avg_rating?.toFixed(1) || '4.8'}</p>
                                         </div>
                                         <Star className="w-8 h-8 text-purple-200" />
                                     </div>
@@ -1849,7 +1779,7 @@ const MemoryMode = ({ user, token, memories, setMemories, trips, dashboardData, 
                                     <div className="flex items-center justify-between">
                                         <div>
                                             <p className="text-orange-100 text-sm">Active Days</p>
-                                            <p className="text-3xl font-bold">{displayData.memories?.active_days || 0}</p>
+                                            <p className="text-3xl font-bold">{dashboardData?.memories?.active_days || '12'}</p>
                                         </div>
                                         <Clock className="w-8 h-8 text-orange-200" />
                                     </div>
@@ -1860,7 +1790,7 @@ const MemoryMode = ({ user, token, memories, setMemories, trips, dashboardData, 
                             <div>
                                 <h3 className="text-lg font-semibold mb-4">Recent Activity</h3>
                                 <div className="space-y-3">
-                                    {displayData.recentActivity?.slice(0, 5).map((activity, index) => (
+                                    {dashboardData?.recentActivity?.slice(0, 5).map((activity, index) => (
                                         <div key={index} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
                                             <div className={`w-2 h-2 rounded-full ${activity.type === 'memory' ? 'bg-green-500' : 'bg-blue-500'}`}></div>
                                             <div className="flex-1">
@@ -1872,8 +1802,8 @@ const MemoryMode = ({ user, token, memories, setMemories, trips, dashboardData, 
                                             <span className={`text-xs px-2 py-1 rounded-full ${
                                                 activity.type === 'memory' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
                                             }`}>
-                                                {activity.type}
-                                            </span>
+                        {activity.type}
+                      </span>
                                         </div>
                                     )) || (
                                         <p className="text-gray-500">No recent activity</p>
@@ -1883,20 +1813,7 @@ const MemoryMode = ({ user, token, memories, setMemories, trips, dashboardData, 
                         </div>
                     )}
 
-                    {/* Continue with other tabs in Part 5... */}
-
-                </div>
-            </div>
-
-            {showCreateMemory && <CreateMemoryModal />}
-        </div>
-    );
-};
-// ===================================
-// App.jsx - Part 5: Memory Mode Tabs and Chat Components (Fixed)
-// ===================================
-
-{/* Memories Tab */}
+                    {/* Memories Tab */}
                     {activeTab === 'memories' && (
                         <div>
                             <div className="flex items-center justify-between mb-6">
@@ -1917,7 +1834,7 @@ const MemoryMode = ({ user, token, memories, setMemories, trips, dashboardData, 
                                     </select>
                                 </div>
                             </div>
-                    
+
                             {memories.length > 0 ? (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                     {memories.map(memory => (
@@ -1931,7 +1848,7 @@ const MemoryMode = ({ user, token, memories, setMemories, trips, dashboardData, 
                                                     />
                                                 </div>
                                             )}
-                    
+
                                             <div className="p-4">
                                                 <div className="flex items-start justify-between mb-2">
                                                     <h4 className="font-semibold text-gray-900">{memory.title}</h4>
@@ -1942,20 +1859,20 @@ const MemoryMode = ({ user, token, memories, setMemories, trips, dashboardData, 
                                                         </div>
                                                     )}
                                                 </div>
-                    
+
                                                 <p className="text-gray-600 text-sm mb-3 line-clamp-2">{memory.description}</p>
-                    
+
                                                 <div className="flex items-center justify-between text-xs text-gray-500">
-                                                    <span>{new Date(memory.memory_date).toLocaleDateString()}</span>
-                                                    <span className="bg-gray-100 px-2 py-1 rounded">{memory.memory_type}</span>
+                                                    <span>{new Date(memory.memory_date || memory.created_at).toLocaleDateString()}</span>
+                                                    <span className="bg-gray-100 px-2 py-1 rounded">{memory.memory_type || memory.type}</span>
                                                 </div>
-                    
+
                                                 {memory.tags && memory.tags.length > 0 && (
                                                     <div className="flex flex-wrap gap-1 mt-2">
                                                         {memory.tags.slice(0, 3).map((tag, index) => (
                                                             <span key={index} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                                                                                    {tag}
-                                                                                </span>
+                                {tag}
+                              </span>
                                                         ))}
                                                     </div>
                                                 )}
@@ -1978,7 +1895,7 @@ const MemoryMode = ({ user, token, memories, setMemories, trips, dashboardData, 
                             )}
                         </div>
                     )}
-                    
+
                     {/* Travel Story Tab */}
                     {activeTab === 'story' && (
                         <div>
@@ -2008,7 +1925,7 @@ const MemoryMode = ({ user, token, memories, setMemories, trips, dashboardData, 
                                     </button>
                                 </div>
                             </div>
-                    
+
                             {travelStory ? (
                                 <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-lg p-8">
                                     <div className="prose max-w-none">
@@ -2020,11 +1937,11 @@ const MemoryMode = ({ user, token, memories, setMemories, trips, dashboardData, 
                                                 <span>Generated {new Date(travelStory.generatedAt).toLocaleDateString()}</span>
                                             </div>
                                         </div>
-                    
+
                                         <div className="text-gray-800 leading-relaxed whitespace-pre-wrap">
                                             {travelStory.story}
                                         </div>
-                    
+
                                         <div className="mt-8 flex space-x-3">
                                             <button
                                                 onClick={() => sendChatMessage("Help me improve this travel story")}
@@ -2039,14 +1956,10 @@ const MemoryMode = ({ user, token, memories, setMemories, trips, dashboardData, 
                                                 Social Media Version
                                             </button>
                                             <button
-                                                onClick={() => {
-                                                    if (navigator.share) {
-                                                        navigator.share({
-                                                            title: 'My Travel Story',
-                                                            text: travelStory.story
-                                                        });
-                                                    }
-                                                }}
+                                                onClick={() => navigator.share && navigator.share({
+                                                    title: 'My Travel Story',
+                                                    text: travelStory.story
+                                                })}
                                                 className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700"
                                             >
                                                 Share Story
@@ -2075,7 +1988,7 @@ const MemoryMode = ({ user, token, memories, setMemories, trips, dashboardData, 
                     {activeTab === 'insights' && (
                         <div>
                             <h3 className="text-lg font-semibold mb-6">Travel Insights & Recommendations</h3>
-                    
+
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                 {/* Travel Patterns */}
                                 <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg p-6">
@@ -2103,72 +2016,79 @@ const MemoryMode = ({ user, token, memories, setMemories, trips, dashboardData, 
                                     </div>
                                 </div>
 
-            {/* Recommendations */}
-            <div className="bg-gradient-to-br from-green-50 to-blue-50 rounded-lg p-6">
-                <h4 className="font-semibold text-gray-900 mb-4 flex items-center">
-                    <Globe className="w-5 h-5 mr-2 text-green-600" />
-                    Next Destination Ideas
-                </h4>
-                <div className="space-y-3">
-                    {[
-                        { destination: 'Iceland', reason: 'Perfect for your love of nature and photography', match: '95%' },
-                        { destination: 'Morocco', reason: 'Great cultural experiences and food', match: '88%' },
-                        { destination: 'New Zealand', reason: 'Adventure activities and stunning landscapes', match: '82%' }
-                    ].map((rec, index) => (
-                        <div key={index} className="border border-gray-200 rounded-lg p-4">
-                            <div className="flex items-center justify-between mb-2">
-                                <h5 className="font-medium text-gray-900">{rec.destination}</h5>
-                                <span className="text-sm bg-green-100 text-green-700 px-2 py-1 rounded">
-                                                        {rec.match} match
-                                                    </span>
+                                {/* Recommendations */}
+                                <div className="bg-gradient-to-br from-green-50 to-blue-50 rounded-lg p-6">
+                                    <h4 className="font-semibold text-gray-900 mb-4 flex items-center">
+                                        <Globe className="w-5 h-5 mr-2 text-green-600" />
+                                        Next Destination Ideas
+                                    </h4>
+                                    <div className="space-y-3">
+                                        {[
+                                            { destination: 'Iceland', reason: 'Perfect for your love of nature and photography', match: '95%' },
+                                            { destination: 'Morocco', reason: 'Great cultural experiences and food', match: '88%' },
+                                            { destination: 'New Zealand', reason: 'Adventure activities and stunning landscapes', match: '82%' }
+                                        ].map((rec, index) => (
+                                            <div key={index} className="border border-gray-200 rounded-lg p-4">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <h5 className="font-medium text-gray-900">{rec.destination}</h5>
+                                                    <span className="text-sm bg-green-100 text-green-700 px-2 py-1 rounded">
+                            {rec.match} match
+                          </span>
+                                                </div>
+                                                <p className="text-sm text-gray-600">{rec.reason}</p>
+                                                <button
+                                                    onClick={() => sendChatMessage(`Tell me more about traveling to ${rec.destination}`)}
+                                                    className="mt-2 text-sm text-blue-600 hover:text-blue-700"
+                                                >
+                                                    Learn more →
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
-                            <p className="text-sm text-gray-600">{rec.reason}</p>
-                            <button
-                                onClick={() => sendChatMessage(`Tell me more about traveling to ${rec.destination}`)}
-                                className="mt-2 text-sm text-blue-600 hover:text-blue-700"
-                            >
-                                Learn more →
-                            </button>
+
+                            {/* AI Insights */}
+                            <div className="mt-8 bg-white border border-gray-200 rounded-lg p-6">
+                                <h4 className="font-semibold text-gray-900 mb-4">AI Travel Personality Analysis</h4>
+                                <div className="prose max-w-none text-gray-700">
+                                    <p>
+                                        Based on your travel memories and preferences, you're a <strong>Cultural Explorer</strong> who enjoys
+                                        immersive experiences that blend local culture, history, and cuisine. You tend to prefer moderate
+                                        budgets with occasional splurges on unique experiences, and you value authentic connections with
+                                        local communities.
+                                    </p>
+                                    <p>
+                                        Your travel style suggests you'd enjoy destinations with rich cultural heritage, diverse food scenes,
+                                        and opportunities for both structured activities and spontaneous exploration. Consider adding more
+                                        off-the-beaten-path destinations to your future plans.
+                                    </p>
+                                </div>
+
+                                <div className="mt-4 flex space-x-3">
+                                    <button
+                                        onClick={() => sendChatMessage("Analyze my travel personality and give me personalized recommendations")}
+                                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                                    >
+                                        Deep Dive Analysis
+                                    </button>
+                                    <button
+                                        onClick={() => sendChatMessage("What destinations would be perfect for my travel style?")}
+                                        className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
+                                    >
+                                        Get Recommendations
+                                    </button>
+                                </div>
+                            </div>
                         </div>
-                    ))}
+                    )}
                 </div>
             </div>
-        </div>
 
-        {/* AI Insights */}
-        <div className="mt-8 bg-white border border-gray-200 rounded-lg p-6">
-            <h4 className="font-semibold text-gray-900 mb-4">AI Travel Personality Analysis</h4>
-            <div className="prose max-w-none text-gray-700">
-                <p>
-                    Based on your travel memories and preferences, you're a <strong>Cultural Explorer</strong> who enjoys
-                    immersive experiences that blend local culture, history, and cuisine. You tend to prefer moderate
-                    budgets with occasional splurges on unique experiences, and you value authentic connections with
-                    local communities.
-                </p>
-                <p>
-                    Your travel style suggests you'd enjoy destinations with rich cultural heritage, diverse food scenes,
-                    and opportunities for both structured activities and spontaneous exploration. Consider adding more
-                    off-the-beaten-path destinations to your future plans.
-                </p>
-            </div>
-
-            <div className="mt-4 flex space-x-3">
-                <button
-                    onClick={() => sendChatMessage("Analyze my travel personality and give me personalized recommendations")}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-                >
-                    Deep Dive Analysis
-                </button>
-                <button
-                    onClick={() => sendChatMessage("What destinations would be perfect for my travel style?")}
-                    className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
-                >
-                    Get Recommendations
-                </button>
-            </div>
+            {showCreateMemory && <CreateMemoryModal />}
         </div>
-    </div>
-)}
+    );
+};
 
 // ===================================
 // AI CHAT COMPONENT

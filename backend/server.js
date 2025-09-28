@@ -892,6 +892,8 @@ async function startServer() {
         // Initialize database connection
         await database.initialize();
 
+        await database.createTables();
+
         // Initialize Redis connection
         await redis.initialize();
 

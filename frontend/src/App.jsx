@@ -142,34 +142,89 @@ const useLocation = () => {
 // SOCKET.IO HOOK
 // ===================================
 const useSocket = (token) => {
-    const [socket, setSocket] = useState(null);
-    const [connected, setConnected] = useState(false);
+  const [socket, setSocket] = useState(null);
+  const [connected, setConnected] = useState(false);
 
-    useEffect(() => {
-        if (token) {
-            const newSocket = io(WS_URL, {
-                auth: { token }
-            });
+  useEffect(() => {
+    if (token) {
+      // Determine the correct backend URL
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
+      const WS_URL = API_BASE_URL.replace('/api', ''); // Remove /api suffix for socket connection
+      
+      console.log('Connecting to Socket.IO at:', WS_URL);
 
-            newSocket.on('connect', () => {
-                setConnected(true);
-                console.log('Socket connected');
-            });
+      const newSocket = io(WS_URL, {
+        auth: { token },
+        transports: ['websocket', 'polling'], // Try websocket first, fallback to polling
+        withCredentials: true,
+        forceNew: true,
+        timeout: 20000,
+        // Additional options for better connectivity
+        autoConnect: true,
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionAttempts: 5,
+        maxReconnectionAttempts: 5
+      });
 
-            newSocket.on('disconnect', () => {
-                setConnected(false);
-                console.log('Socket disconnected');
-            });
+      // Enhanced event listeners
+      newSocket.on('connect', () => {
+        setConnected(true);
+        console.log('✅ Socket connected successfully');
+        console.log('Socket ID:', newSocket.id);
+      });
 
-            setSocket(newSocket);
+      newSocket.on('disconnect', (reason) => {
+        setConnected(false);
+        console.log('❌ Socket disconnected:', reason);
+      });
 
-            return () => {
-                newSocket.close();
-            };
+      newSocket.on('connect_error', (error) => {
+        setConnected(false);
+        console.error('🔴 Socket connection error:', error);
+        
+        // Provide helpful error messages
+        if (error.message.includes('CORS')) {
+          console.error('CORS Error: Check backend CORS configuration');
+        } else if (error.message.includes('timeout')) {
+          console.error('Timeout Error: Backend might be slow to respond');
+        } else if (error.message.includes('403')) {
+          console.error('Auth Error: Check JWT token');
         }
-    }, [token]);
+      });
 
-    return { socket, connected };
+      newSocket.on('reconnect', (attemptNumber) => {
+        console.log(`🔄 Socket reconnected after ${attemptNumber} attempts`);
+        setConnected(true);
+      });
+
+      newSocket.on('reconnect_error', (error) => {
+        console.error('🔴 Socket reconnection error:', error);
+      });
+
+      newSocket.on('ai_response', (data) => {
+        setChatMessages(prev => [...prev, {
+          type: 'ai',
+          content: data.success ? data.data.message : data.fallback,
+          timestamp: new Date(),
+          model: data.data?.model
+        }]);
+      });
+
+      newSocket.on('location_context', (data) => {
+        setNearbyPlaces(data.nearbyRecommendations || []);
+      });
+
+      setSocket(newSocket);
+
+      return () => {
+        console.log('🔌 Cleaning up socket connection');
+        newSocket.close();
+      };
+    }
+  }, [token]);
+
+  return { socket, connected };
 };
 
 // ===================================
@@ -2272,3 +2327,4 @@ const FloatingChatButton = ({ onClick }) => {
 };
 
 export default App;
+

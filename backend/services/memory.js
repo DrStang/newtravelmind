@@ -7,10 +7,10 @@ class MemoryService {
             await database.initialize();
 
             const result = await database.pool.query(`
-        INSERT INTO memories (user_id, trip_id, memory_type, title, description, location, 
-                             photos, notes, rating, tags, memory_date, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
-      `, [
+                INSERT INTO memories (user_id, trip_id, memory_type, title, description, location, 
+                                     photos, notes, rating, tags, memory_date, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            `, [
                 userId,
                 memoryData.tripId || null,
                 memoryData.type || 'experience',
@@ -38,11 +38,11 @@ class MemoryService {
             await database.initialize();
 
             let query = `
-        SELECT m.*, t.title as trip_title, t.destination 
-        FROM memories m 
-        LEFT JOIN trips t ON m.trip_id = t.id 
-        WHERE m.user_id = ?
-      `;
+                SELECT m.*, t.title as trip_title, t.destination 
+                FROM memories m 
+                LEFT JOIN trips t ON m.trip_id = t.id 
+                WHERE m.user_id = ?
+            `;
             let params = [userId];
 
             if (filters.tripId) {
@@ -132,37 +132,37 @@ Length: 300-500 words.`;
             await database.initialize();
 
             const [stats] = await database.pool.query(`
-        SELECT 
-          COUNT(*) as total_memories,
-          COUNT(DISTINCT trip_id) as total_trips,
-          AVG(rating) as average_rating,
-          MIN(memory_date) as first_memory,
-          MAX(memory_date) as latest_memory
-        FROM memories 
-        WHERE user_id = ? AND rating IS NOT NULL
-      `, [userId]);
+                SELECT 
+                  COUNT(*) as total_memories,
+                  COUNT(DISTINCT trip_id) as total_trips,
+                  AVG(rating) as average_rating,
+                  MIN(memory_date) as first_memory,
+                  MAX(memory_date) as latest_memory
+                FROM memories 
+                WHERE user_id = ? AND rating IS NOT NULL
+            `, [userId]);
 
             const topDestinations = await database.pool.query(`
-        SELECT 
-          JSON_UNQUOTE(JSON_EXTRACT(location, '$.name')) as destination,
-          COUNT(*) as visit_count
-        FROM memories 
-        WHERE user_id = ? AND JSON_EXTRACT(location, '$.name') IS NOT NULL
-        GROUP BY destination
-        ORDER BY visit_count DESC
-        LIMIT 5
-      `, [userId]);
+                SELECT 
+                  JSON_UNQUOTE(JSON_EXTRACT(location, '$.name')) as destination,
+                  COUNT(*) as visit_count
+                FROM memories 
+                WHERE user_id = ? AND JSON_EXTRACT(location, '$.name') IS NOT NULL
+                GROUP BY destination
+                ORDER BY visit_count DESC
+                LIMIT 5
+            `, [userId]);
 
             const activityBreakdown = await database.pool.query(`
-        SELECT 
-          memory_type,
-          COUNT(*) as count,
-          AVG(rating) as avg_rating
-        FROM memories 
-        WHERE user_id = ?
-        GROUP BY memory_type
-        ORDER BY count DESC
-      `, [userId]);
+                SELECT 
+                  memory_type,
+                  COUNT(*) as count,
+                  AVG(rating) as avg_rating
+                FROM memories 
+                WHERE user_id = ?
+                GROUP BY memory_type
+                ORDER BY count DESC
+            `, [userId]);
 
             await database.close();
 
@@ -177,56 +177,70 @@ Length: 300-500 words.`;
             throw error;
         }
     }
+
+    static async saveConversation(userId, userMessage, aiResponse, context, model, responseTime) {
+        try {
+            const database = new DatabaseService();
+            await database.initialize();
+
+            await database.pool.query(`
+                INSERT INTO ai_conversations (user_id, user_message, ai_response, context, model_used, response_time_ms, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, NOW())
+            `, [userId, userMessage, aiResponse, JSON.stringify(context), model, responseTime]);
+
+            await database.close();
+        } catch (error) {
+            console.error('Save conversation error:', error);
+            throw error;
+        }
+    }
+
+    static async saveUserLocation(userId, latitude, longitude, accuracy) {
+        try {
+            const database = new DatabaseService();
+            await database.initialize();
+
+            await database.pool.query(`
+                INSERT INTO user_locations (user_id, latitude, longitude, accuracy, created_at)
+                VALUES (?, ?, ?, ?, NOW())
+            `, [userId, latitude, longitude, accuracy]);
+
+            await database.close();
+        } catch (error) {
+            console.error('Save user location error:', error);
+            throw error;
+        }
+    }
+
+    static async createTrip(userId, tripData) {
+        try {
+            const database = new DatabaseService();
+            await database.initialize();
+
+            const result = await database.pool.query(`
+                INSERT INTO trips (user_id, title, destination, start_date, end_date, duration, budget, 
+                                  travel_style, interests, itinerary, status, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'planning', NOW())
+            `, [
+                userId,
+                tripData.title,
+                tripData.destination,
+                tripData.startDate || null,
+                tripData.endDate || null,
+                tripData.duration || null,
+                tripData.budget || null,
+                tripData.travelStyle || 'moderate',
+                JSON.stringify(tripData.interests || []),
+                JSON.stringify(tripData.itinerary)
+            ]);
+
+            await database.close();
+            return result.insertId;
+        } catch (error) {
+            console.error('Create trip error:', error);
+            throw error;
+        }
+    }
 }
 
 module.exports = { MemoryService };
-} catch (error) {
-    console.error('Create user error:', error);
-    throw error;
-}
-}
-
-async saveConversation(userId, userMessage, aiResponse, context, model, responseTime) {
-    try {
-        await this.pool.query(`
-        INSERT INTO ai_conversations (user_id, user_message, ai_response, context, model_used, response_time_ms, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, NOW())
-      `, [userId, userMessage, aiResponse, JSON.stringify(context), model, responseTime]);
-    } catch (error) {
-        console.error('Save conversation error:', error);
-        throw error;
-    }
-}
-
-async saveUserLocation(userId, latitude, longitude, accuracy) {
-    try {
-        await this.pool.query(`
-        INSERT INTO user_locations (user_id, latitude, longitude, accuracy, created_at)
-        VALUES (?, ?, ?, ?, NOW())
-      `, [userId, latitude, longitude, accuracy]);
-    } catch (error) {
-        console.error('Save user location error:', error);
-        throw error;
-    }
-}
-
-async createTrip(userId, tripData) {
-    try {
-        const result = await this.pool.query(`
-        INSERT INTO trips (user_id, title, destination, start_date, end_date, duration, budget, 
-                          travel_style, interests, itinerary, status, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'planning', NOW())
-      `, [
-            userId,
-            tripData.title,
-            tripData.destination,
-            tripData.startDate || null,
-            tripData.endDate || null,
-            tripData.duration || null,
-            tripData.budget || null,
-            tripData.travelStyle || 'moderate',
-            JSON.stringify(tripData.interests || []),
-            JSON.stringify(tripData.itinerary)
-        ]);
-
-        return result.insertId;

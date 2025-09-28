@@ -12,9 +12,8 @@
 
   "env": {
     "VITE_API_BASE_URL": "https://newtravelmind-production.up.railway.app/api",
-    "VITE_WS_URL": "https://newtravelmind-production.up.railway.app/",
-    "VITE_GOOGLE_MAPS_API_KEY": "AIzaSyD4Og6nF9GaRBW_7RIcdz7BNG4P82eF30Q"
-  },
+    "VITE_WS_URL": "https://newtravelmind-production.up.railway.app/"  },
+  
   "rewrites": [
     {
       "source": "/api/(.*)",

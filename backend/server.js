@@ -50,10 +50,53 @@ app.use(helmet({
     },
 }));
 
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://newtravelmind.vercel.app',
+  'https://travelmind.ai', // Add your custom domain if you have one
+  // Add any other Vercel preview URLs you might have
+];
+
+// Enhanced CORS configuration
 app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-    credentials: true
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Check if the origin is in the allowed list
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    // Allow Vercel preview deployments
+    if (origin && origin.includes('.vercel.app')) {
+      return callback(null, true);
+    }
+    
+    // Allow Railway internal URLs
+    if (origin && origin.includes('.railway.app')) {
+      return callback(null, true);
+    }
+    
+    // Otherwise, reject
+    const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+    return callback(new Error(msg), false);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  optionsSuccessStatus: 200 // For legacy browser support
 }));
+
+// Handle preflight requests explicitly
+app.options('*', (req, res) => {
+  res.header('Access-Control-Allow-Origin', req.headers.origin);
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.sendStatus(200);
+});
+
 
 app.use(compression());
 app.use(morgan('combined'));
@@ -132,11 +175,30 @@ const authenticateToken = async (req, res, next) => {
 // ===================================
 
 const io = new Server(httpServer, {
-    cors: {
-        origin: process.env.FRONTEND_URL || "http://localhost:3000",
-        methods: ["GET", "POST"]
-    }
+  cors: {
+    origin: function (origin, callback) {
+      // Same logic as Express CORS
+      if (!origin) return callback(null, true);
+      
+      if (allowedOrigins.includes(origin) || 
+          (origin && origin.includes('.vercel.app')) || 
+          (origin && origin.includes('.railway.app'))) {
+        return callback(null, true);
+      }
+      
+      return callback(new Error('Not allowed by CORS'), false);
+    },
+    credentials: true,
+    methods: ["GET", "POST"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  },
+  // Additional Socket.IO configuration for production
+  transports: ['websocket', 'polling'],
+  allowEIO3: true,
+  pingTimeout: 60000,
+  pingInterval: 25000
 });
+
 
 io.use(async (socket, next) => {
     try {
@@ -942,3 +1004,4 @@ process.on('SIGTERM', async () => {
 startServer();
 
 module.exports = app;
+

@@ -23,67 +23,68 @@ class DatabaseService {
             console.error('❌ Database initialization failed:', error);
             throw error;
         }
-    }async createTables() {
+    }
+    async createTables() {
         try {
             await this.pool.query(`
-            CREATE TABLE IF NOT EXISTS users (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                email VARCHAR(255) UNIQUE NOT NULL,
-                password_hash VARCHAR(255) NOT NULL,
-                name VARCHAR(255),
-                preferences JSON,
-                travel_style VARCHAR(50) DEFAULT 'moderate',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                CREATE TABLE IF NOT EXISTS users (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    email VARCHAR(255) UNIQUE NOT NULL,
+                    password_hash VARCHAR(255) NOT NULL,
+                    name VARCHAR(255),
+                    preferences JSON,
+                    travel_style VARCHAR(50) DEFAULT 'moderate',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
             )
         `);
 
             await this.pool.query(`
-            CREATE TABLE IF NOT EXISTS trips (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                user_id INT NOT NULL,
-                title VARCHAR(255) NOT NULL,
-                destination VARCHAR(255) NOT NULL,
-                start_date DATE,
-                end_date DATE,
-                duration INT,
-                budget DECIMAL(10,2),
-                travel_style VARCHAR(50),
-                interests JSON,
-                itinerary JSON,
-                status ENUM('planning', 'active', 'completed') DEFAULT 'planning',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id)
+                CREATE TABLE IF NOT EXISTS trips (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    user_id INT NOT NULL,
+                    title VARCHAR(255) NOT NULL,
+                    destination VARCHAR(255) NOT NULL,
+                    start_date DATE,
+                    end_date DATE,
+                    duration INT,
+                    budget DECIMAL(10,2),
+                    travel_style VARCHAR(50),
+                    interests JSON,
+                    itinerary JSON,
+                    status ENUM('planning', 'active', 'completed') DEFAULT 'planning',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id)
             )
         `);
 
             await this.pool.query(`
-            CREATE TABLE IF NOT EXISTS memories (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                user_id INT NOT NULL,
-                trip_id INT,
-                title VARCHAR(255) NOT NULL,
-                description TEXT,
-                memory_type ENUM('experience', 'photo', 'note', 'recommendation') DEFAULT 'experience',
-                rating INT CHECK (rating >= 1 AND rating <= 5),
-                tags JSON,
-                photos JSON,
-                memory_date DATE,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id),
-                FOREIGN KEY (trip_id) REFERENCES trips(id)
+                CREATE TABLE IF NOT EXISTS memories (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    user_id INT NOT NULL,
+                    trip_id INT,
+                    title VARCHAR(255) NOT NULL,
+                    description TEXT,
+                    memory_type ENUM('experience', 'photo', 'note', 'recommendation') DEFAULT 'experience',
+                    rating INT CHECK (rating >= 1 AND rating <= 5),
+                    tags JSON,
+                    photos JSON,
+                    memory_date DATE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id),
+                    FOREIGN KEY (trip_id) REFERENCES trips(id)
             )
         `);
 
             await this.pool.query(`
-            CREATE TABLE IF NOT EXISTS analytics_events (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                user_id INT NOT NULL,
-                event_type VARCHAR(100) NOT NULL,
-                event_data JSON,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id)
+                CREATE TABLE IF NOT EXISTS analytics_events (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    user_id INT NOT NULL,
+                    event_type VARCHAR(100) NOT NULL,
+                    event_data JSON,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id)
             )
         `);
 

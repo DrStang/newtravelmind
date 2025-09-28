@@ -1897,211 +1897,211 @@ const MemoryMode = ({ user, token, memories, setMemories, trips, dashboardData, 
 // ===================================
 
 {/* Memories Tab */}
-{activeTab === 'memories' && (
-    <div>
-        <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold">Your Travel Memories</h3>
-            <div className="flex space-x-2">
-                <select className="px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                    <option>All Types</option>
-                    <option>Experience</option>
-                    <option>Photo</option>
-                    <option>Note</option>
-                    <option>Recommendation</option>
-                </select>
-                <select className="px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                    <option>All Trips</option>
-                    {trips.map(trip => (
-                        <option key={trip.id} value={trip.id}>{trip.title}</option>
-                    ))}
-                </select>
-            </div>
-        </div>
-
-        {memories.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {memories.map(memory => (
-                    <div key={memory.id} className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow">
-                        {memory.photos && memory.photos.length > 0 && (
-                            <div className="aspect-video bg-gray-200">
-                                <img
-                                    src={memory.photos[0].url}
-                                    alt={memory.title}
-                                    className="w-full h-full object-cover"
-                                />
+                    {activeTab === 'memories' && (
+                        <div>
+                            <div className="flex items-center justify-between mb-6">
+                                <h3 className="text-lg font-semibold">Your Travel Memories</h3>
+                                <div className="flex space-x-2">
+                                    <select className="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                                        <option>All Types</option>
+                                        <option>Experience</option>
+                                        <option>Photo</option>
+                                        <option>Note</option>
+                                        <option>Recommendation</option>
+                                    </select>
+                                    <select className="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                                        <option>All Trips</option>
+                                        {trips.map(trip => (
+                                            <option key={trip.id} value={trip.id}>{trip.title}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
-                        )}
-
-                        <div className="p-4">
-                            <div className="flex items-start justify-between mb-2">
-                                <h4 className="font-semibold text-gray-900">{memory.title}</h4>
-                                {memory.rating && (
-                                    <div className="flex items-center space-x-1">
-                                        <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                                        <span className="text-sm text-gray-600">{memory.rating}</span>
-                                    </div>
-                                )}
-                            </div>
-
-                            <p className="text-gray-600 text-sm mb-3 line-clamp-2">{memory.description}</p>
-
-                            <div className="flex items-center justify-between text-xs text-gray-500">
-                                <span>{new Date(memory.memory_date).toLocaleDateString()}</span>
-                                <span className="bg-gray-100 px-2 py-1 rounded">{memory.memory_type}</span>
-                            </div>
-
-                            {memory.tags && memory.tags.length > 0 && (
-                                <div className="flex flex-wrap gap-1 mt-2">
-                                    {memory.tags.slice(0, 3).map((tag, index) => (
-                                        <span key={index} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                                                                {tag}
-                                                            </span>
+                    
+                            {memories.length > 0 ? (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {memories.map(memory => (
+                                        <div key={memory.id} className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow">
+                                            {memory.photos && memory.photos.length > 0 && (
+                                                <div className="aspect-video bg-gray-200">
+                                                    <img
+                                                        src={memory.photos[0].url}
+                                                        alt={memory.title}
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                </div>
+                                            )}
+                    
+                                            <div className="p-4">
+                                                <div className="flex items-start justify-between mb-2">
+                                                    <h4 className="font-semibold text-gray-900">{memory.title}</h4>
+                                                    {memory.rating && (
+                                                        <div className="flex items-center space-x-1">
+                                                            <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                                                            <span className="text-sm text-gray-600">{memory.rating}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                    
+                                                <p className="text-gray-600 text-sm mb-3 line-clamp-2">{memory.description}</p>
+                    
+                                                <div className="flex items-center justify-between text-xs text-gray-500">
+                                                    <span>{new Date(memory.memory_date).toLocaleDateString()}</span>
+                                                    <span className="bg-gray-100 px-2 py-1 rounded">{memory.memory_type}</span>
+                                                </div>
+                    
+                                                {memory.tags && memory.tags.length > 0 && (
+                                                    <div className="flex flex-wrap gap-1 mt-2">
+                                                        {memory.tags.slice(0, 3).map((tag, index) => (
+                                                            <span key={index} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                                                                                    {tag}
+                                                                                </span>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
                                     ))}
+                                </div>
+                            ) : (
+                                <div className="text-center py-12">
+                                    <Camera className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                                    <h3 className="text-lg font-medium text-gray-900 mb-2">No memories yet</h3>
+                                    <p className="text-gray-500 mb-4">Start capturing your travel experiences!</p>
+                                    <button
+                                        onClick={() => setShowCreateMemory(true)}
+                                        className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+                                    >
+                                        Create First Memory
+                                    </button>
                                 </div>
                             )}
                         </div>
-                    </div>
-                ))}
-            </div>
-        ) : (
-            <div className="text-center py-12">
-                <Camera className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No memories yet</h3>
-                <p className="text-gray-500 mb-4">Start capturing your travel experiences!</p>
-                <button
-                    onClick={() => setShowCreateMemory(true)}
-                    className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
-                >
-                    Create First Memory
-                </button>
-            </div>
-        )}
-    </div>
-)}
-
-{/* Travel Story Tab */}
-{activeTab === 'story' && (
-    <div>
-        <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold">AI-Generated Travel Story</h3>
-            <div className="flex space-x-2">
-                <select
-                    onChange={(e) => generateTravelStory(e.target.value || null)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                >
-                    <option value="">All trips</option>
-                    {trips.map(trip => (
-                        <option key={trip.id} value={trip.id}>{trip.title}</option>
-                    ))}
-                </select>
-                <button
-                    onClick={() => generateTravelStory()}
-                    disabled={loadingStory}
-                    className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center space-x-2"
-                >
-                    {loadingStory ? (
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    ) : (
-                        <Book className="w-4 h-4" />
                     )}
-                    <span>{loadingStory ? 'Generating...' : 'Generate Story'}</span>
-                </button>
-            </div>
-        </div>
-
-        {travelStory ? (
-            <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-lg p-8">
-                <div className="prose max-w-none">
-                    <div className="mb-6">
-                        <h4 className="text-xl font-bold text-gray-900 mb-2">Your Travel Journey</h4>
-                        <div className="flex items-center space-x-4 text-sm text-gray-600">
-                            <span>{travelStory.memories?.length || 0} memories</span>
-                            <span>{travelStory.wordCount} words</span>
-                            <span>Generated {new Date(travelStory.generatedAt).toLocaleDateString()}</span>
+                    
+                    {/* Travel Story Tab */}
+                    {activeTab === 'story' && (
+                        <div>
+                            <div className="flex items-center justify-between mb-6">
+                                <h3 className="text-lg font-semibold">AI-Generated Travel Story</h3>
+                                <div className="flex space-x-2">
+                                    <select
+                                        onChange={(e) => generateTravelStory(e.target.value || null)}
+                                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                    >
+                                        <option value="">All trips</option>
+                                        {trips.map(trip => (
+                                            <option key={trip.id} value={trip.id}>{trip.title}</option>
+                                        ))}
+                                    </select>
+                                    <button
+                                        onClick={() => generateTravelStory()}
+                                        disabled={loadingStory}
+                                        className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center space-x-2"
+                                    >
+                                        {loadingStory ? (
+                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                        ) : (
+                                            <Book className="w-4 h-4" />
+                                        )}
+                                        <span>{loadingStory ? 'Generating...' : 'Generate Story'}</span>
+                                    </button>
+                                </div>
+                            </div>
+                    
+                            {travelStory ? (
+                                <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-lg p-8">
+                                    <div className="prose max-w-none">
+                                        <div className="mb-6">
+                                            <h4 className="text-xl font-bold text-gray-900 mb-2">Your Travel Journey</h4>
+                                            <div className="flex items-center space-x-4 text-sm text-gray-600">
+                                                <span>{travelStory.memories?.length || 0} memories</span>
+                                                <span>{travelStory.wordCount} words</span>
+                                                <span>Generated {new Date(travelStory.generatedAt).toLocaleDateString()}</span>
+                                            </div>
+                                        </div>
+                    
+                                        <div className="text-gray-800 leading-relaxed whitespace-pre-wrap">
+                                            {travelStory.story}
+                                        </div>
+                    
+                                        <div className="mt-8 flex space-x-3">
+                                            <button
+                                                onClick={() => sendChatMessage("Help me improve this travel story")}
+                                                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                                            >
+                                                Improve Story
+                                            </button>
+                                            <button
+                                                onClick={() => sendChatMessage("Create a shorter version of this story for social media")}
+                                                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
+                                            >
+                                                Social Media Version
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    if (navigator.share) {
+                                                        navigator.share({
+                                                            title: 'My Travel Story',
+                                                            text: travelStory.story
+                                                        });
+                                                    }
+                                                }}
+                                                className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700"
+                                            >
+                                                Share Story
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="text-center py-12">
+                                    <Book className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                                    <h3 className="text-lg font-medium text-gray-900 mb-2">No travel story yet</h3>
+                                    <p className="text-gray-500 mb-4">Generate an AI-powered narrative of your travels!</p>
+                                    <button
+                                        onClick={() => generateTravelStory()}
+                                        disabled={loadingStory || memories.length === 0}
+                                        className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                                    >
+                                        Generate Travel Story
+                                    </button>
+                                </div>
+                            )}
                         </div>
-                    </div>
+                    )}
 
-                    <div className="text-gray-800 leading-relaxed whitespace-pre-wrap">
-                        {travelStory.story}
-                    </div>
-
-                    <div className="mt-8 flex space-x-3">
-                        <button
-                            onClick={() => sendChatMessage("Help me improve this travel story")}
-                            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-                        >
-                            Improve Story
-                        </button>
-                        <button
-                            onClick={() => sendChatMessage("Create a shorter version of this story for social media")}
-                            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
-                        >
-                            Social Media Version
-                        </button>
-                        <button
-                            onClick={() => {
-                                if (navigator.share) {
-                                    navigator.share({
-                                        title: 'My Travel Story',
-                                        text: travelStory.story
-                                    });
-                                }
-                            }}
-                            className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700"
-                        >
-                            Share Story
-                        </button>
-                    </div>
-                </div>
-            </div>
-        ) : (
-            <div className="text-center py-12">
-                <Book className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No travel story yet</h3>
-                <p className="text-gray-500 mb-4">Generate an AI-powered narrative of your travels!</p>
-                <button
-                    onClick={() => generateTravelStory()}
-                    disabled={loadingStory || memories.length === 0}
-                    className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 disabled:opacity-50"
-                >
-                    Generate Travel Story
-                </button>
-            </div>
-        )}
-    </div>
-)}
-
-{/* Insights Tab */}
-{activeTab === 'insights' && (
-    <div>
-        <h3 className="text-lg font-semibold mb-6">Travel Insights & Recommendations</h3>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Travel Patterns */}
-            <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg p-6">
-                <h4 className="font-semibold text-gray-900 mb-4 flex items-center">
-                    <TrendingUp className="w-5 h-5 mr-2 text-blue-600" />
-                    Travel Patterns
-                </h4>
-                <div className="space-y-4">
-                    <div>
-                        <p className="text-sm text-gray-600">Preferred Season</p>
-                        <p className="font-medium">Summer (60% of trips)</p>
-                    </div>
-                    <div>
-                        <p className="text-sm text-gray-600">Favorite Activity Type</p>
-                        <p className="font-medium">Cultural Experiences</p>
-                    </div>
-                    <div>
-                        <p className="text-sm text-gray-600">Average Trip Duration</p>
-                        <p className="font-medium">7 days</p>
-                    </div>
-                    <div>
-                        <p className="text-sm text-gray-600">Budget Range</p>
-                        <p className="font-medium">$1,000 - $2,500</p>
-                    </div>
-                </div>
-            </div>
+                    {/* Insights Tab */}
+                    {activeTab === 'insights' && (
+                        <div>
+                            <h3 className="text-lg font-semibold mb-6">Travel Insights & Recommendations</h3>
+                    
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                {/* Travel Patterns */}
+                                <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg p-6">
+                                    <h4 className="font-semibold text-gray-900 mb-4 flex items-center">
+                                        <TrendingUp className="w-5 h-5 mr-2 text-blue-600" />
+                                        Travel Patterns
+                                    </h4>
+                                    <div className="space-y-4">
+                                        <div>
+                                            <p className="text-sm text-gray-600">Preferred Season</p>
+                                            <p className="font-medium">Summer (60% of trips)</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-sm text-gray-600">Favorite Activity Type</p>
+                                            <p className="font-medium">Cultural Experiences</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-sm text-gray-600">Average Trip Duration</p>
+                                            <p className="font-medium">7 days</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-sm text-gray-600">Budget Range</p>
+                                            <p className="font-medium">$1,000 - $2,500</p>
+                                        </div>
+                                    </div>
+                                </div>
 
             {/* Recommendations */}
             <div className="bg-gradient-to-br from-green-50 to-blue-50 rounded-lg p-6">

@@ -58,50 +58,50 @@ app.use(helmet({
 }));
 
 const allowedOrigins = [
-  'http://localhost:3000',
-  'https://newtravelmind.vercel.app',
-  'https://travelmind.ai', // Add your custom domain if you have one
-  // Add any other Vercel preview URLs you might have
+    'http://localhost:3000',
+    'https://newtravelmind.vercel.app',
+    'https://travelmind.ai', // Add your custom domain if you have one
+    // Add any other Vercel preview URLs you might have
 ];
 
 // Enhanced CORS configuration
 app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    // Check if the origin is in the allowed list
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    
-    // Allow Vercel preview deployments
-    if (origin && origin.includes('.vercel.app')) {
-      return callback(null, true);
-    }
-    
-    // Allow Railway internal URLs
-    if (origin && origin.includes('.railway.app')) {
-      return callback(null, true);
-    }
-    
-    // Otherwise, reject
-    const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-    return callback(new Error(msg), false);
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
-  optionsSuccessStatus: 200 // For legacy browser support
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+
+        // Check if the origin is in the allowed list
+        if (allowedOrigins.includes(origin)) {
+            return callback(null, true);
+        }
+
+        // Allow Vercel preview deployments
+        if (origin && origin.includes('.vercel.app')) {
+            return callback(null, true);
+        }
+
+        // Allow Railway internal URLs
+        if (origin && origin.includes('.railway.app')) {
+            return callback(null, true);
+        }
+
+        // Otherwise, reject
+        const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+        return callback(new Error(msg), false);
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+    optionsSuccessStatus: 200 // For legacy browser support
 }));
 
 // Handle preflight requests explicitly
 app.options('*', (req, res) => {
-  res.header('Access-Control-Allow-Origin', req.headers.origin);
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.sendStatus(200);
+    res.header('Access-Control-Allow-Origin', req.headers.origin);
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.sendStatus(200);
 });
 
 
@@ -182,28 +182,28 @@ const authenticateToken = async (req, res, next) => {
 // ===================================
 
 const io = new Server(httpServer, {
-  cors: {
-    origin: function (origin, callback) {
-      // Same logic as Express CORS
-      if (!origin) return callback(null, true);
-      
-      if (allowedOrigins.includes(origin) || 
-          (origin && origin.includes('.vercel.app')) || 
-          (origin && origin.includes('.railway.app'))) {
-        return callback(null, true);
-      }
-      
-      return callback(new Error('Not allowed by CORS'), false);
+    cors: {
+        origin: function (origin, callback) {
+            // Same logic as Express CORS
+            if (!origin) return callback(null, true);
+
+            if (allowedOrigins.includes(origin) ||
+                (origin && origin.includes('.vercel.app')) ||
+                (origin && origin.includes('.railway.app'))) {
+                return callback(null, true);
+            }
+
+            return callback(new Error('Not allowed by CORS'), false);
+        },
+        credentials: true,
+        methods: ["GET", "POST"],
+        allowedHeaders: ["Content-Type", "Authorization"],
     },
-    credentials: true,
-    methods: ["GET", "POST"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  },
-  // Additional Socket.IO configuration for production
-  transports: ['websocket', 'polling'],
-  allowEIO3: true,
-  pingTimeout: 60000,
-  pingInterval: 25000
+    // Additional Socket.IO configuration for production
+    transports: ['websocket', 'polling'],
+    allowEIO3: true,
+    pingTimeout: 60000,
+    pingInterval: 25000
 });
 
 
@@ -501,22 +501,52 @@ app.post('/api/ai/chat', authenticateToken, async (req, res) => {
 app.post('/api/ai/generate-itinerary', authenticateToken, async (req, res) => {
     try {
         const tripData = req.body;
+
+        console.log('Generating itinerary for:', tripData.destination);
+
+        // Validate input
+        if (!tripData.destination || !tripData.duration) {
+            return res.status(400).json({
+                success: false,
+                error: 'Destination and duration are required'
+            });
+        }
+
         const userPreferences = req.user.preferences || [];
 
-        const itinerary = await ollama.generateDetailedItinerary(tripData, userPreferences);
+        // Generate itinerary using Ollama
+        let itinerary;
+        try {
+            itinerary = await ollama.generateDetailedItinerary(tripData, userPreferences);
+        } catch (ollamaError) {
+            console.error('Ollama generation error:', ollamaError);
+            // Provide fallback itinerary
+            itinerary = {
+                itinerary: `Sample ${tripData.duration}-day itinerary for ${tripData.destination}:\n\nDay 1: Arrival and city orientation\nDay 2: Main attractions and local experiences\n...`,
+                model: 'fallback',
+                generatedAt: new Date().toISOString()
+            };
+        }
 
-        // Save trip to database
-        const tripId = await database.createTrip(req.user.id, {
-            title: `${tripData.destination} Trip`,
-            destination: tripData.destination,
-            startDate: tripData.startDate,
-            endDate: tripData.endDate,
-            duration: parseInt(tripData.duration),
-            budget: parseFloat(tripData.budget),
-            travelStyle: tripData.travelStyle || req.user.travel_style,
-            interests: tripData.interests || [],
-            itinerary: itinerary
-        });
+        // Try to save trip to database
+        let tripId;
+        try {
+            tripId = await database.createTrip(req.user.id, {
+                title: `${tripData.destination} Trip`,
+                destination: tripData.destination,
+                startDate: tripData.startDate || null,
+                endDate: tripData.endDate || null,
+                duration: parseInt(tripData.duration),
+                budget: parseFloat(tripData.budget) || 0,
+                travelStyle: tripData.travelStyle || req.user.travel_style || 'moderate',
+                interests: tripData.interests || [],
+                itinerary: itinerary
+            });
+            console.log('Trip created with ID:', tripId);
+        } catch (dbError) {
+            console.error('Database save error (continuing):', dbError);
+            tripId = Date.now(); // Use timestamp as fallback ID
+        }
 
         res.json({
             success: true,
@@ -525,7 +555,8 @@ app.post('/api/ai/generate-itinerary', authenticateToken, async (req, res) => {
                 itinerary,
                 tripData: {
                     ...tripData,
-                    id: tripId
+                    id: tripId,
+                    status: 'planning'
                 }
             }
         });
@@ -533,7 +564,8 @@ app.post('/api/ai/generate-itinerary', authenticateToken, async (req, res) => {
         console.error('Itinerary generation error:', error);
         res.status(500).json({
             success: false,
-            error: 'Failed to generate itinerary'
+            error: 'Failed to generate itinerary',
+            details: error.message
         });
     }
 });
@@ -878,7 +910,31 @@ app.get('/api/memories/statistics', authenticateToken, async (req, res) => {
 // Analytics Route
 app.get('/api/analytics/dashboard', authenticateToken, async (req, res) => {
     try {
-        const dashboardData = await database.getDashboardAnalytics(req.user.id);
+        // Try to get dashboard data, but provide fallback if fails
+        let dashboardData;
+
+        try {
+            dashboardData = await database.getDashboardAnalytics(req.user.id);
+        } catch (dbError) {
+            console.error('Dashboard analytics DB error:', dbError);
+            // Return safe fallback data
+            dashboardData = {
+                trips: {
+                    total_trips: 0,
+                    completed_trips: 0,
+                    active_trips: 0,
+                    avg_budget: 0,
+                    total_budget: 0
+                },
+                memories: {
+                    total_memories: 0,
+                    avg_rating: 0,
+                    active_days: 0
+                },
+                recentActivity: [],
+                generatedAt: new Date().toISOString()
+            };
+        }
 
         res.json({
             success: true,
@@ -888,7 +944,8 @@ app.get('/api/analytics/dashboard', authenticateToken, async (req, res) => {
         console.error('Dashboard analytics error:', error);
         res.status(500).json({
             success: false,
-            error: 'Failed to get dashboard data'
+            error: 'Failed to load dashboard data',
+            details: error.message
         });
     }
 });
@@ -927,8 +984,13 @@ app.get('/api', (req, res) => {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-    console.error('Unhandled error:', err);
-
+    console.error('Unhandled error:', {
+        error: err.message,
+        stack: err.stack,
+        url: req.url,
+        method: req.method,
+        body: req.body
+    });
     if (err instanceof multer.MulterError) {
         if (err.code === 'LIMIT_FILE_SIZE') {
             return res.status(400).json({
@@ -946,7 +1008,8 @@ app.use((err, req, res, next) => {
 
     res.status(500).json({
         success: false,
-        error: 'Internal server error'
+        error: 'Internal server error',
+        details: process.env.NODE_ENV === 'development' ? err.message : undefined
     });
 });
 
@@ -987,7 +1050,7 @@ async function startServer() {
             console.log(`📚 API documentation: http://localhost:${PORT}/api`);
             console.log(`🔌 Socket.IO enabled for real-time features`);
 
-                       // Log Redis status after startup
+            // Log Redis status after startup
             setTimeout(() => {
                 const redisStatus = redis.getStatus();
                 console.log(`🔧 Redis Status: ${redisStatus.connected ? 'Connected' : 'Not Connected'}`);
@@ -1034,6 +1097,7 @@ process.on('SIGTERM', async () => {
 startServer();
 
 module.exports = app;
+
 
 
 

@@ -35,6 +35,13 @@ const amadeus = new AmadeusService();
 const database = new DatabaseService();
 const redis = new RedisService();
 
+console.log('🔍 Environment Debug:');
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('PORT:', process.env.PORT);
+console.log('FRONTEND_URL:', process.env.FRONTEND_URL);
+console.log('REDIS_URL:', process.env.REDIS_URL ? 'SET' : 'NOT SET');
+console.log('DATABASE_URL:', process.env.DATABASE_URL ? 'SET' : 'NOT SET');
+
 // ===================================
 // MIDDLEWARE SETUP
 // ===================================
@@ -317,19 +324,28 @@ app.get('/health', async (req, res) => {
         const redisStatus = await redis.testConnection();
         const ollamaStatus = await ollama.healthCheck();
 
-        res.json({
+        const health = {
             status: 'healthy',
             timestamp: new Date().toISOString(),
             version: '2.0.0',
             services: {
                 database: dbStatus ? 'connected' : 'disconnected',
-                redis: redisStatus ? 'connected' : 'disconnected',
-                ollama: ollamaStatus ? 'connected' : 'disconnected',
+                redis: redisStatus ? 'connected' : 'disconnected (optional)',
                 googleMaps: !!process.env.GOOGLE_MAPS_API_KEY,
                 amadeus: !!(process.env.AMADEUS_API_KEY && process.env.AMADEUS_API_SECRET)
+            },
+            redis_info: redis.getStatus(),
+            environment: {
+                node_env: process.env.NODE_ENV,
+                port: PORT,
+                redis_configured: !!(process.env.REDIS_URL || process.env.REDIS_HOST)
             }
-        });
+        };
+
+        // Return 200 even if Redis is down (it's optional)
+        res.status(200).json(health);
     } catch (error) {
+        console.error('Health check error:', error);
         res.status(503).json({
             status: 'unhealthy',
             error: error.message,
@@ -948,6 +964,8 @@ app.use('*', (req, res) => {
 
 async function startServer() {
     try {
+        console.log('🚀 Starting TravelMind.ai Server...');
+
         // Create uploads directory
         await fs.mkdir('uploads', { recursive: true });
 
@@ -957,18 +975,23 @@ async function startServer() {
         await database.createTables();
 
         // Initialize Redis connection
-        try {
-            await redis.initialize();
-        } catch (redisError) {
-            console.warn('⚠️  Redis initialization failed, continuing without cache:', redisError.message);
-        }
+        console.log('🔄 Initializing Redis cache...');
+        redis.initialize().catch(err => {
+            console.warn('⚠️  Redis initialization failed (non-blocking):', err.message);
+        });
 
         // Start server
-        httpServer.listen(PORT, () => {
+        httpServer.listen(PORT, '0.0.0.0', () => {
             console.log(`🚀 TravelMind.ai API Server running on port ${PORT}`);
             console.log(`📊 Health check: http://localhost:${PORT}/health`);
             console.log(`📚 API documentation: http://localhost:${PORT}/api`);
             console.log(`🔌 Socket.IO enabled for real-time features`);
+
+                       // Log Redis status after startup
+            setTimeout(() => {
+                const redisStatus = redis.getStatus();
+                console.log(`🔧 Redis Status: ${redisStatus.connected ? 'Connected' : 'Not Connected'}`);
+            }, 2000);
 
             console.log('\n🎯 Available Features:');
             console.log('  ✅ Multi-model AI (Chat, Planning, Translation, Analysis)');
@@ -980,9 +1003,12 @@ async function startServer() {
             console.log('  ✅ Socket.IO real-time communication');
             console.log('  ✅ Redis caching');
             console.log('  ✅ MariaDB database with full schema');
+            console.log(`  ${redis.isAvailable() ? '✅' : '⚠️ '} Redis caching ${redis.isAvailable() ? '' : '(disabled)'}`);
+
         });
     } catch (error) {
         console.error('❌ Server startup failed:', error);
+        console.error('Stack trace:', error.stack);
         process.exit(1);
     }
 }
@@ -1008,5 +1034,6 @@ process.on('SIGTERM', async () => {
 startServer();
 
 module.exports = app;
+
 
 

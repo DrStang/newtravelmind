@@ -141,90 +141,73 @@ const useLocation = () => {
 // ===================================
 // SOCKET.IO HOOK
 // ===================================
-const useSocket = (token) => {
-  const [socket, setSocket] = useState(null);
-  const [connected, setConnected] = useState(false);
+const useSocket = (token, setChatMessages, setNearbyPlaces) => {
+    const [socket, setSocket] = useState(null);
+    const [connected, setConnected] = useState(false);
 
-  useEffect(() => {
-    if (token) {
-      // Determine the correct backend URL
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
-      const WS_URL = API_BASE_URL.replace('/api', ''); // Remove /api suffix for socket connection
-      
-      console.log('Connecting to Socket.IO at:', WS_URL);
+    useEffect(() => {
+        if (token) {
+            const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
+            const WS_URL = API_BASE_URL.replace('/api', '');
 
-      const newSocket = io(WS_URL, {
-        auth: { token },
-        transports: ['websocket', 'polling'], // Try websocket first, fallback to polling
-        withCredentials: true,
-        forceNew: true,
-        timeout: 20000,
-        // Additional options for better connectivity
-        autoConnect: true,
-        reconnection: true,
-        reconnectionDelay: 1000,
-        reconnectionAttempts: 5,
-        maxReconnectionAttempts: 5
-      });
+            console.log('Connecting to Socket.IO at:', WS_URL);
 
-      // Enhanced event listeners
-      newSocket.on('connect', () => {
-        setConnected(true);
-        console.log('✅ Socket connected successfully');
-        console.log('Socket ID:', newSocket.id);
-      });
+            const newSocket = io(WS_URL, {
+                auth: { token },
+                transports: ['websocket', 'polling'],
+                withCredentials: true,
+                forceNew: true,
+                timeout: 20000,
+                autoConnect: true,
+                reconnection: true,
+                reconnectionDelay: 1000,
+                reconnectionAttempts: 5
+            });
 
-      newSocket.on('disconnect', (reason) => {
-        setConnected(false);
-        console.log('❌ Socket disconnected:', reason);
-      });
+            newSocket.on('connect', () => {
+                setConnected(true);
+                console.log('✅ Socket connected successfully');
+                console.log('Socket ID:', newSocket.id);
+            });
 
-      newSocket.on('connect_error', (error) => {
-        setConnected(false);
-        console.error('🔴 Socket connection error:', error);
-        
-        // Provide helpful error messages
-        if (error.message.includes('CORS')) {
-          console.error('CORS Error: Check backend CORS configuration');
-        } else if (error.message.includes('timeout')) {
-          console.error('Timeout Error: Backend might be slow to respond');
-        } else if (error.message.includes('403')) {
-          console.error('Auth Error: Check JWT token');
+            newSocket.on('disconnect', (reason) => {
+                setConnected(false);
+                console.log('❌ Socket disconnected:', reason);
+            });
+
+            newSocket.on('connect_error', (error) => {
+                setConnected(false);
+                console.error('🔴 Socket connection error:', error);
+            });
+
+            // Fixed: Now using the passed setChatMessages function
+            newSocket.on('ai_response', (data) => {
+                if (setChatMessages) {
+                    setChatMessages(prev => [...prev, {
+                        type: 'ai',
+                        content: data.success ? data.data.message : data.fallback,
+                        timestamp: new Date(),
+                        model: data.data?.model
+                    }]);
+                }
+            });
+
+            newSocket.on('location_context', (data) => {
+                if (setNearbyPlaces) {
+                    setNearbyPlaces(data.nearbyRecommendations || []);
+                }
+            });
+
+            setSocket(newSocket);
+
+            return () => {
+                console.log('🔌 Cleaning up socket connection');
+                newSocket.close();
+            };
         }
-      });
+    }, [token, setChatMessages, setNearbyPlaces]);
 
-      newSocket.on('reconnect', (attemptNumber) => {
-        console.log(`🔄 Socket reconnected after ${attemptNumber} attempts`);
-        setConnected(true);
-      });
-
-      newSocket.on('reconnect_error', (error) => {
-        console.error('🔴 Socket reconnection error:', error);
-      });
-
-      newSocket.on('ai_response', (data) => {
-        setChatMessages(prev => [...prev, {
-          type: 'ai',
-          content: data.success ? data.data.message : data.fallback,
-          timestamp: new Date(),
-          model: data.data?.model
-        }]);
-      });
-
-      newSocket.on('location_context', (data) => {
-        setNearbyPlaces(data.nearbyRecommendations || []);
-      });
-
-      setSocket(newSocket);
-
-      return () => {
-        console.log('🔌 Cleaning up socket connection');
-        newSocket.close();
-      };
-    }
-  }, [token]);
-
-  return { socket, connected };
+    return { socket, connected };
 };
 
 // ===================================
@@ -233,7 +216,7 @@ const useSocket = (token) => {
 const App = () => {
     const { user, token, loading, login, register, logout } = useAuth();
     const { location, weather, updateLocation } = useLocation();
-    const { socket, connected } = useSocket(token);
+    const { socket, connected } = useSocket(token, setChatMessages, setNearbyPlaces);
 
     const [currentMode, setCurrentMode] = useState('planning');
     const [chatOpen, setChatOpen] = useState(false);
@@ -379,7 +362,7 @@ const App = () => {
 
         setChatMessages(prev => [...prev, userMessage]);
 
-        if (socket) {
+        if (socket && connected) {
             socket.emit('ai_chat', {
                 message,
                 context: {
@@ -391,15 +374,16 @@ const App = () => {
                 }
             });
         } else {
-            // Mock AI response for demo
+            console.warn('Socket not connected, cannot send message');
+            // Add error message to chat
             setTimeout(() => {
                 setChatMessages(prev => [...prev, {
                     type: 'ai',
-                    content: `I understand you're asking about "${message}". I'd be happy to help with your travel needs!`,
+                    content: 'Connection not available. Please check your internet connection and try again.',
                     timestamp: new Date(),
-                    model: 'demo'
+                    error: true
                 }]);
-            }, 1000);
+            }, 500);
         }
     };
 
@@ -881,236 +865,236 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                                 {isCreating ? 'Cancel' : 'New Trip'}
                             </button>
                         </div>
-                            {isCreating && (
-                                    <form onSubmit={handleCreateTrip} className="space-y-6">
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                    Destination
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    required
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                                    value={formData.destination}
-                                                    onChange={(e) => setFormData(prev => ({ ...prev, destination: e.target.value }))}
-                                                    placeholder="e.g., Tokyo, Japan"
-                                                />
-                                            </div>
+                        {isCreating && (
+                            <form onSubmit={handleCreateTrip} className="space-y-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Destination
+                                        </label>
+                                        <input
+                                            type="text"
+                                            required
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                            value={formData.destination}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, destination: e.target.value }))}
+                                            placeholder="e.g., Tokyo, Japan"
+                                        />
+                                    </div>
 
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                    Duration (days)
-                                                </label>
-                                                <input
-                                                    type="number"
-                                                    required
-                                                    min="1"
-                                                    max="365"
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                                    value={formData.duration}
-                                                    onChange={(e) => setFormData(prev => ({ ...prev, duration: e.target.value }))}
-                                                    placeholder="7"
-                                                />
-                                            </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Duration (days)
+                                        </label>
+                                        <input
+                                            type="number"
+                                            required
+                                            min="1"
+                                            max="365"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                            value={formData.duration}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, duration: e.target.value }))}
+                                            placeholder="7"
+                                        />
+                                    </div>
 
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                    Budget ($)
-                                                </label>
-                                                <input
-                                                    type="number"
-                                                    min="0"
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                                    value={formData.budget}
-                                                    onChange={(e) => setFormData(prev => ({ ...prev, budget: e.target.value }))}
-                                                    placeholder="2000"
-                                                />
-                                            </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Budget ($)
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                            value={formData.budget}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, budget: e.target.value }))}
+                                            placeholder="2000"
+                                        />
+                                    </div>
 
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                    Travel Style
-                                                </label>
-                                                <select
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                                    value={formData.travelStyle}
-                                                    onChange={(e) => setFormData(prev => ({ ...prev, travelStyle: e.target.value }))}
-                                                >
-                                                    <option value="budget">Budget</option>
-                                                    <option value="moderate">Moderate</option>
-                                                    <option value="luxury">Luxury</option>
-                                                </select>
-                                            </div>
-
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                    Start Date
-                                                </label>
-                                                <input
-                                                    type="date"
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                                    value={formData.startDate}
-                                                    onChange={(e) => setFormData(prev => ({ ...prev, startDate: e.target.value }))}
-                                                />
-                                            </div>
-
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                    End Date
-                                                </label>
-                                                <input
-                                                    type="date"
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                                    value={formData.endDate}
-                                                    onChange={(e) => setFormData(prev => ({ ...prev, endDate: e.target.value }))}
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-3">
-                                                Interests
-                                            </label>
-                                            <div className="flex flex-wrap gap-2">
-                                                {interestOptions.map(interest => (
-                                                    <button
-                                                        key={interest}
-                                                        type="button"
-                                                        onClick={() => toggleInterest(interest)}
-                                                        className={`px-3 py-1 rounded-full text-sm transition-colors ${
-                                                            formData.interests.includes(interest)
-                                                                ? 'bg-blue-600 text-white'
-                                                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                                        }`}
-                                                    >
-                                                        {interest}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        <button
-                                            type="submit"
-                                            disabled={loading || !formData.destination || !formData.duration}
-                                            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Travel Style
+                                        </label>
+                                        <select
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                            value={formData.travelStyle}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, travelStyle: e.target.value }))}
                                         >
-                                            {loading ? (
-                                                <>
-                                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                                                    Generating AI Itinerary...
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Zap className="w-5 h-5 mr-2" />
-                                                    Generate AI Itinerary
-                                                </>
-                                            )}
-                                        </button>
-                                    </form>
-                                )}
+                                            <option value="budget">Budget</option>
+                                            <option value="moderate">Moderate</option>
+                                            <option value="luxury">Luxury</option>
+                                        </select>
+                                    </div>
 
-                                {/* Recent Trips */}
-                                {!isCreating && (
-                                    <div className="space-y-4">
-                                        <h4 className="text-lg font-semibold text-gray-900">Your Recent Trips</h4>
-                                        {trips.length > 0 ? trips.slice(0, 3).map(trip => (
-                                            <div key={trip.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                                                <div className="flex items-start justify-between">
-                                                    <div className="flex-1">
-                                                        <h5 className="font-semibold text-gray-900">{trip.title}</h5>
-                                                        <p className="text-gray-600 text-sm">{trip.destination}</p>
-                                                        <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
-                                                            <span>{trip.duration} days</span>
-                                                            {trip.budget && <span>${trip.budget}</span>}
-                                                            <span className={`px-2 py-1 rounded-full ${
-                                                                trip.status === 'active' ? 'bg-green-100 text-green-700' :
-                                                                    trip.status === 'completed' ? 'bg-blue-100 text-blue-700' :
-                                                                        'bg-gray-100 text-gray-700'
-                                                            }`}>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Start Date
+                                        </label>
+                                        <input
+                                            type="date"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                            value={formData.startDate}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, startDate: e.target.value }))}
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            End Date
+                                        </label>
+                                        <input
+                                            type="date"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                            value={formData.endDate}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, endDate: e.target.value }))}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                                        Interests
+                                    </label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {interestOptions.map(interest => (
+                                            <button
+                                                key={interest}
+                                                type="button"
+                                                onClick={() => toggleInterest(interest)}
+                                                className={`px-3 py-1 rounded-full text-sm transition-colors ${
+                                                    formData.interests.includes(interest)
+                                                        ? 'bg-blue-600 text-white'
+                                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                }`}
+                                            >
+                                                {interest}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    disabled={loading || !formData.destination || !formData.duration}
+                                    className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                                >
+                                    {loading ? (
+                                        <>
+                                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                                            Generating AI Itinerary...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Zap className="w-5 h-5 mr-2" />
+                                            Generate AI Itinerary
+                                        </>
+                                    )}
+                                </button>
+                            </form>
+                        )}
+
+                        {/* Recent Trips */}
+                        {!isCreating && (
+                            <div className="space-y-4">
+                                <h4 className="text-lg font-semibold text-gray-900">Your Recent Trips</h4>
+                                {trips.length > 0 ? trips.slice(0, 3).map(trip => (
+                                    <div key={trip.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                                        <div className="flex items-start justify-between">
+                                            <div className="flex-1">
+                                                <h5 className="font-semibold text-gray-900">{trip.title}</h5>
+                                                <p className="text-gray-600 text-sm">{trip.destination}</p>
+                                                <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
+                                                    <span>{trip.duration} days</span>
+                                                    {trip.budget && <span>${trip.budget}</span>}
+                                                    <span className={`px-2 py-1 rounded-full ${
+                                                        trip.status === 'active' ? 'bg-green-100 text-green-700' :
+                                                            trip.status === 'completed' ? 'bg-blue-100 text-blue-700' :
+                                                                'bg-gray-100 text-gray-700'
+                                                    }`}>
                                                         {trip.status}
                                                     </span>
-                                                        </div>
-                                                    </div>
-                                                    <button
-                                                        onClick={() => setCurrentTrip(trip)}
-                                                        className="text-blue-600 hover:text-blue-700 text-sm"
-                                                    >
-                                                        View Details
-                                                    </button>
                                                 </div>
                                             </div>
-                                        )) : (
-                                            <div className="text-center py-8 text-gray-500">
-                                                <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                                                <p>No trips yet. Create your first trip!</p>
-                                            </div>
-                                        )}
+                                            <button
+                                                onClick={() => setCurrentTrip(trip)}
+                                                className="text-blue-600 hover:text-blue-700 text-sm"
+                                            >
+                                                View Details
+                                            </button>
+                                        </div>
+                                    </div>
+                                )) : (
+                                    <div className="text-center py-8 text-gray-500">
+                                        <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                                        <p>No trips yet. Create your first trip!</p>
                                     </div>
                                 )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Quick Actions & Info */}
+                <div className="space-y-6">
+                    <div className="bg-white rounded-xl shadow-lg p-6">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+                        <div className="space-y-3">
+                            <button
+                                onClick={() => sendChatMessage("Help me plan a weekend getaway")}
+                                className="w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                            >
+                                <div className="flex items-center space-x-3">
+                                    <Calendar className="w-5 h-5 text-blue-600" />
+                                    <span>Weekend Getaway</span>
+                                </div>
+                            </button>
+
+                            <button
+                                onClick={() => sendChatMessage("Find flights for my next trip")}
+                                className="w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                            >
+                                <div className="flex items-center space-x-3">
+                                    <Plane className="w-5 h-5 text-blue-600" />
+                                    <span>Find Flights</span>
+                                </div>
+                            </button>
+
+                            <button
+                                onClick={() => sendChatMessage("Recommend hotels in my destination")}
+                                className="w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                            >
+                                <div className="flex items-center space-x-3">
+                                    <Star className="w-5 h-5 text-blue-600" />
+                                    <span>Find Hotels</span>
+                                </div>
+                            </button>
                         </div>
                     </div>
 
-                    {/* Quick Actions & Info */}
-                    <div className="space-y-6">
-                        <div className="bg-white rounded-xl shadow-lg p-6">
-                            <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-                            <div className="space-y-3">
-                                <button
-                                    onClick={() => sendChatMessage("Help me plan a weekend getaway")}
-                                    className="w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
-                                >
-                                    <div className="flex items-center space-x-3">
-                                        <Calendar className="w-5 h-5 text-blue-600" />
-                                        <span>Weekend Getaway</span>
-                                    </div>
-                                </button>
-
-                                <button
-                                    onClick={() => sendChatMessage("Find flights for my next trip")}
-                                    className="w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
-                                >
-                                    <div className="flex items-center space-x-3">
-                                        <Plane className="w-5 h-5 text-blue-600" />
-                                        <span>Find Flights</span>
-                                    </div>
-                                </button>
-
-                                <button
-                                    onClick={() => sendChatMessage("Recommend hotels in my destination")}
-                                    className="w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
-                                >
-                                    <div className="flex items-center space-x-3">
-                                        <Star className="w-5 h-5 text-blue-600" />
-                                        <span>Find Hotels</span>
-                                    </div>
-                                </button>
+                    {/* Budget Insights */}
+                    <div className="bg-white rounded-xl shadow-lg p-6">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Budget Insights</h3>
+                        <div className="space-y-3">
+                            <div className="flex justify-between items-center">
+                                <span className="text-gray-600">Average Trip Cost</span>
+                                <span className="font-semibold">$1,200</span>
                             </div>
-                        </div>
-
-                        {/* Budget Insights */}
-                        <div className="bg-white rounded-xl shadow-lg p-6">
-                            <h3 className="text-lg font-semibold text-gray-900 mb-4">Budget Insights</h3>
-                            <div className="space-y-3">
-                                <div className="flex justify-between items-center">
-                                    <span className="text-gray-600">Average Trip Cost</span>
-                                    <span className="font-semibold">$1,200</span>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-gray-600">Budget Saved</span>
-                                    <span className="font-semibold text-green-600">15%</span>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-gray-600">Best Time to Book</span>
-                                    <span className="font-semibold">6-8 weeks ahead</span>
-                                </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-gray-600">Budget Saved</span>
+                                <span className="font-semibold text-green-600">15%</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-gray-600">Best Time to Book</span>
+                                <span className="font-semibold">6-8 weeks ahead</span>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-            );
-            };
+        </div>
+    );
+};
 
 // ===================================
 // COMPANION MODE COMPONENT
@@ -2327,4 +2311,3 @@ const FloatingChatButton = ({ onClick }) => {
 };
 
 export default App;
-

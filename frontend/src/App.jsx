@@ -736,6 +736,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
 
         setLoading(true);
         try {
+            console.log('Creating trip:', formData);
             const response = await fetch(`${API_BASE_URL}/ai/generate-itinerary`, {
                 method: 'POST',
                 headers: {
@@ -745,52 +746,12 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                 body: JSON.stringify(formData)
             });
 
-            if (response.ok) {
-                const data = await response.json();
-                if (data.success) {
-                    const newTrip = {
-                        id: Date.now(),
-                        title: `${formData.destination} Trip`,
-                        destination: formData.destination,
-                        duration: parseInt(formData.duration),
-                        budget: parseFloat(formData.budget),
-                        status: 'planning',
-                        startDate: formData.startDate,
-                        endDate: formData.endDate,
-                        interests: formData.interests
-                    };
+            const data = await response.json();
+            console.log('Trip creation response:', data);
 
-                    setTrips(prev => [newTrip, ...prev]);
-                    setCurrentTrip(newTrip);
-                    setIsCreating(false);
-                    setFormData({
-                        destination: '',
-                        duration: '',
-                        budget: '',
-                        startDate: '',
-                        endDate: '',
-                        travelStyle: user?.travelStyle || 'moderate',
-                        interests: []
-                    });
-
-                    sendChatMessage(`I just created a new itinerary for ${formData.destination}! Can you give me some additional tips?`);
-                }
-            } else {
-                // Create trip anyway for demo
-                const newTrip = {
-                    id: Date.now(),
-                    title: `${formData.destination} Trip`,
-                    destination: formData.destination,
-                    duration: parseInt(formData.duration),
-                    budget: parseFloat(formData.budget),
-                    status: 'planning',
-                    startDate: formData.startDate,
-                    endDate: formData.endDate,
-                    interests: formData.interests
-                };
-
-                setTrips(prev => [newTrip, ...prev]);
-                setCurrentTrip(newTrip);
+            if (data.success) {
+                setTrips(prev => [data.data.tripData, ...prev]);
+                setCurrentTrip(data.data.tripData);
                 setIsCreating(false);
                 setFormData({
                     destination: '',
@@ -803,39 +764,17 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                 });
 
                 sendChatMessage(`I just created a new itinerary for ${formData.destination}! Can you give me some additional tips?`);
+            } else {
+                console.error('Trip creation failed:', data.error);
+                alert(`Failed to create trip: ${data.error || 'Unknown error'}`);
             }
         } catch (error) {
             console.error('Trip creation error:', error);
-            // Still create for demo
-            const newTrip = {
-                id: Date.now(),
-                title: `${formData.destination} Trip`,
-                destination: formData.destination,
-                duration: parseInt(formData.duration),
-                budget: parseFloat(formData.budget),
-                status: 'planning',
-                startDate: formData.startDate,
-                endDate: formData.endDate,
-                interests: formData.interests
-            };
-
-            setTrips(prev => [newTrip, ...prev]);
-            setCurrentTrip(newTrip);
-            setIsCreating(false);
-            setFormData({
-                destination: '',
-                duration: '',
-                budget: '',
-                startDate: '',
-                endDate: '',
-                travelStyle: user?.travelStyle || 'moderate',
-                interests: []
-            });
+            alert('Failed to create trip. Please check your connection and try again.');
         } finally {
             setLoading(false);
         }
     };
-
     const toggleInterest = (interest) => {
         setFormData(prev => ({
             ...prev,

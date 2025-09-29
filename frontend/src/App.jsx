@@ -216,7 +216,6 @@ const useSocket = (token, setChatMessages, setNearbyPlaces) => {
 const App = () => {
     const { user, token, loading, login, register, logout } = useAuth();
     const { location, weather, updateLocation } = useLocation();
-    const { socket, connected } = useSocket(token, setChatMessages, setNearbyPlaces);
 
     const [currentMode, setCurrentMode] = useState('planning');
     const [chatOpen, setChatOpen] = useState(false);
@@ -226,6 +225,8 @@ const App = () => {
     const [nearbyPlaces, setNearbyPlaces] = useState([]);
     const [currentTrip, setCurrentTrip] = useState(null);
     const [dashboardData, setDashboardData] = useState(null);
+    const { socket, connected } = useSocket(token, setChatMessages, setNearbyPlaces);
+
 
     // Load initial data when user logs in
     useEffect(() => {

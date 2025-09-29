@@ -713,8 +713,13 @@ const Header = ({ user, logout, currentMode, setCurrentMode, connected, location
 // ===================================
 // PLANNING MODE COMPONENT
 // ===================================
+// ===================================
+// FIXED PLANNING MODE COMPONENT
+// ===================================
+
 const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMessage }) => {
     const [isCreating, setIsCreating] = useState(false);
+    const [selectedTrip, setSelectedTrip] = useState(null); // For modal
     const [formData, setFormData] = useState({
         destination: '',
         duration: '',
@@ -725,6 +730,8 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
         interests: []
     });
     const [loading, setLoading] = useState(false);
+
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
 
     const interestOptions = [
         'Adventure', 'Culture', 'Food', 'History', 'Nature', 'Nightlife',
@@ -738,6 +745,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
         setLoading(true);
         try {
             console.log('Creating trip:', formData);
+
             const response = await fetch(`${API_BASE_URL}/ai/generate-itinerary`, {
                 method: 'POST',
                 headers: {
@@ -751,9 +759,16 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
             console.log('Trip creation response:', data);
 
             if (data.success) {
-                setTrips(prev => [data.data.tripData, ...prev]);
-                setCurrentTrip(data.data.tripData);
+                const newTrip = data.data.tripData;
+
+                // Add trip to state
+                setTrips(prev => [newTrip, ...prev]);
+                setCurrentTrip(newTrip);
+
+                // Close form
                 setIsCreating(false);
+
+                // Reset form
                 setFormData({
                     destination: '',
                     duration: '',
@@ -764,18 +779,23 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                     interests: []
                 });
 
+                // Send success message
                 sendChatMessage(`I just created a new itinerary for ${formData.destination}! Can you give me some additional tips?`);
+
+                // Show success notification
+                console.log('✅ Trip created successfully:', newTrip.title);
             } else {
                 console.error('Trip creation failed:', data.error);
                 alert(`Failed to create trip: ${data.error || 'Unknown error'}`);
             }
         } catch (error) {
             console.error('Trip creation error:', error);
-            alert('Failed to create trip. Please check your connection and try again.');
+            alert('Failed to create trip. Please try again.');
         } finally {
             setLoading(false);
         }
     };
+
     const toggleInterest = (interest) => {
         setFormData(prev => ({
             ...prev,
@@ -805,6 +825,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                                 {isCreating ? 'Cancel' : 'New Trip'}
                             </button>
                         </div>
+
                         {isCreating && (
                             <form onSubmit={handleCreateTrip} className="space-y-6">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -934,40 +955,78 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                             </form>
                         )}
 
-                        {/* Recent Trips */}
+                        {/* Recent Trips List */}
                         {!isCreating && (
                             <div className="space-y-4">
                                 <h4 className="text-lg font-semibold text-gray-900">Your Recent Trips</h4>
-                                {trips.length > 0 ? trips.slice(0, 3).map(trip => (
-                                    <div key={trip.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                                        <div className="flex items-start justify-between">
-                                            <div className="flex-1">
-                                                <h5 className="font-semibold text-gray-900">{trip.title}</h5>
-                                                <p className="text-gray-600 text-sm">{trip.destination}</p>
-                                                <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
-                                                    <span>{trip.duration} days</span>
-                                                    {trip.budget && <span>${trip.budget}</span>}
-                                                    <span className={`px-2 py-1 rounded-full ${
-                                                        trip.status === 'active' ? 'bg-green-100 text-green-700' :
-                                                            trip.status === 'completed' ? 'bg-blue-100 text-blue-700' :
-                                                                'bg-gray-100 text-gray-700'
-                                                    }`}>
-                                                        {trip.status}
-                                                    </span>
+                                {trips.length > 0 ? (
+                                    trips.slice(0, 5).map(trip => (
+                                        <div
+                                            key={trip.id}
+                                            className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                                        >
+                                            <div className="flex items-start justify-between">
+                                                <div className="flex-1">
+                                                    <h5 className="font-semibold text-gray-900 mb-1">{trip.title}</h5>
+                                                    <p className="text-gray-600 text-sm mb-2">{trip.destination}</p>
+
+                                                    <div className="flex items-center space-x-4 mb-3 text-xs text-gray-500">
+                            <span className="flex items-center">
+                              <Calendar className="w-3 h-3 mr-1" />
+                                {trip.duration} days
+                            </span>
+                                                        {trip.budget && (
+                                                            <span className="flex items-center">
+                                <CreditCard className="w-3 h-3 mr-1" />
+                                ${trip.budget}
+                              </span>
+                                                        )}
+                                                        <span className={`px-2 py-1 rounded-full ${
+                                                            trip.status === 'active' ? 'bg-green-100 text-green-700' :
+                                                                trip.status === 'completed' ? 'bg-blue-100 text-blue-700' :
+                                                                    'bg-gray-100 text-gray-700'
+                                                        }`}>
+                              {trip.status}
+                            </span>
+                                                    </div>
+
+                                                    {/* Itinerary Preview */}
+                                                    {trip.itinerary && trip.itinerary.itinerary && (
+                                                        <div className="bg-blue-50 rounded-lg p-3 mb-3">
+                                                            <p className="text-xs text-blue-700 font-medium mb-1">
+                                                                ✨ AI-Generated Itinerary
+                                                            </p>
+                                                            <p className="text-sm text-gray-700 line-clamp-2">
+                                                                {trip.itinerary.itinerary.substring(0, 120)}...
+                                                            </p>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Interests Tags */}
+                                                    {trip.interests && trip.interests.length > 0 && (
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {trip.interests.slice(0, 3).map((interest, idx) => (
+                                                                <span key={idx} className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">
+                                  {interest}
+                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                 </div>
+
+                                                <button
+                                                    onClick={() => setSelectedTrip(trip)}
+                                                    className="ml-4 text-blue-600 hover:text-blue-700 text-sm font-medium whitespace-nowrap"
+                                                >
+                                                    View Details →
+                                                </button>
                                             </div>
-                                            <button
-                                                onClick={() => setCurrentTrip(trip)}
-                                                className="text-blue-600 hover:text-blue-700 text-sm"
-                                            >
-                                                View Details
-                                            </button>
                                         </div>
-                                    </div>
-                                )) : (
-                                    <div className="text-center py-8 text-gray-500">
+                                    ))
+                                ) : (
+                                    <div className="text-center py-12">
                                         <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                                        <p>No trips yet. Create your first trip!</p>
+                                        <p className="text-gray-500">No trips yet. Create your first trip!</p>
                                     </div>
                                 )}
                             </div>
@@ -975,7 +1034,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                     </div>
                 </div>
 
-                {/* Quick Actions & Info */}
+                {/* Quick Actions Sidebar */}
                 <div className="space-y-6">
                     <div className="bg-white rounded-xl shadow-lg p-6">
                         <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
@@ -1012,30 +1071,146 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                         </div>
                     </div>
 
-                    {/* Budget Insights */}
                     <div className="bg-white rounded-xl shadow-lg p-6">
                         <h3 className="text-lg font-semibold text-gray-900 mb-4">Budget Insights</h3>
                         <div className="space-y-3">
                             <div className="flex justify-between items-center">
                                 <span className="text-gray-600">Average Trip Cost</span>
-                                <span className="font-semibold">$1,200</span>
+                                <span className="font-semibold">
+                  ${trips.length > 0
+                                    ? Math.round(trips.reduce((sum, t) => sum + (t.budget || 0), 0) / trips.length)
+                                    : '0'}
+                </span>
                             </div>
                             <div className="flex justify-between items-center">
-                                <span className="text-gray-600">Budget Saved</span>
-                                <span className="font-semibold text-green-600">15%</span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                                <span className="text-gray-600">Best Time to Book</span>
-                                <span className="font-semibold">6-8 weeks ahead</span>
+                                <span className="text-gray-600">Total Trips</span>
+                                <span className="font-semibold">{trips.length}</span>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
+
+            {/* Trip Details Modal */}
+            {selectedTrip && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+                        {/* Modal Header */}
+                        <div className="sticky top-0 bg-white border-b p-6 z-10">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h2 className="text-2xl font-bold text-gray-900">{selectedTrip.title}</h2>
+                                    <p className="text-gray-600">{selectedTrip.destination} • {selectedTrip.duration} days</p>
+                                </div>
+                                <button
+                                    onClick={() => setSelectedTrip(null)}
+                                    className="text-gray-400 hover:text-gray-600 p-2"
+                                >
+                                    <X className="w-6 h-6" />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Modal Content */}
+                        <div className="p-6">
+                            {/* Trip Summary */}
+                            <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-6 mb-6">
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <div>
+                                        <p className="text-sm text-gray-600">Duration</p>
+                                        <p className="font-semibold">{selectedTrip.duration} days</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-gray-600">Budget</p>
+                                        <p className="font-semibold">${selectedTrip.budget || 'Flexible'}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-gray-600">Travel Style</p>
+                                        <p className="font-semibold capitalize">{selectedTrip.travelStyle}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-gray-600">Status</p>
+                                        <p className="font-semibold capitalize">{selectedTrip.status}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* AI-Generated Itinerary */}
+                            {selectedTrip.itinerary && selectedTrip.itinerary.itinerary ? (
+                                <div className="prose max-w-none">
+                                    <h3 className="text-xl font-semibold mb-4 flex items-center">
+                                        <Zap className="w-5 h-5 text-yellow-500 mr-2" />
+                                        AI-Generated Itinerary
+                                    </h3>
+                                    <div className="whitespace-pre-wrap text-gray-800 leading-relaxed bg-gray-50 rounded-lg p-6">
+                                        {selectedTrip.itinerary.itinerary}
+                                    </div>
+
+                                    {/* Metadata */}
+                                    <div className="mt-6 pt-6 border-t text-sm text-gray-500">
+                                        <p>Generated by {selectedTrip.itinerary.model || 'AI'}</p>
+                                        <p>Created: {new Date(selectedTrip.itinerary.generatedAt).toLocaleString()}</p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="text-center py-12">
+                                    <p className="text-gray-500">No itinerary available</p>
+                                </div>
+                            )}
+
+                            {/* Action Buttons */}
+                            <div className="mt-6 flex flex-wrap gap-3">
+                                <button
+                                    onClick={() => {
+                                        sendChatMessage(`Can you give me more tips for my ${selectedTrip.destination} trip?`);
+                                        setSelectedTrip(null);
+                                    }}
+                                    className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 flex items-center justify-center"
+                                >
+                                    <MessageCircle className="w-4 h-4 mr-2" />
+                                    Ask AI for Tips
+                                </button>
+
+                                <button
+                                    onClick={() => {
+                                        if (navigator.share) {
+                                            navigator.share({
+                                                title: selectedTrip.title,
+                                                text: selectedTrip.itinerary?.itinerary || 'Check out my travel itinerary!'
+                                            });
+                                        } else {
+                                            alert('Sharing not supported on this device');
+                                        }
+                                    }}
+                                    className="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 flex items-center justify-center"
+                                >
+                                    <Star className="w-4 h-4 mr-2" />
+                                    Share
+                                </button>
+
+                                <button
+                                    onClick={() => {
+                                        const blob = new Blob([selectedTrip.itinerary?.itinerary || ''], { type: 'text/plain' });
+                                        const url = URL.createObjectURL(blob);
+                                        const a = document.createElement('a');
+                                        a.href = url;
+                                        a.download = `${selectedTrip.destination}-itinerary.txt`;
+                                        a.click();
+                                        URL.revokeObjectURL(url);
+                                    }}
+                                    className="flex-1 bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 flex items-center justify-center"
+                                >
+                                    <Calendar className="w-4 h-4 mr-2" />
+                                    Download
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
-
 // ===================================
 // COMPANION MODE COMPONENT
 // ===================================

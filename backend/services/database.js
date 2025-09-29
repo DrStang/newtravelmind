@@ -12,10 +12,15 @@ class DatabaseService {
                 port: process.env.DB_PORT || 3306,
                 user: process.env.DB_USER || 'travelmind',
                 password: process.env.DB_PASSWORD,
-                database: process.env.DB_NAME || 'travelmind',
+                database: process.env.DB_NAME || 'travelmind_db',
                 connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT) || 10,
                 acquireTimeout: 30000,
-                timeout: 30000
+                timeout: 30000,
+                // Add this to handle BigInt automatically
+                bigIntAsNumber: true, // ← This converts BigInt to Number automatically
+                // Alternative options:
+                // supportBigNumbers: true,
+                // bigNumberStrings: false
             });
 
             console.log('✅ Database connection pool initialized');
@@ -140,7 +145,27 @@ class DatabaseService {
             throw error;
         }
     }
+    convertBigIntToNumber(obj) {
+        if (obj === null || obj === undefined) return obj;
 
+        if (typeof obj === 'bigint') {
+            return Number(obj);
+        }
+
+        if (Array.isArray(obj)) {
+            return obj.map(item => this.convertBigIntToNumber(item));
+        }
+
+        if (typeof obj === 'object') {
+            const converted = {};
+            for (const key in obj) {
+                converted[key] = this.convertBigIntToNumber(obj[key]);
+            }
+            return converted;
+        }
+
+        return obj;
+    }
     async getUserTrips(userId, status = null, limit = 20) {
         try {
             let query = 'SELECT * FROM trips WHERE user_id = ?';
@@ -156,7 +181,8 @@ class DatabaseService {
 
             const trips = await this.pool.query(query, params);
 
-            return trips.map(trip => ({
+            // Convert BigInt and parse JSON
+            return trips.map(trip => this.convertBigIntToNumber({
                 ...trip,
                 interests: JSON.parse(trip.interests || '[]'),
                 itinerary: JSON.parse(trip.itinerary || '{}')
@@ -169,16 +195,20 @@ class DatabaseService {
 
     async getTripById(tripId, userId) {
         try {
-            const rows = await this.pool.query('SELECT * FROM trips WHERE id = ? AND user_id = ?', [tripId, userId]);
+            const rows = await this.pool.query(
+                'SELECT * FROM trips WHERE id = ? AND user_id = ?',
+                [tripId, userId]
+            );
             const trip = rows[0];
 
             if (!trip) return null;
 
-            return {
+            // Convert BigInt and parse JSON
+            return this.convertBigIntToNumber({
                 ...trip,
                 interests: JSON.parse(trip.interests || '[]'),
                 itinerary: JSON.parse(trip.itinerary || '{}')
-            };
+            });
         } catch (error) {
             console.error('Get trip by ID error:', error);
             throw error;
@@ -193,10 +223,10 @@ class DatabaseService {
             console.log('Creating trip for user:', userId);
 
             const result = await this.pool.query(`
-      INSERT INTO trips (user_id, title, destination, start_date, end_date, duration, budget, 
-                        travel_style, interests, itinerary, status, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'planning', NOW())
-    `, [
+                INSERT INTO trips (user_id, title, destination, start_date, end_date, duration, budget,
+                                   travel_style, interests, itinerary, status, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'planning', NOW())
+            `, [
                 userId,
                 tripData.title,
                 tripData.destination,
@@ -209,13 +239,17 @@ class DatabaseService {
                 JSON.stringify(tripData.itinerary)
             ]);
 
-            console.log('Trip created successfully:', result.insertId);
-            return result.insertId;
+            // Convert BigInt to Number
+            const tripId = Number(result.insertId);
+            console.log('Trip created successfully with ID:', tripId);
+
+            return tripId;
         } catch (error) {
             console.error('Create trip error:', error);
             throw error;
         }
     }
+
     async updateTrip(tripId, userId, updates) {
         try {
             const updateFields = [];
@@ -286,12 +320,13 @@ class DatabaseService {
                     LIMIT 10
             `, [userId, userId]);
 
-            return {
+            // Convert all BigInt values
+            return this.convertBigIntToNumber({
                 trips: tripStats,
                 memories: memoryStats,
                 recentActivity,
                 generatedAt: new Date().toISOString()
-            };
+            });
         } catch (error) {
             console.error('Dashboard analytics error:', error);
             throw error;

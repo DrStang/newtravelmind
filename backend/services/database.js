@@ -36,8 +36,8 @@ class DatabaseService {
                     travel_style VARCHAR(50) DEFAULT 'moderate',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-            )
-        `);
+                    )
+            `);
 
             await this.pool.query(`
                 CREATE TABLE IF NOT EXISTS trips (
@@ -56,8 +56,8 @@ class DatabaseService {
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                     FOREIGN KEY (user_id) REFERENCES users(id)
-            )
-        `);
+                    )
+            `);
 
             await this.pool.query(`
                 CREATE TABLE IF NOT EXISTS memories (
@@ -74,8 +74,8 @@ class DatabaseService {
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (user_id) REFERENCES users(id),
                     FOREIGN KEY (trip_id) REFERENCES trips(id)
-            )
-        `);
+                    )
+            `);
 
             await this.pool.query(`
                 CREATE TABLE IF NOT EXISTS analytics_events (
@@ -85,8 +85,8 @@ class DatabaseService {
                     event_data JSON,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (user_id) REFERENCES users(id)
-            )
-        `);
+                    )
+            `);
 
             console.log('✅ Database tables created/verified');
         } catch (error) {
@@ -130,9 +130,9 @@ class DatabaseService {
     async createUser(email, passwordHash, name) {
         try {
             const result = await this.pool.query(`
-        INSERT INTO users (email, password_hash, name, preferences, created_at)
-        VALUES (?, ?, ?, ?, NOW())
-      `, [email, passwordHash, name, JSON.stringify(['sightseeing', 'food', 'culture'])]);
+                INSERT INTO users (email, password_hash, name, preferences, created_at)
+                VALUES (?, ?, ?, ?, NOW())
+            `, [email, passwordHash, name, JSON.stringify(['sightseeing', 'food', 'culture'])]);
 
             return result.insertId;
         } catch (error) {
@@ -184,7 +184,38 @@ class DatabaseService {
             throw error;
         }
     }
+    async createTrip(userId, tripData) {
+        try {
+            if (!this.pool) {
+                throw new Error('Database connection not initialized');
+            }
 
+            console.log('Creating trip for user:', userId);
+
+            const result = await this.pool.query(`
+      INSERT INTO trips (user_id, title, destination, start_date, end_date, duration, budget, 
+                        travel_style, interests, itinerary, status, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'planning', NOW())
+    `, [
+                userId,
+                tripData.title,
+                tripData.destination,
+                tripData.startDate || null,
+                tripData.endDate || null,
+                tripData.duration || null,
+                tripData.budget || null,
+                tripData.travelStyle || 'moderate',
+                JSON.stringify(tripData.interests || []),
+                JSON.stringify(tripData.itinerary)
+            ]);
+
+            console.log('Trip created successfully:', result.insertId);
+            return result.insertId;
+        } catch (error) {
+            console.error('Create trip error:', error);
+            throw error;
+        }
+    }
     async updateTrip(tripId, userId, updates) {
         try {
             const updateFields = [];
@@ -200,10 +231,10 @@ class DatabaseService {
             if (updateFields.length > 0) {
                 updateValues.push(tripId, userId);
                 await this.pool.query(`
-          UPDATE trips 
-          SET ${updateFields.join(', ')}, updated_at = NOW()
-          WHERE id = ? AND user_id = ?
-        `, updateValues);
+                    UPDATE trips
+                    SET ${updateFields.join(', ')}, updated_at = NOW()
+                    WHERE id = ? AND user_id = ?
+                `, updateValues);
             }
         } catch (error) {
             console.error('Update trip error:', error);
@@ -214,9 +245,9 @@ class DatabaseService {
     async logAnalyticsEvent(userId, eventType, eventData) {
         try {
             await this.pool.query(`
-        INSERT INTO analytics_events (user_id, event_type, event_data, created_at)
-        VALUES (?, ?, ?, NOW())
-      `, [userId, eventType, JSON.stringify(eventData)]);
+                INSERT INTO analytics_events (user_id, event_type, event_data, created_at)
+                VALUES (?, ?, ?, NOW())
+            `, [userId, eventType, JSON.stringify(eventData)]);
         } catch (error) {
             console.error('Log analytics event error:', error);
             throw error;
@@ -226,34 +257,34 @@ class DatabaseService {
     async getDashboardAnalytics(userId) {
         try {
             const [tripStats] = await this.pool.query(`
-        SELECT 
-          COUNT(*) as total_trips,
-          COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_trips,
-          COUNT(CASE WHEN status = 'active' THEN 1 END) as active_trips,
-          AVG(budget) as avg_budget,
-          SUM(budget) as total_budget
-        FROM trips 
-        WHERE user_id = ?
-      `, [userId]);
+                SELECT
+                    COUNT(*) as total_trips,
+                    COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_trips,
+                    COUNT(CASE WHEN status = 'active' THEN 1 END) as active_trips,
+                    AVG(budget) as avg_budget,
+                    SUM(budget) as total_budget
+                FROM trips
+                WHERE user_id = ?
+            `, [userId]);
 
             const [memoryStats] = await this.pool.query(`
-        SELECT 
-          COUNT(*) as total_memories,
-          AVG(rating) as avg_rating,
-          COUNT(DISTINCT DATE(memory_date)) as active_days
-        FROM memories 
-        WHERE user_id = ? AND rating IS NOT NULL
-      `, [userId]);
+                SELECT
+                    COUNT(*) as total_memories,
+                    AVG(rating) as avg_rating,
+                    COUNT(DISTINCT DATE(memory_date)) as active_days
+                FROM memories
+                WHERE user_id = ? AND rating IS NOT NULL
+            `, [userId]);
 
             const recentActivity = await this.pool.query(`
-        SELECT 'memory' as type, title as activity, created_at 
-        FROM memories WHERE user_id = ?
-        UNION ALL
-        SELECT 'trip' as type, title as activity, created_at 
-        FROM trips WHERE user_id = ?
-        ORDER BY created_at DESC 
-        LIMIT 10
-      `, [userId, userId]);
+                SELECT 'memory' as type, title as activity, created_at
+                FROM memories WHERE user_id = ?
+                UNION ALL
+                SELECT 'trip' as type, title as activity, created_at
+                FROM trips WHERE user_id = ?
+                ORDER BY created_at DESC
+                    LIMIT 10
+            `, [userId, userId]);
 
             return {
                 trips: tripStats,
@@ -276,3 +307,4 @@ class DatabaseService {
 }
 
 module.exports = { DatabaseService };
+

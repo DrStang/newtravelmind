@@ -3,209 +3,190 @@ const redis = require('redis');
 class RedisService {
     constructor() {
         this.client = null;
+        this.isConnected = false;
+        this.isAttempting = false;
     }
 
     async initialize() {
+        // Don't block if already attempting connection
+        if (this.isAttempting) {
+            console.log('Redis connection already in progress...');
+            return;
+        }
+
+        this.isAttempting = true;
+
         try {
-            // Debug: Log environment variables (remove in production)
-            console.log('Redis Config Debug:');
-            console.log('REDIS_HOST:', process.env.REDIS_HOST);
-            console.log('REDIS_PORT:', process.env.REDIS_PORT);
-            console.log('REDIS_PASSWORD:', process.env.REDIS_PASSWORD ? '***SET***' : 'NOT SET');
-
-            // Railway Redis configuration
-            const redisConfig = {
-                socket: {
-                    host: process.env.REDIS_HOST || 'localhost',
-                    port: parseInt(process.env.REDIS_PORT) || 6379,
-                    // Force IPv4 to avoid IPv6 issues
-                    family: 4,
-                    // Increase timeout for Railway
-                    connectTimeout: 60000,
-                    commandTimeout: 5000,
-                },
-                // Add password if provided
-                ...(process.env.REDIS_PASSWORD && { password: process.env.REDIS_PASSWORD }),
-                // Retry configuration for Railway
-                retry_delay_on_failover: 100,
-                retry_delay_on_cluster_down: 300,
-                max_attempts: 5,
-            };
-
-            // Alternative configuration for Railway using URL
-            if (process.env.REDIS_URL) {
-                console.log('Using REDIS_URL configuration');
-                this.client = redis.createClient({
-                    url: process.env.REDIS_URL,
-                    socket: {
-                        family: 4,
-                        connectTimeout: 60000,
-                    }
-                });
-            } else {
-                console.log('Using individual Redis environment variables');
-                this.client = redis.createClient(redisConfig);
+            console.log('🔄 Attempting Redis connection...');
+            
+            // Check if we have Redis configuration
+            if (!process.env.REDIS_URL && !process.env.REDIS_HOST) {
+                console.log('⚠️  No Redis configuration found, running without cache');
+                this.client = this.createMockClient();
+                this.isAttempting = false;
+                return;
             }
 
-            // Enhanced error handling
+            let redisConfig;
+
+            // Try REDIS_URL first (Railway format)
+            if (process.env.REDIS_URL) {
+                console.log('Using REDIS_URL configuration');
+                redisConfig = {
+                    url: process.env.REDIS_URL,
+                    socket: {
+                        connectTimeout: 5000, // 5 second timeout
+                        commandTimeout: 3000,
+                        family: 4 // Force IPv4
+                    }
+                };
+            } else {
+                // Fallback to individual variables
+                console.log('Using individual Redis environment variables');
+                redisConfig = {
+                    socket: {
+                        host: process.env.REDIS_HOST,
+                        port: parseInt(process.env.REDIS_PORT) || 6379,
+                        connectTimeout: 5000,
+                        commandTimeout: 3000,
+                        family: 4
+                    },
+                    password: process.env.REDIS_PASSWORD
+                };
+            }
+
+            this.client = redis.createClient(redisConfig);
+
+            // Set up event handlers BEFORE connecting
             this.client.on('error', (err) => {
-                console.error('Redis Client Error:', err);
-                // Don't throw here, just log
+                console.warn('⚠️  Redis Error (non-blocking):', err.message);
+                this.isConnected = false;
+                // Don't throw, just log
             });
 
             this.client.on('connect', () => {
-                console.log('✅ Redis client connected');
+                console.log('✅ Redis connected successfully');
+                this.isConnected = true;
             });
 
-            this.client.on('ready', () => {
-                console.log('✅ Redis client ready');
+            this.client.on('disconnect', () => {
+                console.log('📤 Redis disconnected');
+                this.isConnected = false;
             });
 
-            this.client.on('end', () => {
-                console.log('📝 Redis client connection ended');
-            });
+            // Connect with timeout - NON-BLOCKING
+            const connectionPromise = this.client.connect();
+            const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Redis connection timeout')), 5000)
+            );
 
-            this.client.on('reconnecting', () => {
-                console.log('🔄 Redis client reconnecting...');
-            });
-
-            // Connect with timeout
-            const connectTimeout = setTimeout(() => {
-                console.error('❌ Redis connection timeout after 30 seconds');
-            }, 30000);
-
-            await this.client.connect();
-            clearTimeout(connectTimeout);
-
-            console.log('✅ Redis connection initialized successfully');
-        } catch (error) {
-            console.error('❌ Redis initialization failed:', error);
+            await Promise.race([connectionPromise, timeoutPromise]);
             
-            // For Railway deployment, Redis might not be immediately available
-            // We'll create a mock client that gracefully handles failures
-            if (process.env.NODE_ENV === 'production') {
-                console.log('🔄 Creating fallback Redis client for production');
-                this.client = this.createFallbackClient();
-            } else {
-                throw error;
+            console.log('✅ Redis initialization completed');
+
+        } catch (error) {
+            console.warn('⚠️  Redis connection failed, using mock client:', error.message);
+            
+            // Close any partial connection
+            if (this.client) {
+                try { await this.client.quit(); } catch {}
             }
+            
+            // Create mock client - app continues without Redis
+            this.client = this.createMockClient();
+            this.isConnected = false;
+        } finally {
+            this.isAttempting = false;
         }
     }
 
-    // Fallback client that doesn't crash the app if Redis is unavailable
-    createFallbackClient() {
+    // Mock client that mimics Redis interface but does nothing
+    createMockClient() {
+        console.log('🔧 Creating Redis mock client');
         return {
-            ping: async () => false,
+            ping: async () => 'PONG',
             get: async () => null,
             setEx: async () => 'OK',
             quit: async () => 'OK',
-            isOpen: false
+            isOpen: false,
+            isReady: false
         };
     }
 
     async testConnection() {
         try {
-            if (!this.client || !this.client.isOpen) {
-                console.log('Redis client not connected');
-                return false;
-            }
-            
+            if (!this.isConnected || !this.client) return false;
             const result = await this.client.ping();
-            console.log('Redis ping result:', result);
             return result === 'PONG';
         } catch (error) {
-            console.error('Redis connection test failed:', error);
             return false;
         }
     }
 
+    // All cache methods are now safe and non-blocking
     async setConversationCache(userId, response) {
         try {
-            if (!this.client || !this.client.isOpen) {
-                console.log('Redis not available, skipping cache set');
-                return;
-            }
-            
+            if (!this.isConnected) return;
             await this.client.setEx(`chat:${userId}:latest`, 300, JSON.stringify(response));
-            console.log(`Cached conversation for user ${userId}`);
         } catch (error) {
-            console.error('Set conversation cache error:', error);
-            // Don't throw, just log and continue
+            console.warn('Cache set failed (continuing):', error.message);
         }
     }
 
     async getConversationCache(userId) {
         try {
-            if (!this.client || !this.client.isOpen) {
-                console.log('Redis not available, skipping cache get');
-                return null;
-            }
-            
+            if (!this.isConnected) return null;
             const cached = await this.client.get(`chat:${userId}:latest`);
             return cached ? JSON.parse(cached) : null;
         } catch (error) {
-            console.error('Get conversation cache error:', error);
+            console.warn('Cache get failed (continuing):', error.message);
             return null;
         }
     }
 
     async setPlacesCache(location, type, places) {
         try {
-            if (!this.client || !this.client.isOpen) {
-                console.log('Redis not available, skipping places cache set');
-                return;
-            }
-            
+            if (!this.isConnected) return;
             const key = `places:${location.lat.toFixed(3)}:${location.lng.toFixed(3)}:${type}`;
-            await this.client.setEx(key, 1800, JSON.stringify(places)); // 30 minutes
-            console.log(`Cached places for ${key}`);
+            await this.client.setEx(key, 1800, JSON.stringify(places));
         } catch (error) {
-            console.error('Set places cache error:', error);
+            console.warn('Places cache set failed (continuing):', error.message);
         }
     }
 
     async getPlacesCache(location, type) {
         try {
-            if (!this.client || !this.client.isOpen) {
-                console.log('Redis not available, skipping places cache get');
-                return null;
-            }
-            
+            if (!this.isConnected) return null;
             const key = `places:${location.lat.toFixed(3)}:${location.lng.toFixed(3)}:${type}`;
             const cached = await this.client.get(key);
             return cached ? JSON.parse(cached) : null;
         } catch (error) {
-            console.error('Get places cache error:', error);
+            console.warn('Places cache get failed (continuing):', error.message);
             return null;
         }
     }
 
     async close() {
         try {
-            if (this.client && this.client.isOpen) {
+            if (this.client && this.isConnected) {
                 await this.client.quit();
-                console.log('✅ Redis connection closed');
             }
         } catch (error) {
-            console.error('Error closing Redis connection:', error);
+            console.warn('Redis close error (ignored):', error.message);
         }
     }
 
-    // Utility method to check if Redis is available
+    // Utility methods
     isAvailable() {
-        return this.client && this.client.isOpen;
+        return this.isConnected;
     }
 
-    // Method to reinitialize connection if needed
-    async reconnect() {
-        try {
-            if (this.client) {
-                await this.client.quit();
-            }
-            await this.initialize();
-        } catch (error) {
-            console.error('Redis reconnection failed:', error);
-        }
+    getStatus() {
+        return {
+            connected: this.isConnected,
+            attempting: this.isAttempting,
+            hasClient: !!this.client
+        };
     }
 }
 

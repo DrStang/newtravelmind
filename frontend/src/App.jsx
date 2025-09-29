@@ -972,13 +972,11 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                           
                           <div className="flex items-center space-x-4 mb-3 text-xs text-gray-500">
                             <span className="flex items-center">
-                              <Calendar className="w-3 h-3 mr-1" />
-                              {trip.duration} days
+                              📅 {trip.duration} days
                             </span>
                             {trip.budget && (
                               <span className="flex items-center">
-                                <CreditCard className="w-3 h-3 mr-1" />
-                                ${trip.budget}
+                                💰 ${trip.budget}
                               </span>
                             )}
                             <span className={`px-2 py-1 rounded-full ${
@@ -2425,4 +2423,5 @@ const FloatingChatButton = ({ onClick }) => {
 };
 
 export default App;
+
 

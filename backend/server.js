@@ -41,7 +41,14 @@ console.log('PORT:', process.env.PORT);
 console.log('FRONTEND_URL:', process.env.FRONTEND_URL);
 console.log('REDIS_URL:', process.env.REDIS_URL ? 'SET' : 'NOT SET');
 console.log('DATABASE_URL:', process.env.DATABASE_URL ? 'SET' : 'NOT SET');
-
+BigInt.prototype.toJSON = function() {
+    const value = Number(this);
+    // Warn if value is too large (loses precision)
+    if (this > Number.MAX_SAFE_INTEGER) {
+        console.warn('BigInt value too large for safe conversion:', this.toString());
+    }
+    return value;
+};
 // ===================================
 // MIDDLEWARE SETUP
 // ===================================
@@ -502,7 +509,8 @@ app.post('/api/ai/generate-itinerary', authenticateToken, async (req, res) => {
     try {
         const tripData = req.body;
 
-        console.log('Generating itinerary for:', tripData.destination);
+        console.log('🎯 Generating itinerary for:', tripData.destination);
+        console.log('Trip data:', JSON.stringify(tripData, null, 2));
 
         // Validate input
         if (!tripData.destination || !tripData.duration) {
@@ -515,20 +523,31 @@ app.post('/api/ai/generate-itinerary', authenticateToken, async (req, res) => {
         const userPreferences = req.user.preferences || [];
 
         // Generate itinerary using Ollama
+        console.log('🤖 Calling Ollama to generate itinerary...');
         let itinerary;
         try {
             itinerary = await ollama.generateDetailedItinerary(tripData, userPreferences);
+            console.log('✅ Ollama generation successful');
         } catch (ollamaError) {
-            console.error('Ollama generation error:', ollamaError);
+            console.error('❌ Ollama generation error:', ollamaError);
             // Provide fallback itinerary
             itinerary = {
-                itinerary: `Sample ${tripData.duration}-day itinerary for ${tripData.destination}:\n\nDay 1: Arrival and city orientation\nDay 2: Main attractions and local experiences\n...`,
+                itinerary: `${tripData.duration}-Day Itinerary for ${tripData.destination}\n\n` +
+                    `Budget: $${tripData.budget}\n` +
+                    `Style: ${tripData.travelStyle}\n\n` +
+                    `Day 1: Arrival and Orientation\n` +
+                    `- Morning: Check-in and settle into accommodation\n` +
+                    `- Afternoon: Explore nearby area and local markets\n` +
+                    `- Evening: Welcome dinner at local restaurant\n\n` +
+                    `Day 2-${tripData.duration}: Enjoy your destination!\n` +
+                    `(AI generation temporarily unavailable - this is a sample itinerary)`,
                 model: 'fallback',
                 generatedAt: new Date().toISOString()
             };
         }
 
-        // Try to save trip to database
+        // Save trip to database
+        console.log('💾 Saving trip to database...');
         let tripId;
         try {
             tripId = await database.createTrip(req.user.id, {
@@ -542,26 +561,49 @@ app.post('/api/ai/generate-itinerary', authenticateToken, async (req, res) => {
                 interests: tripData.interests || [],
                 itinerary: itinerary
             });
-            console.log('Trip created with ID:', tripId);
+
+            // Ensure tripId is a number, not BigInt
+            tripId = Number(tripId);
+            console.log('✅ Trip saved with ID:', tripId);
+
         } catch (dbError) {
-            console.error('Database save error (continuing):', dbError);
-            tripId = Date.now(); // Use timestamp as fallback ID
+            console.error('❌ Database save error:', dbError);
+            // Continue even if DB save fails - use timestamp as fallback
+            tripId = Date.now();
+            console.log('⚠️ Using fallback ID:', tripId);
         }
+
+        // Prepare response with safe JSON serialization
+        const responseData = {
+            tripId: Number(tripId), // Explicitly convert to Number
+            itinerary,
+            tripData: {
+                id: Number(tripId), // Explicitly convert to Number
+                title: `${tripData.destination} Trip`,
+                destination: tripData.destination,
+                duration: parseInt(tripData.duration),
+                budget: parseFloat(tripData.budget) || 0,
+                status: 'planning',
+                startDate: tripData.startDate || null,
+                endDate: tripData.endDate || null,
+                interests: tripData.interests || [],
+                travelStyle: tripData.travelStyle || 'moderate',
+                itinerary: itinerary,
+                created_at: new Date().toISOString()
+            }
+        };
+
+        console.log('📤 Sending response with trip ID:', responseData.tripId);
 
         res.json({
             success: true,
-            data: {
-                tripId: tripId,
-                itinerary,
-                tripData: {
-                    ...tripData,
-                    id: tripId,
-                    status: 'planning'
-                }
-            }
+            data: responseData
         });
+
     } catch (error) {
-        console.error('Itinerary generation error:', error);
+        console.error('❌ Itinerary generation error:', error);
+        console.error('Error stack:', error.stack);
+
         res.status(500).json({
             success: false,
             error: 'Failed to generate itinerary',
@@ -910,14 +952,15 @@ app.get('/api/memories/statistics', authenticateToken, async (req, res) => {
 // Analytics Route
 app.get('/api/analytics/dashboard', authenticateToken, async (req, res) => {
     try {
-        // Try to get dashboard data, but provide fallback if fails
-        let dashboardData;
+        console.log('📊 Loading dashboard for user:', req.user.id);
 
+        let dashboardData;
         try {
             dashboardData = await database.getDashboardAnalytics(req.user.id);
+            console.log('✅ Dashboard data loaded');
         } catch (dbError) {
-            console.error('Dashboard analytics DB error:', dbError);
-            // Return safe fallback data
+            console.error('❌ Dashboard DB error:', dbError);
+            // Return safe fallback
             dashboardData = {
                 trips: {
                     total_trips: 0,
@@ -936,15 +979,20 @@ app.get('/api/analytics/dashboard', authenticateToken, async (req, res) => {
             };
         }
 
+        // Ensure all BigInt values are converted
+        const safeData = JSON.parse(JSON.stringify(dashboardData, (key, value) =>
+            typeof value === 'bigint' ? Number(value) : value
+        ));
+
         res.json({
             success: true,
-            data: dashboardData
+            data: safeData
         });
     } catch (error) {
-        console.error('Dashboard analytics error:', error);
+        console.error('❌ Dashboard error:', error);
         res.status(500).json({
             success: false,
-            error: 'Failed to load dashboard data',
+            error: 'Failed to load dashboard',
             details: error.message
         });
     }
@@ -1006,13 +1054,20 @@ app.use((err, req, res, next) => {
         }
     }
 
+    if (err.message && err.message.includes('BigInt')) {
+        return res.status(500).json({
+            success: false,
+            error: 'Data serialization error',
+            details: 'BigInt conversion issue - check backend logs'
+        });
+    }
+
     res.status(500).json({
         success: false,
         error: 'Internal server error',
         details: process.env.NODE_ENV === 'development' ? err.message : undefined
     });
 });
-
 // 404 handler
 app.use('*', (req, res) => {
     res.status(404).json({

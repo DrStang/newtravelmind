@@ -20,8 +20,20 @@ class GooglePlacesService {
             const response = await fetch(url);
             const data = await response.json();
 
-            if (data.status !== 'OK') {
-                throw new Error(`Google Places API error: ${data.status}`);
+            // ✅ FIX: Handle ZERO_RESULTS gracefully instead of throwing error
+            if (data.status === 'ZERO_RESULTS') {
+                console.log(`No results found for ${type} near ${location.lat},${location.lng}`);
+                return []; // Return empty array instead of throwing error
+            }
+
+            // Only throw error for actual API errors
+            if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
+                throw new Error(`Google Places API error: ${data.status} - ${data.error_message || 'Unknown error'}`);
+            }
+
+            // Return empty array if no results
+            if (!data.results || data.results.length === 0) {
+                return [];
             }
 
             return data.results.map(place => ({
@@ -43,7 +55,10 @@ class GooglePlacesService {
             }));
         } catch (error) {
             console.error('Google Places search error:', error);
-            throw error;
+            
+            // ✅ FIX: Return empty array on error instead of throwing
+            // This prevents the entire location update from failing
+            return [];
         }
     }
 
@@ -68,11 +83,19 @@ class GooglePlacesService {
     async getWeatherInfo(location) {
         try {
             const weatherApiKey = process.env.WEATHER_API_KEY;
-            if (!weatherApiKey) return null;
+            if (!weatherApiKey) {
+                console.log('Weather API key not configured');
+                return null;
+            }
 
             const response = await fetch(
                 `https://api.openweathermap.org/data/2.5/weather?lat=${location.lat}&lon=${location.lng}&appid=${weatherApiKey}&units=metric`
             );
+
+            if (!response.ok) {
+                console.error('Weather API error:', response.status);
+                return null;
+            }
 
             const data = await response.json();
 
@@ -86,7 +109,7 @@ class GooglePlacesService {
             };
         } catch (error) {
             console.error('Weather API error:', error);
-            return null;
+            return null; // Return null instead of throwing
         }
     }
 }

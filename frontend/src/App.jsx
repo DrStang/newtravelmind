@@ -11,6 +11,70 @@ import io from 'socket.io-client';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
 const WS_URL = import.meta.env.VITE_WS_URL || 'http://localhost:3001';
+const formatItinerary = (text) => {
+  if (!text) return '';
+  
+  return text
+    // Convert **bold** to <strong>
+    .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-gray-900">$1</strong>')
+    // Convert * list items to bullet points
+    .replace(/^\* (.+)$/gm, '<li class="ml-4 mb-2">$1</li>')
+    // Convert + list items to bullet points
+    .replace(/^\+ (.+)$/gm, '<li class="ml-4 mb-2">$1</li>')
+    // Convert - list items to bullet points  
+    .replace(/^- (.+)$/gm, '<li class="ml-4 mb-2">$1</li>')
+    // Add spacing between sections
+    .replace(/\n\n/g, '<br/><br/>');
+};
+
+// Better itinerary display component
+const FormattedItinerary = ({ text }) => {
+  if (!text) return null;
+
+  // Split by day sections
+  const sections = text.split(/(?=\*\*Day \d+)/g);
+
+  return (
+    <div className="space-y-6">
+      {sections.map((section, index) => {
+        if (!section.trim()) return null;
+
+        // Check if it's a day section
+        const isDaySection = section.match(/\*\*Day (\d+)/);
+        
+        if (isDaySection) {
+          const dayNumber = isDaySection[1];
+          const dayContent = section.replace(/\*\*Day \d+:?\s*(.*?)\*\*/g, '').trim();
+          const dayTitle = section.match(/\*\*Day \d+:?\s*(.*?)\*\*/)?.[1] || `Day ${dayNumber}`;
+
+          return (
+            <div key={index} className="bg-white border border-gray-200 rounded-lg p-6">
+              <h3 className="text-xl font-bold text-blue-600 mb-4 flex items-center">
+                <span className="bg-blue-100 text-blue-600 rounded-full w-8 h-8 flex items-center justify-center mr-3">
+                  {dayNumber}
+                </span>
+                {dayTitle}
+              </h3>
+              <div 
+                className="prose prose-sm max-w-none text-gray-700 leading-relaxed"
+                dangerouslySetInnerHTML={{ __html: formatItinerary(dayContent) }}
+              />
+            </div>
+          );
+        }
+
+        // Header section or other content
+        return (
+          <div 
+            key={index}
+            className="prose prose-lg max-w-none"
+            dangerouslySetInnerHTML={{ __html: formatItinerary(section) }}
+          />
+        );
+      })}
+    </div>
+  );
+};
 
 // ===================================
 // AUTHENTICATION HOOK
@@ -362,6 +426,9 @@ const App = () => {
         };
 
         setChatMessages(prev => [...prev, userMessage]);
+        console.log('Sending message:', message);
+        console.log('Socket connected:', connected);
+        console.log('Socket exists:', !!socket);
 
         if (socket && connected) {
             socket.emit('ai_chat', {
@@ -374,20 +441,59 @@ const App = () => {
                     userPreferences: user?.preferences
                 }
             });
-        } else {
+            console.log('Message sent via socket');
+          } else {
             console.warn('Socket not connected, cannot send message');
             // Add error message to chat
-            setTimeout(() => {
-                setChatMessages(prev => [...prev, {
-                    type: 'ai',
-                    content: 'Connection not available. Please check your internet connection and try again.',
-                    timestamp: new Date(),
-                    error: true
-                }]);
-            }, 500);
-        }
-    };
+            setTimeout(async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/ai/chat`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            message,
+            context: {
+              mode: currentMode,
+              location: location,
+              weather: weather,
+              currentTrip: currentTrip,
+              userPreferences: user?.preferences
+            }
+          })
+        });
+        const data = await response.json();
+        console.log('HTTP API response:', data);
 
+        if (data.success) {
+          setChatMessages(prev => [...prev, {
+            type: 'ai',
+            content: data.data.message,
+            timestamp: new Date(),
+            model: data.data.model
+          }]);
+        } else {
+          setChatMessages(prev => [...prev, {
+            type: 'ai',
+            content: 'Sorry, I encountered an error. Please try again.',
+            timestamp: new Date(),
+            error: true
+          }]);
+        }
+      } catch (error) {
+        console.error('HTTP fallback error:', error);
+        setChatMessages(prev => [...prev, {
+          type: 'ai',
+          content: 'Connection error. Please check your internet connection.',
+          timestamp: new Date(),
+          error: true
+        }]);
+      }
+    }, 500);
+  }
+};
     // Show loading screen
     if (loading) {
         return (
@@ -1140,9 +1246,9 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                     <Zap className="w-5 h-5 text-yellow-500 mr-2" />
                     AI-Generated Itinerary
                   </h3>
-                  <div className="whitespace-pre-wrap text-gray-800 leading-relaxed bg-gray-50 rounded-lg p-6">
-                    {selectedTrip.itinerary.itinerary}
-                  </div>
+                <div className="bg-gray-50 rounded-lg p-6">
+                  <FormattedItinerary text={selectedTrip.itinerary.itinerary} />
+                </div>
 
                   {/* Metadata */}
                   <div className="mt-6 pt-6 border-t text-sm text-gray-500">
@@ -2423,5 +2529,6 @@ const FloatingChatButton = ({ onClick }) => {
 };
 
 export default App;
+
 
 

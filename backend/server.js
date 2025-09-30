@@ -245,13 +245,18 @@ io.on('connection', (socket) => {
     socket.on('ai_chat', async (data) => {
         try {
             const { message, context = {} } = data;
+            console.log('Received ai_chat from user:', socket.userId);
+            console.log('Message:', message);
+            const userContext = {
+            ...context,
+            userId: socket.userId,
+            userPreferences: socket.user.preferences || [],
+            travelStyle: socket.user.travel_style
+    };
 
-            const response = await ollama.chat(message, {
-                ...context,
-                userId: socket.userId,
-                userPreferences: socket.user.preferences,
-                realTime: true
-            });
+            const response = await ollama.chat(message, userContext, context.mode || 'chat');
+
+            console.log('AI response generated:', response.message.substring(0, 100));
 
             // Save conversation to database
             await database.saveConversation(socket.userId, message, response.message, context, response.model, response.responseTime);
@@ -263,17 +268,22 @@ io.on('connection', (socket) => {
             });
 
             // Cache response
-            await redis.setConversationCache(socket.userId, response);
+            if (redis && redis.isAvailable()) {
+              redis.setConversationCache(socket.userId, response).catch(err => {
+                console.warn('Cache set failed:', err.message);
+      });
+    }
 
-        } catch (error) {
-            console.error('Real-time AI chat error:', error);
+          } catch (error) {
+            console.error('AI chat error:', error);
             socket.emit('ai_response', {
-                success: false,
-                error: 'AI assistant temporarily unavailable',
-                fallback: 'I\'m having trouble right now. Please try again in a moment.'
-            });
-        }
+              success: false,
+              error: 'AI assistant temporarily unavailable',
+              fallback: "I'm having trouble right now. Please try again in a moment.",
+              timestamp: new Date().toISOString()
     });
+  }
+});
 
     // Location updates
     socket.on('location_update', async (data) => {
@@ -1152,6 +1162,7 @@ process.on('SIGTERM', async () => {
 startServer();
 
 module.exports = app;
+
 
 
 

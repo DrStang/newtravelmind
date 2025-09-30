@@ -286,26 +286,46 @@ io.on('connection', (socket) => {
 });
 
     // Location updates
+    // Location updates
     socket.on('location_update', async (data) => {
         try {
             const { lat, lng, accuracy } = data;
 
             await database.saveUserLocation(socket.userId, lat, lng, accuracy);
 
-            // Get weather and nearby recommendations
+        // Get weather and nearby recommendations
             const weather = await googlePlaces.getWeatherInfo({ lat, lng });
-            const nearbyPlaces = await googlePlaces.searchNearby({ lat, lng }, 'restaurant', 500);
-
-            socket.emit('location_context', {
-                weather,
-                nearbyRecommendations: nearbyPlaces.slice(0, 5),
-                timestamp: new Date().toISOString()
-            });
-
-        } catch (error) {
-            console.error('Location update error:', error);
+        
+        // ✅ FIX: Try multiple place types if first search returns no results
+            let nearbyPlaces = [];
+            const placeTypes = ['restaurant', 'tourist_attraction', 'lodging', 'cafe'];
+        
+            for (const type of placeTypes) {
+            nearbyPlaces = await googlePlaces.searchNearby({ lat, lng }, type, 500);
+            if (nearbyPlaces.length > 0) {
+                break; // Found results, stop searching
+            }
         }
-    });
+
+        socket.emit('location_context', {
+            weather,
+            nearbyRecommendations: nearbyPlaces.slice(0, 5),
+            timestamp: new Date().toISOString(),
+            // ✅ Add message if no places found
+            message: nearbyPlaces.length === 0 ? 'No nearby places found. Try increasing search radius.' : undefined
+        });
+
+    } catch (error) {
+        console.error('Location update error:', error);
+        // ✅ FIX: Send error response to client instead of crashing
+        socket.emit('location_context', {
+            weather: null,
+            nearbyRecommendations: [],
+            error: 'Failed to get location context',
+            timestamp: new Date().toISOString()
+        });
+    }
+});
 
     // Trip updates
     socket.on('trip_update', async (data) => {
@@ -656,6 +676,7 @@ app.post('/api/ai/translate', authenticateToken, async (req, res) => {
 });
 
 // Places Routes
+// Places Routes
 app.get('/api/places/nearby', async (req, res) => {
     try {
         const { lat, lng, type = 'tourist_attraction', radius = 1000, keyword, minprice, maxprice, opennow } = req.query;
@@ -680,15 +701,19 @@ app.get('/api/places/nearby', async (req, res) => {
             options
         );
 
+        // ✅ FIX: Always return success with empty array if no results
         res.json({
             success: true,
-            data: places
+            data: places,
+            count: places.length,
+            message: places.length === 0 ? 'No places found matching your criteria' : undefined
         });
     } catch (error) {
         console.error('Places search error:', error);
         res.status(500).json({
             success: false,
-            error: 'Failed to search places'
+            error: 'Failed to search places',
+            details: error.message
         });
     }
 });
@@ -1162,6 +1187,7 @@ process.on('SIGTERM', async () => {
 startServer();
 
 module.exports = app;
+
 
 
 

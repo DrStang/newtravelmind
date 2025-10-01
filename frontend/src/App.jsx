@@ -12,68 +12,68 @@ import io from 'socket.io-client';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
 const WS_URL = import.meta.env.VITE_WS_URL || 'http://localhost:3001';
 const formatItinerary = (text) => {
-  if (!text) return '';
-  
-  return text
-    // Convert **bold** to <strong>
-    .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-gray-900">$1</strong>')
-    // Convert * list items to bullet points
-    .replace(/^\* (.+)$/gm, '<li class="ml-4 mb-2">$1</li>')
-    // Convert + list items to bullet points
-    .replace(/^\+ (.+)$/gm, '<li class="ml-4 mb-2">$1</li>')
-    // Convert - list items to bullet points  
-    .replace(/^- (.+)$/gm, '<li class="ml-4 mb-2">$1</li>')
-    // Add spacing between sections
-    .replace(/\n\n/g, '<br/><br/>');
+    if (!text) return '';
+
+    return text
+        // Convert **bold** to <strong>
+        .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-gray-900">$1</strong>')
+        // Convert * list items to bullet points
+        .replace(/^\* (.+)$/gm, '<li class="ml-4 mb-2">$1</li>')
+        // Convert + list items to bullet points
+        .replace(/^\+ (.+)$/gm, '<li class="ml-4 mb-2">$1</li>')
+        // Convert - list items to bullet points
+        .replace(/^- (.+)$/gm, '<li class="ml-4 mb-2">$1</li>')
+        // Add spacing between sections
+        .replace(/\n\n/g, '<br/><br/>');
 };
 
 // Better itinerary display component
 const FormattedItinerary = ({ text }) => {
-  if (!text) return null;
+    if (!text) return null;
 
-  // Split by day sections
-  const sections = text.split(/(?=\*\*Day \d+)/g);
+    // Split by day sections
+    const sections = text.split(/(?=\*\*Day \d+)/g);
 
-  return (
-    <div className="space-y-6">
-      {sections.map((section, index) => {
-        if (!section.trim()) return null;
+    return (
+        <div className="space-y-6">
+            {sections.map((section, index) => {
+                if (!section.trim()) return null;
 
-        // Check if it's a day section
-        const isDaySection = section.match(/\*\*Day (\d+)/);
-        
-        if (isDaySection) {
-          const dayNumber = isDaySection[1];
-          const dayContent = section.replace(/\*\*Day \d+:?\s*(.*?)\*\*/g, '').trim();
-          const dayTitle = section.match(/\*\*Day \d+:?\s*(.*?)\*\*/)?.[1] || `Day ${dayNumber}`;
+                // Check if it's a day section
+                const isDaySection = section.match(/\*\*Day (\d+)/);
 
-          return (
-            <div key={index} className="bg-white border border-gray-200 rounded-lg p-6">
-              <h3 className="text-xl font-bold text-blue-600 mb-4 flex items-center">
+                if (isDaySection) {
+                    const dayNumber = isDaySection[1];
+                    const dayContent = section.replace(/\*\*Day \d+:?\s*(.*?)\*\*/g, '').trim();
+                    const dayTitle = section.match(/\*\*Day \d+:?\s*(.*?)\*\*/)?.[1] || `Day ${dayNumber}`;
+
+                    return (
+                        <div key={index} className="bg-white border border-gray-200 rounded-lg p-6">
+                            <h3 className="text-xl font-bold text-blue-600 mb-4 flex items-center">
                 <span className="bg-blue-100 text-blue-600 rounded-full w-8 h-8 flex items-center justify-center mr-3">
                   {dayNumber}
                 </span>
-                {dayTitle}
-              </h3>
-              <div 
-                className="prose prose-sm max-w-none text-gray-700 leading-relaxed"
-                dangerouslySetInnerHTML={{ __html: formatItinerary(dayContent) }}
-              />
-            </div>
-          );
-        }
+                                {dayTitle}
+                            </h3>
+                            <div
+                                className="prose prose-sm max-w-none text-gray-700 leading-relaxed"
+                                dangerouslySetInnerHTML={{ __html: formatItinerary(dayContent) }}
+                            />
+                        </div>
+                    );
+                }
 
-        // Header section or other content
-        return (
-          <div 
-            key={index}
-            className="prose prose-lg max-w-none"
-            dangerouslySetInnerHTML={{ __html: formatItinerary(section) }}
-          />
-        );
-      })}
-    </div>
-  );
+                // Header section or other content
+                return (
+                    <div
+                        key={index}
+                        className="prose prose-lg max-w-none"
+                        dangerouslySetInnerHTML={{ __html: formatItinerary(section) }}
+                    />
+                );
+            })}
+        </div>
+    );
 };
 
 // ===================================
@@ -442,58 +442,58 @@ const App = () => {
                 }
             });
             console.log('Message sent via socket');
-          } else {
+        } else {
             console.warn('Socket not connected, cannot send message');
             // Add error message to chat
             setTimeout(async () => {
-      try {
-        const response = await fetch(`${API_BASE_URL}/ai/chat`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            message,
-            context: {
-              mode: currentMode,
-              location: location,
-              weather: weather,
-              currentTrip: currentTrip,
-              userPreferences: user?.preferences
-            }
-          })
-        });
-        const data = await response.json();
-        console.log('HTTP API response:', data);
+                try {
+                    const response = await fetch(`${API_BASE_URL}/ai/chat`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            message,
+                            context: {
+                                mode: currentMode,
+                                location: location,
+                                weather: weather,
+                                currentTrip: currentTrip,
+                                userPreferences: user?.preferences
+                            }
+                        })
+                    });
+                    const data = await response.json();
+                    console.log('HTTP API response:', data);
 
-        if (data.success) {
-          setChatMessages(prev => [...prev, {
-            type: 'ai',
-            content: data.data.message,
-            timestamp: new Date(),
-            model: data.data.model
-          }]);
-        } else {
-          setChatMessages(prev => [...prev, {
-            type: 'ai',
-            content: 'Sorry, I encountered an error. Please try again.',
-            timestamp: new Date(),
-            error: true
-          }]);
+                    if (data.success) {
+                        setChatMessages(prev => [...prev, {
+                            type: 'ai',
+                            content: data.data.message,
+                            timestamp: new Date(),
+                            model: data.data.model
+                        }]);
+                    } else {
+                        setChatMessages(prev => [...prev, {
+                            type: 'ai',
+                            content: 'Sorry, I encountered an error. Please try again.',
+                            timestamp: new Date(),
+                            error: true
+                        }]);
+                    }
+                } catch (error) {
+                    console.error('HTTP fallback error:', error);
+                    setChatMessages(prev => [...prev, {
+                        type: 'ai',
+                        content: 'Connection error. Please check your internet connection.',
+                        timestamp: new Date(),
+                        error: true
+                    }]);
+                }
+            }, 500);
         }
-      } catch (error) {
-        console.error('HTTP fallback error:', error);
-        setChatMessages(prev => [...prev, {
-          type: 'ai',
-          content: 'Connection error. Please check your internet connection.',
-          timestamp: new Date(),
-          error: true
-        }]);
-      }
-    }, 500);
-  }
-};
+    };
     // Show loading screen
     if (loading) {
         return (
@@ -817,504 +817,1085 @@ const Header = ({ user, logout, currentMode, setCurrentMode, connected, location
 };
 
 // ===================================
-// PLANNING MODE COMPONENT
+// ENHANCED PLANNING MODE COMPONENT
 // ===================================
-// ===================================
-// FIXED PLANNING MODE COMPONENT
-// ===================================
-
 const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMessage }) => {
-  const [isCreating, setIsCreating] = useState(false);
-  const [selectedTrip, setSelectedTrip] = useState(null); // For modal
-  const [formData, setFormData] = useState({
-    destination: '',
-    duration: '',
-    budget: '',
-    startDate: '',
-    endDate: '',
-    travelStyle: user?.travelStyle || 'moderate',
-    interests: []
-  });
-  const [loading, setLoading] = useState(false);
+    const [isCreating, setIsCreating] = useState(false);
+    const [selectedTrip, setSelectedTrip] = useState(null);
+    const [bookingTab, setBookingTab] = useState('itinerary'); // 'itinerary', 'flights', 'hotels'
+    const [formData, setFormData] = useState({
+        destination: '',
+        duration: '',
+        budget: '',
+        startDate: '',
+        endDate: '',
+        travelStyle: user?.travelStyle || 'moderate',
+        interests: []
+    });
+    const [loading, setLoading] = useState(false);
 
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
+    const interestOptions = [
+        'Adventure', 'Culture', 'Food', 'History', 'Nature', 'Nightlife',
+        'Photography', 'Relaxation', 'Shopping', 'Sports'
+    ];
 
-  const interestOptions = [
-    'Adventure', 'Culture', 'Food', 'History', 'Nature', 'Nightlife',
-    'Photography', 'Relaxation', 'Shopping', 'Sports'
-  ];
+    const handleCreateTrip = async (e) => {
+        e.preventDefault();
+        if (!formData.destination || !formData.duration) return;
 
-  const handleCreateTrip = async (e) => {
-    e.preventDefault();
-    if (!formData.destination || !formData.duration) return;
+        setLoading(true);
+        try {
+            const response = await fetch(`${API_BASE_URL}/ai/generate-itinerary`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
 
-    setLoading(true);
-    try {
-      console.log('Creating trip:', formData);
-      
-      const response = await fetch(`${API_BASE_URL}/ai/generate-itinerary`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(formData)
-      });
+            const data = await response.json();
 
-      const data = await response.json();
-      console.log('Trip creation response:', data);
+            if (data.success) {
+                const newTrip = {
+                    ...data.data.tripData,
+                    itinerary: data.data.itinerary
+                };
 
-      if (data.success) {
-        const newTrip = data.data.tripData;
-        
-        // Add trip to state
-        setTrips(prev => [newTrip, ...prev]);
-        setCurrentTrip(newTrip);
-        
-        // Close form
-        setIsCreating(false);
-        
-        // Reset form
-        setFormData({
-          destination: '',
-          duration: '',
-          budget: '',
-          startDate: '',
-          endDate: '',
-          travelStyle: user?.travelStyle || 'moderate',
-          interests: []
-        });
+                setTrips(prev => [newTrip, ...prev]);
+                setCurrentTrip(newTrip);
+                setSelectedTrip(newTrip);
+                setIsCreating(false);
 
-        // Send success message
-        sendChatMessage(`I just created a new itinerary for ${formData.destination}! Can you give me some additional tips?`);
-        
-        // Show success notification
-        console.log('✅ Trip created successfully:', newTrip.title);
-      } else {
-        console.error('Trip creation failed:', data.error);
-        alert(`Failed to create trip: ${data.error || 'Unknown error'}`);
-      }
-    } catch (error) {
-      console.error('Trip creation error:', error);
-      alert('Failed to create trip. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
+                // Reset form
+                setFormData({
+                    destination: '',
+                    duration: '',
+                    budget: '',
+                    startDate: '',
+                    endDate: '',
+                    travelStyle: user?.travelStyle || 'moderate',
+                    interests: []
+                });
 
-  const toggleInterest = (interest) => {
-    setFormData(prev => ({
-      ...prev,
-      interests: prev.interests.includes(interest)
-        ? prev.interests.filter(i => i !== interest)
-        : [...prev.interests, interest]
-    }));
-  };
+                // Switch to itinerary tab to show results
+                setBookingTab('itinerary');
 
-  return (
+                // Success message
+                sendChatMessage(`I just created a new itinerary for ${formData.destination}! Can you give me some additional tips?`);
+            }
+        } catch (error) {
+            console.error('Trip creation error:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const toggleInterest = (interest) => {
+        setFormData(prev => ({
+            ...prev,
+            interests: prev.interests.includes(interest)
+                ? prev.interests.filter(i => i !== interest)
+                : [...prev.interests, interest]
+        }));
+    };
+
+    // Show booking interface if trip is selected
+    if (selectedTrip) {
+        return (
+            <div className="max-w-7xl mx-auto px-4 py-8">
+                {/* Header with Back Button */}
+                <div className="mb-8">
+                    <button
+                        onClick={() => setSelectedTrip(null)}
+                        className="flex items-center space-x-2 text-blue-600 hover:text-blue-700 mb-4"
+                    >
+                        <span>←</span>
+                        <span>Back to All Trips</span>
+                    </button>
+
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h2 className="text-3xl font-bold text-gray-900 mb-2">
+                                {selectedTrip.title || `${selectedTrip.destination} Trip`}
+                            </h2>
+                            <p className="text-gray-600">
+                                {selectedTrip.destination} • {selectedTrip.duration} days • ${selectedTrip.budget}
+                            </p>
+                        </div>
+<div className="flex space-x-3">
+    <button
+        onClick={() => sendChatMessage(`Help me refine my ${selectedTrip.destination} itinerary`)}
+        className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
+    >
+        <MessageCircle className="w-4 h-4" />
+        <span>Ask AI</span>
+    </button>
+</div>
+</div>
+</div>
+
+{/* Booking Tabs */}
+<div className="bg-white rounded-xl shadow-lg mb-6">
+    <div className="border-b border-gray-200">
+        <nav className="flex space-x-8 px-6">
+            {[
+                { id: 'itinerary', label: 'Itinerary', icon: Calendar },
+                { id: 'flights', label: 'Flights', icon: Plane },
+                { id: 'hotels', label: 'Hotels', icon: Star }
+            ].map(({ id, label, icon: Icon }) => (
+                <button
+                    key={id}
+                    onClick={() => setBookingTab(id)}
+                    className={`flex items-center space-x-2 py-4 border-b-2 transition-colors ${
+                        bookingTab === id
+                            ? 'border-blue-600 text-blue-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700'
+                    }`}
+                >
+                    <Icon className="w-5 h-5" />
+                    <span className="font-medium">{label}</span>
+                </button>
+            ))}
+        </nav>
+    </div>
+</div>
+
+{/* Tab Content */}
+<div className="animate-fade-in">
+    {bookingTab === 'itinerary' && (
+        <ItineraryView trip={selectedTrip} itinerary={selectedTrip.itinerary} />
+    )}
+
+    {bookingTab === 'flights' && (
+        <FlightSearch trip={selectedTrip} token={token} />
+    )}
+
+    {bookingTab === 'hotels' && (
+        <HotelSearch trip={selectedTrip} token={token} />
+    )}
+</div>
+</div>
+);
+}
+
+// Default trip list view
+return (
     <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h2 className="text-3xl font-bold text-gray-900 mb-2">Trip Planning</h2>
-        <p className="text-gray-600">Create your perfect itinerary with AI assistance</p>
-      </div>
+        <div className="mb-8">
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">Trip Planning</h2>
+            <p className="text-gray-600">Create your perfect itinerary with AI assistance, then book flights and hotels</p>
+        </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Trip Creation Form */}
-        <div className="lg:col-span-2">
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-semibold text-gray-900">Plan New Trip</h3>
-              <button
-                onClick={() => setIsCreating(!isCreating)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                {isCreating ? 'Cancel' : 'New Trip'}
-              </button>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Trip Creation Form */}
+            <div className="lg:col-span-2">
+                <div className="bg-white rounded-xl shadow-lg p-6">
+                    <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-xl font-semibold text-gray-900">Plan New Trip</h3>
+                        <button
+                            onClick={() => setIsCreating(!isCreating)}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                            {isCreating ? 'Cancel' : 'New Trip'}
+                        </button>
+                    </div>
+
+                    {isCreating && (
+                        <form onSubmit={handleCreateTrip} className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Destination
+                                    </label>
+                                    <input
+                                        type="text"
+                                        required
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                        value={formData.destination}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, destination: e.target.value }))}
+                                        placeholder="e.g., Tokyo, Japan"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Duration (days)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        required
+                                        min="1"
+                                        max="365"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                        value={formData.duration}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, duration: e.target.value }))}
+                                        placeholder="7"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Budget ($)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                        value={formData.budget}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, budget: e.target.value }))}
+                                        placeholder="2000"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Travel Style
+                                    </label>
+                                    <select
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                        value={formData.travelStyle}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, travelStyle: e.target.value }))}
+                                    >
+                                        <option value="budget">Budget</option>
+                                        <option value="moderate">Moderate</option>
+                                        <option value="luxury">Luxury</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Start Date
+                                    </label>
+                                    <input
+                                        type="date"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                        value={formData.startDate}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, startDate: e.target.value }))}
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        End Date
+                                    </label>
+                                    <input
+                                        type="date"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                        value={formData.endDate}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, endDate: e.target.value }))}
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-3">
+                                    Interests
+                                </label>
+                                <div className="flex flex-wrap gap-2">
+                                    {interestOptions.map(interest => (
+                                        <button
+                                            key={interest}
+                                            type="button"
+                                            onClick={() => toggleInterest(interest)}
+                                            className={`px-3 py-1 rounded-full text-sm transition-colors ${
+                                                formData.interests.includes(interest)
+                                                    ? 'bg-blue-600 text-white'
+                                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                            }`}
+                                        >
+                                            {interest}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={loading || !formData.destination || !formData.duration}
+                                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                            >
+                                {loading ? (
+                                    <>
+                                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                                        Generating AI Itinerary...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Zap className="w-5 h-5 mr-2" />
+                                        Generate AI Itinerary
+                                    </>
+                                )}
+                            </button>
+                        </form>
+                    )}
+
+                    {/* Recent Trips */}
+                    {!isCreating && trips.length > 0 && (
+                        <div className="space-y-4">
+                            <h4 className="text-lg font-semibold text-gray-900">Your Recent Trips</h4>
+                            {trips.slice(0, 5).map(trip => (
+                                <div
+                                    key={trip.id}
+                                    className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                                    onClick={() => setSelectedTrip(trip)}
+                                >
+                                    <div className="flex items-start justify-between">
+                                        <div className="flex-1">
+                                            <h5 className="font-semibold text-gray-900">{trip.title || `${trip.destination} Trip`}</h5>
+                                            <p className="text-gray-600 text-sm">{trip.destination}</p>
+                                            <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
+                                                <span>{trip.duration} days</span>
+                                                {trip.budget && <span>${trip.budget}</span>}
+                                                <span className={`px-2 py-1 rounded-full ${
+                                                    trip.status === 'active' ? 'bg-green-100 text-green-700' :
+                                                        trip.status === 'completed' ? 'bg-blue-100 text-blue-700' :
+                                                            'bg-gray-100 text-gray-700'
+                                                }`}>
+                            {trip.status}
+                          </span>
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-col space-y-2 ml-4">
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setSelectedTrip(trip);
+                                                    setBookingTab('flights');
+                                                }}
+                                                className="text-blue-600 hover:text-blue-700 text-sm flex items-center space-x-1"
+                                            >
+                                                <Plane className="w-4 h-4" />
+                                                <span>Flights</span>
+                                            </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setSelectedTrip(trip);
+                                                    setBookingTab('hotels');
+                                                }}
+                                                className="text-green-600 hover:text-green-700 text-sm flex items-center space-x-1"
+                                            >
+                                                <Star className="w-4 h-4" />
+                                                <span>Hotels</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {!isCreating && trips.length === 0 && (
+                        <div className="text-center py-12">
+                            <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                            <h3 className="text-lg font-medium text-gray-900 mb-2">No trips yet</h3>
+                            <p className="text-gray-500 mb-4">Create your first trip to get started!</p>
+                            <button
+                                onClick={() => setIsCreating(true)}
+                                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+                            >
+                                Create Your First Trip
+                            </button>
+                        </div>
+                    )}
+                </div>
             </div>
 
-            {isCreating && (
-              <form onSubmit={handleCreateTrip} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Destination
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      value={formData.destination}
-                      onChange={(e) => setFormData(prev => ({ ...prev, destination: e.target.value }))}
-                      placeholder="e.g., Tokyo, Japan"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Duration (days)
-                    </label>
-                    <input
-                      type="number"
-                      required
-                      min="1"
-                      max="365"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      value={formData.duration}
-                      onChange={(e) => setFormData(prev => ({ ...prev, duration: e.target.value }))}
-                      placeholder="7"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Budget ($)
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      value={formData.budget}
-                      onChange={(e) => setFormData(prev => ({ ...prev, budget: e.target.value }))}
-                      placeholder="2000"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Travel Style
-                    </label>
-                    <select
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      value={formData.travelStyle}
-                      onChange={(e) => setFormData(prev => ({ ...prev, travelStyle: e.target.value }))}
-                    >
-                      <option value="budget">Budget</option>
-                      <option value="moderate">Moderate</option>
-                      <option value="luxury">Luxury</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Start Date
-                    </label>
-                    <input
-                      type="date"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      value={formData.startDate}
-                      onChange={(e) => setFormData(prev => ({ ...prev, startDate: e.target.value }))}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      End Date
-                    </label>
-                    <input
-                      type="date"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      value={formData.endDate}
-                      onChange={(e) => setFormData(prev => ({ ...prev, endDate: e.target.value }))}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
-                    Interests
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {interestOptions.map(interest => (
-                      <button
-                        key={interest}
-                        type="button"
-                        onClick={() => toggleInterest(interest)}
-                        className={`px-3 py-1 rounded-full text-sm transition-colors ${
-                          formData.interests.includes(interest)
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                      >
-                        {interest}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={loading || !formData.destination || !formData.duration}
-                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                >
-                  {loading ? (
-                    <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                      Generating AI Itinerary...
-                    </>
-                  ) : (
-                    <>
-                      <Zap className="w-5 h-5 mr-2" />
-                      Generate AI Itinerary
-                    </>
-                  )}
-                </button>
-              </form>
-            )}
-
-            {/* Recent Trips List */}
-            {!isCreating && (
-              <div className="space-y-4">
-                <h4 className="text-lg font-semibold text-gray-900">Your Recent Trips</h4>
-                {trips.length > 0 ? (
-                  trips.slice(0, 5).map(trip => (
-                    <div 
-                      key={trip.id} 
-                      className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <h5 className="font-semibold text-gray-900 mb-1">{trip.title}</h5>
-                          <p className="text-gray-600 text-sm mb-2">{trip.destination}</p>
-                          
-                          <div className="flex items-center space-x-4 mb-3 text-xs text-gray-500">
-                            <span className="flex items-center">
-                              📅 {trip.duration} days
-                            </span>
-                            {trip.budget && (
-                              <span className="flex items-center">
-                                💰 ${trip.budget}
-                              </span>
-                            )}
-                            <span className={`px-2 py-1 rounded-full ${
-                              trip.status === 'active' ? 'bg-green-100 text-green-700' :
-                              trip.status === 'completed' ? 'bg-blue-100 text-blue-700' :
-                              'bg-gray-100 text-gray-700'
-                            }`}>
-                              {trip.status}
-                            </span>
-                          </div>
-
-                          {/* Itinerary Preview */}
-                          {trip.itinerary && trip.itinerary.itinerary && (
-                            <div className="bg-blue-50 rounded-lg p-3 mb-3">
-                              <p className="text-xs text-blue-700 font-medium mb-1">
-                                ✨ AI-Generated Itinerary
-                              </p>
-                              <p className="text-sm text-gray-700 line-clamp-2">
-                                {trip.itinerary.itinerary.substring(0, 120)}...
-                              </p>
+            {/* Quick Actions & Info */}
+            <div className="space-y-6">
+                <div className="bg-white rounded-xl shadow-lg p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">✨ AI Features</h3>
+                    <div className="space-y-3">
+                        <div className="flex items-start space-x-3">
+                            <div className="bg-blue-100 p-2 rounded-lg">
+                                <Zap className="w-5 h-5 text-blue-600" />
                             </div>
-                          )}
-
-                          {/* Interests Tags */}
-                          {trip.interests && trip.interests.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {trip.interests.slice(0, 3).map((interest, idx) => (
-                                <span key={idx} className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">
-                                  {interest}
-                                </span>
-                              ))}
+                            <div>
+                                <h4 className="font-medium text-gray-900 text-sm">Smart Itineraries</h4>
+                                <p className="text-xs text-gray-600">AI creates personalized day-by-day plans</p>
                             </div>
-                          )}
                         </div>
 
-                        <button
-                          onClick={() => setSelectedTrip(trip)}
-                          className="ml-4 text-blue-600 hover:text-blue-700 text-sm font-medium whitespace-nowrap"
-                        >
-                          View Details →
-                        </button>
-                      </div>
+                        <div className="flex items-start space-x-3">
+                            <div className="bg-green-100 p-2 rounded-lg">
+                                <Plane className="w-5 h-5 text-green-600" />
+                            </div>
+                            <div>
+                                <h4 className="font-medium text-gray-900 text-sm">Flight Search</h4>
+                                <p className="text-xs text-gray-600">Find and compare flights instantly</p>
+                            </div>
+                        </div>
+
+                        <div className="flex items-start space-x-3">
+                            <div className="bg-purple-100 p-2 rounded-lg">
+                                <Star className="w-5 h-5 text-purple-600" />
+                            </div>
+                            <div>
+                                <h4 className="font-medium text-gray-900 text-sm">Hotel Booking</h4>
+                                <p className="text-xs text-gray-600">Browse accommodations that fit your style</p>
+                            </div>
+                        </div>
                     </div>
-                  ))
-                ) : (
-                  <div className="text-center py-12">
-                    <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                    <p className="text-gray-500">No trips yet. Create your first trip!</p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+                </div>
+
+                <div className="bg-white rounded-xl shadow-lg p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+                    <div className="space-y-3">
+                        <button
+                            onClick={() => sendChatMessage("Help me plan a weekend getaway")}
+                            className="w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                        >
+                            <div className="flex items-center space-x-3">
+                                <Calendar className="w-5 h-5 text-blue-600" />
+                                <span>Weekend Getaway</span>
+                            </div>
+                        </button>
+
+                        <button
+                            onClick={() => sendChatMessage("Find cheap flights to Europe")}
+                            className="w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                        >
+                            <div className="flex items-center space-x-3">
+                                <Plane className="w-5 h-5 text-blue-600" />
+                                <span>Find Cheap Flights</span>
+                            </div>
+                        </button>
+
+                        <button
+                            onClick={() => sendChatMessage("Recommend budget hotels")}
+                            className="w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                        >
+                            <div className="flex items-center space-x-3">
+                                <Star className="w-5 h-5 text-blue-600" />
+                                <span>Budget Hotels</span>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+
+                {/* Budget Insights */}
+                <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl shadow-lg p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">💡 Travel Tips</h3>
+                    <div className="space-y-3 text-sm">
+                        <div className="flex items-start space-x-2">
+                            <div className="w-1.5 h-1.5 bg-blue-600 rounded-full mt-1.5"></div>
+                            <p className="text-gray-700">Book flights 6-8 weeks in advance for best prices</p>
+                        </div>
+                        <div className="flex items-start space-x-2">
+                            <div className="w-1.5 h-1.5 bg-blue-600 rounded-full mt-1.5"></div>
+                            <p className="text-gray-700">Tuesday and Wednesday are cheapest days to fly</p>
+                        </div>
+                        <div className="flex items-start space-x-2">
+                            <div className="w-1.5 h-1.5 bg-blue-600 rounded-full mt-1.5"></div>
+                            <p className="text-gray-700">Hotels are cheaper on weekdays than weekends</p>
+                        </div>
+                        <div className="flex items-start space-x-2">
+                            <div className="w-1.5 h-1.5 bg-blue-600 rounded-full mt-1.5"></div>
+                            <p className="text-gray-700">Use incognito mode when searching for flights</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-
-        {/* Quick Actions Sidebar */}
-        <div className="space-y-6">
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-            <div className="space-y-3">
-              <button
-                onClick={() => sendChatMessage("Help me plan a weekend getaway")}
-                className="w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex items-center space-x-3">
-                  <Calendar className="w-5 h-5 text-blue-600" />
-                  <span>Weekend Getaway</span>
-                </div>
-              </button>
-
-              <button
-                onClick={() => sendChatMessage("Find flights for my next trip")}
-                className="w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex items-center space-x-3">
-                  <Plane className="w-5 h-5 text-blue-600" />
-                  <span>Find Flights</span>
-                </div>
-              </button>
-
-              <button
-                onClick={() => sendChatMessage("Recommend hotels in my destination")}
-                className="w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex items-center space-x-3">
-                  <Star className="w-5 h-5 text-blue-600" />
-                  <span>Find Hotels</span>
-                </div>
-              </button>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Budget Insights</h3>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600">Average Trip Cost</span>
-                <span className="font-semibold">
-                  ${trips.length > 0 
-                    ? Math.round(trips.reduce((sum, t) => sum + (t.budget || 0), 0) / trips.length)
-                    : '0'}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600">Total Trips</span>
-                <span className="font-semibold">{trips.length}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Trip Details Modal */}
-      {selectedTrip && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            {/* Modal Header */}
-            <div className="sticky top-0 bg-white border-b p-6 z-10">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">{selectedTrip.title}</h2>
-                  <p className="text-gray-600">{selectedTrip.destination} • {selectedTrip.duration} days</p>
-                </div>
-                <button
-                  onClick={() => setSelectedTrip(null)}
-                  className="text-gray-400 hover:text-gray-600 p-2"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-            </div>
-
-            {/* Modal Content */}
-            <div className="p-6">
-              {/* Trip Summary */}
-              <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-6 mb-6">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-600">Duration</p>
-                    <p className="font-semibold">{selectedTrip.duration} days</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Budget</p>
-                    <p className="font-semibold">${selectedTrip.budget || 'Flexible'}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Travel Style</p>
-                    <p className="font-semibold capitalize">{selectedTrip.travelStyle}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Status</p>
-                    <p className="font-semibold capitalize">{selectedTrip.status}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* AI-Generated Itinerary */}
-              {selectedTrip.itinerary && selectedTrip.itinerary.itinerary ? (
-                <div className="prose max-w-none">
-                  <h3 className="text-xl font-semibold mb-4 flex items-center">
-                    <Zap className="w-5 h-5 text-yellow-500 mr-2" />
-                    AI-Generated Itinerary
-                  </h3>
-                <div className="bg-gray-50 rounded-lg p-6">
-                  <FormattedItinerary text={selectedTrip.itinerary.itinerary} />
-                </div>
-
-                  {/* Metadata */}
-                  <div className="mt-6 pt-6 border-t text-sm text-gray-500">
-                    <p>Generated by {selectedTrip.itinerary.model || 'AI'}</p>
-                    <p>Created: {new Date(selectedTrip.itinerary.generatedAt).toLocaleString()}</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <p className="text-gray-500">No itinerary available</p>
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="mt-6 flex flex-wrap gap-3">
-                <button 
-                  onClick={() => {
-                    sendChatMessage(`Can you give me more tips for my ${selectedTrip.destination} trip?`);
-                    setSelectedTrip(null);
-                  }}
-                  className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 flex items-center justify-center"
-                >
-                  <MessageCircle className="w-4 h-4 mr-2" />
-                  Ask AI for Tips
-                </button>
-                
-                <button 
-                  onClick={() => {
-                    if (navigator.share) {
-                      navigator.share({
-                        title: selectedTrip.title,
-                        text: selectedTrip.itinerary?.itinerary || 'Check out my travel itinerary!'
-                      });
-                    } else {
-                      alert('Sharing not supported on this device');
-                    }
-                  }}
-                  className="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 flex items-center justify-center"
-                >
-                  <Star className="w-4 h-4 mr-2" />
-                  Share
-                </button>
-                
-                <button 
-                  onClick={() => {
-                    const blob = new Blob([selectedTrip.itinerary?.itinerary || ''], { type: 'text/plain' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `${selectedTrip.destination}-itinerary.txt`;
-                    a.click();
-                    URL.revokeObjectURL(url);
-                  }}
-                  className="flex-1 bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 flex items-center justify-center"
-                >
-                  <Calendar className="w-4 h-4 mr-2" />
-                  Download
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
-  );
-};// ===================================
+)
+// ===================================
+// FLIGHT SEARCH COMPONENT
+// ===================================
+const FlightSearch = ({ trip, token }) => {
+    const [searchParams, setSearchParams] = useState({
+        origin: '',
+        destination: trip?.destination?.split(',')[0] || '',
+        departureDate: trip?.startDate || '',
+        returnDate: trip?.endDate || '',
+        adults: 1,
+        travelClass: 'ECONOMY'
+    });
+    const [flights, setFlights] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    const searchFlights = async () => {
+        if (!searchParams.origin || !searchParams.destination || !searchParams.departureDate) {
+            setError('Please fill in origin, destination, and departure date');
+            return;
+        }
+
+        setLoading(true);
+        setError('');
+
+        try {
+            const queryParams = new URLSearchParams({
+                origin: searchParams.origin,
+                destination: searchParams.destination,
+                departureDate: searchParams.departureDate,
+                returnDate: searchParams.returnDate || '',
+                adults: searchParams.adults,
+                travelClass: searchParams.travelClass
+            });
+
+            const response = await fetch(`${API_BASE_URL}/flights/search?${queryParams}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                setFlights(data.data);
+            } else {
+                setError(data.error || 'Failed to search flights');
+            }
+        } catch (err) {
+            console.error('Flight search error:', err);
+            setError('Failed to search flights. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const formatDuration = (duration) => {
+        if (!duration) return 'N/A';
+        const hours = Math.floor(parseInt(duration.replace('PT', '').replace('H', '')) / 60);
+        const minutes = parseInt(duration.replace('PT', '').replace('H', '')) % 60;
+        return `${hours}h ${minutes}m`;
+    };
+
+    return (
+        <div className="space-y-6">
+            {/* Search Form */}
+            <div className="bg-white rounded-xl shadow-lg p-6">
+                <h3 className="text-xl font-semibold text-gray-900 mb-4">Search Flights</h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            From (Airport Code)
+                        </label>
+                        <input
+                            type="text"
+                            placeholder="e.g., JFK, LAX"
+                            maxLength={3}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 uppercase"
+                            value={searchParams.origin}
+                            onChange={(e) => setSearchParams(prev => ({ ...prev, origin: e.target.value.toUpperCase() }))}
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            To (Airport Code)
+                        </label>
+                        <input
+                            type="text"
+                            placeholder="e.g., CDG, LHR"
+                            maxLength={3}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 uppercase"
+                            value={searchParams.destination}
+                            onChange={(e) => setSearchParams(prev => ({ ...prev, destination: e.target.value.toUpperCase() }))}
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Departure Date
+                        </label>
+                        <input
+                            type="date"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            value={searchParams.departureDate}
+                            onChange={(e) => setSearchParams(prev => ({ ...prev, departureDate: e.target.value }))}
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Return Date (Optional)
+                        </label>
+                        <input
+                            type="date"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            value={searchParams.returnDate}
+                            onChange={(e) => setSearchParams(prev => ({ ...prev, returnDate: e.target.value }))}
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Passengers
+                        </label>
+                        <select
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            value={searchParams.adults}
+                            onChange={(e) => setSearchParams(prev => ({ ...prev, adults: parseInt(e.target.value) }))}
+                        >
+                            {[1, 2, 3, 4, 5, 6].map(num => (
+                                <option key={num} value={num}>{num} Adult{num > 1 ? 's' : ''}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Class
+                        </label>
+                        <select
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            value={searchParams.travelClass}
+                            onChange={(e) => setSearchParams(prev => ({ ...prev, travelClass: e.target.value }))}
+                        >
+                            <option value="ECONOMY">Economy</option>
+                            <option value="PREMIUM_ECONOMY">Premium Economy</option>
+                            <option value="BUSINESS">Business</option>
+                            <option value="FIRST">First Class</option>
+                        </select>
+                    </div>
+                </div>
+
+                {error && (
+                    <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-3">
+                        <p className="text-red-700 text-sm">{error}</p>
+                    </div>
+                )}
+
+                <button
+                    onClick={searchFlights}
+                    disabled={loading}
+                    className="mt-4 w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-colors disabled:opacity-50 flex items-center justify-center"
+                >
+                    {loading ? (
+                        <>
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                            Searching Flights...
+                        </>
+                    ) : (
+                        <>
+                            <Plane className="w-5 h-5 mr-2" />
+                            Search Flights
+                        </>
+                    )}
+                </button>
+            </div>
+
+            {/* Results */}
+            {flights.length > 0 && (
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-xl font-semibold text-gray-900">
+                            Available Flights ({flights.length})
+                        </h3>
+                        <div className="flex items-center space-x-2">
+                            <select className="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                                <option>Price: Low to High</option>
+                                <option>Price: High to Low</option>
+                                <option>Duration: Shortest</option>
+                                <option>Departure: Earliest</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    {flights.map((flight, index) => (
+                        <div key={flight.id || index} className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow">
+                            <div className="flex items-start justify-between mb-4">
+                                <div className="flex-1">
+                                    <div className="flex items-center space-x-4 mb-4">
+                                        <div className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-medium">
+                                            {flight.validatingAirlineCodes?.[0] || 'Airline'}
+                                        </div>
+                                        <div className="text-sm text-gray-500">
+                                            Flight #{flight.id?.substring(0, 8)}
+                                        </div>
+                                    </div>
+
+                                    {/* Itinerary Segments */}
+                                    {flight.itineraries?.map((itinerary, iIndex) => (
+                                        <div key={iIndex} className="mb-4">
+                                            <div className="flex items-center space-x-4 text-sm text-gray-500 mb-3">
+                        <span className="font-medium">
+                          {iIndex === 0 ? 'Outbound' : 'Return'}
+                        </span>
+                                                <span>Duration: {formatDuration(itinerary.duration)}</span>
+                                                <span>{itinerary.segments?.length || 0} stop{itinerary.segments?.length !== 1 ? 's' : ''}</span>
+                                            </div>
+
+                                            {itinerary.segments?.map((segment, sIndex) => (
+                                                <div key={sIndex} className="flex items-center space-x-4 mb-3">
+                                                    <div className="flex-1 flex items-center">
+                                                        <div className="text-center">
+                                                            <div className="text-2xl font-bold text-gray-900">
+                                                                {new Date(segment.departure.at).toLocaleTimeString('en-US', {
+                                                                    hour: '2-digit',
+                                                                    minute: '2-digit'
+                                                                })}
+                                                            </div>
+                                                            <div className="text-sm text-gray-600">{segment.departure.iataCode}</div>
+                                                        </div>
+
+                                                        <div className="flex-1 mx-4">
+                                                            <div className="flex items-center justify-center">
+                                                                <div className="flex-1 border-t-2 border-gray-300"></div>
+                                                                <Plane className="w-4 h-4 text-gray-400 mx-2" />
+                                                                <div className="flex-1 border-t-2 border-gray-300"></div>
+                                                            </div>
+                                                            <div className="text-center text-xs text-gray-500 mt-1">
+                                                                {segment.carrierCode} {segment.number}
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="text-center">
+                                                            <div className="text-2xl font-bold text-gray-900">
+                                                                {new Date(segment.arrival.at).toLocaleTimeString('en-US', {
+                                                                    hour: '2-digit',
+                                                                    minute: '2-digit'
+                                                                })}
+                                                            </div>
+                                                            <div className="text-sm text-gray-600">{segment.arrival.iataCode}</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="ml-6 text-right">
+                                    <div className="text-3xl font-bold text-gray-900 mb-2">
+                                        ${flight.price?.total || 'N/A'}
+                                    </div>
+                                    <div className="text-sm text-gray-500 mb-4">
+                                        {flight.price?.currency || 'USD'} per person
+                                    </div>
+                                    <button className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors">
+                                        Book Now
+                                    </button>
+                                    <button className="w-full mt-2 bg-gray-100 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-200 transition-colors text-sm">
+                                        View Details
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {!loading && flights.length === 0 && searchParams.origin && (
+                <div className="bg-white rounded-xl shadow-lg p-12 text-center">
+                    <Plane className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No flights found</h3>
+                    <p className="text-gray-500">Try adjusting your search criteria</p>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// ===================================
+// HOTEL SEARCH COMPONENT
+// ===================================
+const HotelSearch = ({ trip, token }) => {
+    const [searchParams, setSearchParams] = useState({
+        cityCode: '',
+        checkInDate: trip?.startDate || '',
+        checkOutDate: trip?.endDate || '',
+        adults: 1,
+        rooms: 1
+    });
+    const [hotels, setHotels] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    const searchHotels = async () => {
+        if (!searchParams.cityCode || !searchParams.checkInDate || !searchParams.checkOutDate) {
+            setError('Please fill in all required fields');
+            return;
+        }
+
+        setLoading(true);
+        setError('');
+
+        try {
+            const queryParams = new URLSearchParams({
+                cityCode: searchParams.cityCode,
+                checkInDate: searchParams.checkInDate,
+                checkOutDate: searchParams.checkOutDate,
+                adults: searchParams.adults,
+                rooms: searchParams.rooms
+            });
+
+            const response = await fetch(`${API_BASE_URL}/hotels/search?${queryParams}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                setHotels(data.data);
+            } else {
+                setError(data.error || 'Failed to search hotels');
+            }
+        } catch (err) {
+            console.error('Hotel search error:', err);
+            setError('Failed to search hotels. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="space-y-6">
+            {/* Search Form */}
+            <div className="bg-white rounded-xl shadow-lg p-6">
+                <h3 className="text-xl font-semibold text-gray-900 mb-4">Search Hotels</h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            City Code
+                        </label>
+                        <input
+                            type="text"
+                            placeholder="e.g., NYC, LON, PAR"
+                            maxLength={3}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 uppercase"
+                            value={searchParams.cityCode}
+                            onChange={(e) => setSearchParams(prev => ({ ...prev, cityCode: e.target.value.toUpperCase() }))}
+                        />
+                        <p className="text-xs text-gray-500 mt-1">3-letter IATA city code</p>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Check-in Date
+                        </label>
+                        <input
+                            type="date"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            value={searchParams.checkInDate}
+                            onChange={(e) => setSearchParams(prev => ({ ...prev, checkInDate: e.target.value }))}
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Check-out Date
+                        </label>
+                        <input
+                            type="date"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            value={searchParams.checkOutDate}
+                            onChange={(e) => setSearchParams(prev => ({ ...prev, checkOutDate: e.target.value }))}
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Adults
+                        </label>
+                        <select
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            value={searchParams.adults}
+                            onChange={(e) => setSearchParams(prev => ({ ...prev, adults: parseInt(e.target.value) }))}
+                        >
+                            {[1, 2, 3, 4].map(num => (
+                                <option key={num} value={num}>{num} Adult{num > 1 ? 's' : ''}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Rooms
+                        </label>
+                        <select
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            value={searchParams.rooms}
+                            onChange={(e) => setSearchParams(prev => ({ ...prev, rooms: parseInt(e.target.value) }))}
+                        >
+                            {[1, 2, 3, 4].map(num => (
+                                <option key={num} value={num}>{num} Room{num > 1 ? 's' : ''}</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+
+                {error && (
+                    <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-3">
+                        <p className="text-red-700 text-sm">{error}</p>
+                    </div>
+                )}
+
+                <button
+                    onClick={searchHotels}
+                    disabled={loading}
+                    className="mt-4 w-full bg-gradient-to-r from-green-600 to-teal-600 text-white py-3 rounded-lg hover:from-green-700 hover:to-teal-700 transition-colors disabled:opacity-50 flex items-center justify-center"
+                >
+                    {loading ? (
+                        <>
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                            Searching Hotels...
+                        </>
+                    ) : (
+                        <>
+                            <Star className="w-5 h-5 mr-2" />
+                            Search Hotels
+                        </>
+                    )}
+                </button>
+            </div>
+
+            {/* Results */}
+            {hotels.length > 0 && (
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-xl font-semibold text-gray-900">
+                            Available Hotels ({hotels.length})
+                        </h3>
+                        <div className="flex items-center space-x-2">
+                            <select className="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                                <option>Recommended</option>
+                                <option>Price: Low to High</option>
+                                <option>Price: High to Low</option>
+                                <option>Star Rating</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    {hotels.map((hotel, index) => (
+                        <div key={hotel.hotelId || index} className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
+                            <div className="flex">
+                                {/* Hotel Image Placeholder */}
+                                <div className="w-64 h-48 bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">
+                                    <Star className="w-16 h-16 text-gray-400" />
+                                </div>
+
+                                {/* Hotel Details */}
+                                <div className="flex-1 p-6">
+                                    <div className="flex items-start justify-between mb-4">
+                                        <div className="flex-1">
+                                            <h4 className="text-xl font-semibold text-gray-900 mb-2">{hotel.name}</h4>
+                                            <p className="text-gray-600 text-sm mb-3">{hotel.address?.cityName}</p>
+
+                                            {/* Rating Stars */}
+                                            <div className="flex items-center space-x-2 mb-3">
+                                                <div className="flex">
+                                                    {[...Array(5)].map((_, i) => (
+                                                        <Star
+                                                            key={i}
+                                                            className={`w-4 h-4 ${
+                                                                i < (hotel.rating || 0) ? 'text-yellow-400 fill-current' : 'text-gray-300'
+                                                            }`}
+                                                        />
+                                                    ))}
+                                                </div>
+                                                {hotel.rating && (
+                                                    <span className="text-sm text-gray-600">({hotel.rating} stars)</span>
+                                                )}
+                                            </div>
+
+                                            {/* Amenities */}
+                                            {hotel.amenities && (
+                                                <div className="flex flex-wrap gap-2">
+                                                    {hotel.amenities.slice(0, 4).map((amenity, i) => (
+                                                        <span key={i} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                              {amenity}
+                            </span>
+                                                    ))}
+                                                    {hotel.amenities.length > 4 && (
+                                                        <span className="text-xs text-gray-500">
+                              +{hotel.amenities.length - 4} more
+                            </span>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="ml-6 text-right">
+                                            <div className="text-sm text-gray-500 mb-1">From</div>
+                                            <div className="text-3xl font-bold text-gray-900 mb-2">
+                                                ${hotel.price || '150'}
+                                            </div>
+                                            <div className="text-sm text-gray-500 mb-4">per night</div>
+                                            <button className="w-full bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors whitespace-nowrap">
+                                                Book Now
+                                            </button>
+                                            <button className="w-full mt-2 bg-gray-100 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-200 transition-colors text-sm">
+                                                View Details
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {!loading && hotels.length === 0 && searchParams.cityCode && (
+                <div className="bg-white rounded-xl shadow-lg p-12 text-center">
+                    <Star className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No hotels found</h3>
+                    <p className="text-gray-500">Try adjusting your search criteria</p>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// ===================================
+// ITINERARY VIEW COMPONENT
+// ===================================
+const ItineraryView = ({ trip, itinerary }) => {
+    if (!itinerary) {
+        return (
+            <div className="bg-white rounded-xl shadow-lg p-12 text-center">
+                <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No itinerary yet</h3>
+                <p className="text-gray-500">Generate an itinerary to see your day-by-day plan</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="bg-white rounded-xl shadow-lg p-6">
+            <div className="flex items-center justify-between mb-6">
+                <div>
+                    <h3 className="text-2xl font-bold text-gray-900">{trip.title}</h3>
+                    <p className="text-gray-600">{trip.destination} • {trip.duration} days</p>
+                </div>
+                <div className="text-right">
+                    <div className="text-sm text-gray-500">Total Budget</div>
+                    <div className="text-2xl font-bold text-gray-900">${trip.budget}</div>
+                </div>
+            </div>
+
+            <div className="prose max-w-none">
+                <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-6 mb-6">
+                    <h4 className="text-lg font-semibold text-gray-900 mb-3">📋 Your AI-Generated Itinerary</h4>
+                    <div className="text-gray-700 whitespace-pre-wrap leading-relaxed">
+                        {typeof itinerary === 'string' ? itinerary : itinerary.itinerary}
+                    </div>
+                </div>
+
+                {/* Quick Actions */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                    <button className="flex items-center justify-center space-x-2 bg-blue-100 text-blue-700 px-4 py-3 rounded-lg hover:bg-blue-200 transition-colors">
+                        <Plane className="w-5 h-5" />
+                        <span>Add Flights</span>
+                    </button>
+                    <button className="flex items-center justify-center space-x-2 bg-green-100 text-green-700 px-4 py-3 rounded-lg hover:bg-green-200 transition-colors">
+                        <Star className="w-5 h-5" />
+                        <span>Add Hotels</span>
+                    </button>
+                    <button className="flex items-center justify-center space-x-2 bg-purple-100 text-purple-700 px-4 py-3 rounded-lg hover:bg-purple-200 transition-colors">
+                        <MapPin className="w-5 h-5" />
+                        <span>Add Activities</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+// ===================================
 // COMPANION MODE COMPONENT
 // ===================================
 const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTrip, sendChatMessage }) => {
@@ -2373,15 +2954,17 @@ const AIChat = ({ isOpen, onClose, messages, onSendMessage, currentMode, connect
     const quickActions = {
         planning: [
             'Help me plan a weekend trip',
-            'Find flights to my destination',
-            'Recommend hotels',
-            'Create a budget estimate'
+            'Find cheap flights to my destination',
+            'Recommend budget hotels',
+            'Compare flight prices',
+            'Show me hotel deals'
         ],
         companion: [
             'Find restaurants near me',
             'What\'s the weather like?',
             'Translate this phrase',
-            'Get directions'
+            'Get directions',
+            'Book a nearby hotel'
         ],
         memory: [
             'Help me write about this experience',
@@ -2529,6 +3112,5 @@ const FloatingChatButton = ({ onClick }) => {
 };
 
 export default App;
-
 
 

@@ -3110,7 +3110,8 @@ const FloatingChatButton = ({ onClick }) => {
         </button>
     );
 };
-
+}
 export default App;
+
 
 

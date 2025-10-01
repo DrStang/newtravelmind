@@ -1930,7 +1930,8 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                 </div>
             </div>
         </div>
-    )
+    );
+};
 
 // ===================================
 // COMPANION MODE COMPONENT
@@ -3120,8 +3121,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-end z-50 p-4">
                 <div className="bg-white rounded-xl w-full max-w-md h-[600px] flex flex-col shadow-2xl">
                     {/* Header */}
-                    <div
-                        className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-t-xl">
+                    <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-t-xl">
                         <div className="flex items-center space-x-3">
                             <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
                                 <MessageCircle className="w-4 h-4"/>
@@ -3129,16 +3129,12 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                             <div>
                                 <h3 className="font-semibold">AI Travel Assistant</h3>
                                 <div className="flex items-center space-x-2 text-xs">
-                                    <div
-                                        className={`w-2 h-2 rounded-full ${connected ? 'bg-green-400' : 'bg-red-400'}`}></div>
+                                    <div className={`w-2 h-2 rounded-full ${connected ? 'bg-green-400' : 'bg-red-400'}`}></div>
                                     <span>{connected ? 'Connected' : 'Demo Mode'}</span>
                                 </div>
                             </div>
                         </div>
-                        <button
-                            onClick={onClose}
-                            className="text-white/80 hover:text-white transition-colors"
-                        >
+                        <button onClick={onClose} className="text-white/80 hover:text-white transition-colors">
                             <X className="w-6 h-6"/>
                         </button>
                     </div>
@@ -3149,12 +3145,10 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                             <div className="text-center text-gray-500">
                                 <MessageCircle className="w-12 h-12 text-gray-300 mx-auto mb-3"/>
                                 <p className="text-sm mb-4">
-                                    Hi! I'm your AI travel assistant. I can help you with planning, real-time
-                                    assistance, and memory creation.
+                                    Hi! I'm your AI travel assistant. I can help you with planning, real-time assistance, and memory creation.
                                 </p>
                                 <div className="text-left">
-                                    <p className="text-xs font-medium text-gray-700 mb-2">Quick actions
-                                        for {currentMode} mode:</p>
+                                    <p className="text-xs font-medium text-gray-700 mb-2">Quick actions for {currentMode} mode:</p>
                                     <div className="space-y-1">
                                         {quickActions[currentMode]?.slice(0, 3).map((action, index) => (
                                             <button
@@ -3171,26 +3165,17 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                         )}
 
                         {messages.map((message, index) => (
-                            <div
-                                key={index}
-                                className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
-                            >
-                                <div
-                                    className={`max-w-[80%] p-3 rounded-lg ${
-                                        message.type === 'user'
-                                            ? 'bg-blue-600 text-white'
-                                            : 'bg-gray-100 text-gray-800'
-                                    }`}
-                                >
+                            <div key={index} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                <div className={`max-w-[80%] p-3 rounded-lg ${
+                                    message.type === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-800'
+                                }`}>
                                     <div className="text-sm whitespace-pre-wrap break-words">
                                         {message.content}
                                     </div>
                                     <div className="flex items-center justify-between mt-2 text-xs opacity-70">
                                         <span>{message.timestamp.toLocaleTimeString()}</span>
                                         {message.model && message.type === 'ai' && (
-                                            <span className="bg-black/10 px-1 rounded text-xs">
-                                            {message.model}
-                                        </span>
+                                            <span className="bg-black/10 px-1 rounded text-xs">{message.model}</span>
                                         )}
                                     </div>
                                 </div>
@@ -3252,7 +3237,5 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
             </button>
         );
     };
-}
-export default App;
 
-
+    export default App;

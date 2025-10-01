@@ -1,8 +1,9 @@
+// backend/services/amadeus.js
 class AmadeusService {
     constructor() {
         this.apiKey = process.env.AMADEUS_API_KEY;
         this.apiSecret = process.env.AMADEUS_API_SECRET;
-        this.baseUrl = 'https://api.amadeus.com/v1';
+        this.baseUrl = 'https://test.api.amadeus.com/v1'; // Use test API
         this.accessToken = null;
         this.tokenExpiry = null;
     }
@@ -17,27 +18,37 @@ class AmadeusService {
         }
 
         try {
-            const response = await fetch('https://api.amadeus.com/v1/security/oauth2/token', {
+            const params = new URLSearchParams();
+            params.append('grant_type', 'client_credentials');
+            params.append('client_id', this.apiKey);
+            params.append('client_secret', this.apiSecret);
+
+            const response = await fetch('https://test.api.amadeus.com/v1/security/oauth2/token', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: `grant_type=client_credentials&client_id=${this.apiKey}&client_secret=${this.apiSecret}`
+                headers: { 
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: params.toString()
             });
 
-            const data = await response.json();
-
             if (!response.ok) {
-                throw new Error(`Amadeus auth error: ${data.error_description}`);
+                const errorText = await response.text();
+                console.error('Amadeus auth error:', errorText);
+                throw new Error(`Amadeus authentication failed: ${response.status}`);
             }
 
+            const data = await response.json();
             this.accessToken = data.access_token;
-            this.tokenExpiry = Date.now() + (data.expires_in * 1000);
+            this.tokenExpiry = Date.now() + (data.expires_in * 1000) - 60000; // Refresh 1 min early
 
+            console.log('✅ Amadeus authentication successful');
             return this.accessToken;
         } catch (error) {
             console.error('Amadeus authentication error:', error);
             throw error;
         }
     }
+    
 
     async searchFlights(params) {
         const token = await this.getAccessToken();
@@ -125,3 +136,4 @@ class AmadeusService {
 }
 
 module.exports = { AmadeusService };
+

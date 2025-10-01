@@ -3134,8 +3134,12 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                                 </div>
                             </div>
                         </div>
-                        <button onClick={onClose} className="text-white/80 hover:text-white transition-colors">
-                            <X className="w-6 h-6"/>
+                        <button 
+                          onClick={onClose} 
+                          className="text-white hover:text-white/80 transition-colors p-1 hover:bg-white/10 rounded"
+                          aria-label="Close chat"
+                        >
+                          <X className="w-5 h-5" />
                         </button>
                     </div>
 
@@ -3239,3 +3243,4 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
     };
 
     export default App;
+

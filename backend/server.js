@@ -777,75 +777,153 @@ app.get('/api/weather', async (req, res) => {
 });
 
 // Flight and Hotel Routes
-app.get('/api/flights/search', async (req, res) => {
+// backend/server.js - Update the flight search route
+app.get('/api/flights/search', authenticateToken, async (req, res) => {
     try {
-        const { origin, destination, departureDate, returnDate, adults, travelClass } = req.query;
+        const { 
+            origin, 
+            destination, 
+            departureDate, 
+            returnDate, 
+            adults, 
+            children,
+            infants,
+            travelClass,
+            nonStop,
+            currencyCode,
+            max
+        } = req.query;
 
+        // Validate required parameters
         if (!origin || !destination || !departureDate) {
             return res.status(400).json({
                 success: false,
-                error: 'Origin, destination, and departure date are required'
+                error: 'Origin, destination, and departure date are required',
+                details: {
+                    origin: !origin ? 'Missing origin airport code (e.g., JFK)' : undefined,
+                    destination: !destination ? 'Missing destination airport code (e.g., LAX)' : undefined,
+                    departureDate: !departureDate ? 'Missing departure date (YYYY-MM-DD format)' : undefined
+                }
+            });
+        }
+
+        // Validate date format
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        if (!dateRegex.test(departureDate)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid date format. Use YYYY-MM-DD (e.g., 2025-12-25)'
+            });
+        }
+
+        if (returnDate && !dateRegex.test(returnDate)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid return date format. Use YYYY-MM-DD'
             });
         }
 
         const searchParams = {
-            origin,
-            destination,
+            origin: origin.toUpperCase(),
+            destination: destination.toUpperCase(),
             departureDate,
             returnDate,
             adults: adults ? parseInt(adults) : 1,
-            travelClass: travelClass || 'ECONOMY'
+            children: children ? parseInt(children) : 0,
+            infants: infants ? parseInt(infants) : 0,
+            travelClass: travelClass || 'ECONOMY',
+            nonStop: nonStop === 'true',
+            currencyCode: currencyCode || 'USD',
+            max: max ? parseInt(max) : 10
         };
+
+        console.log('🔍 Flight search params:', searchParams);
 
         const flights = await amadeus.searchFlights(searchParams);
 
+        // Log analytics
+        await database.logAnalyticsEvent(req.user.id, 'flight_search', {
+            ...searchParams,
+            resultsCount: flights.offers.length
+        });
+
         res.json({
             success: true,
-            data: flights
+            data: flights,
+            searchParams: searchParams
         });
     } catch (error) {
-        console.error('Flight search error:', error);
+        console.error('❌ Flight search endpoint error:', error);
         res.status(500).json({
             success: false,
-            error: 'Failed to search flights'
+            error: 'Failed to search flights',
+            message: error.message,
+            hint: 'Make sure Amadeus API credentials are configured correctly'
         });
     }
 });
 
-app.get('/api/hotels/search', async (req, res) => {
+// Update hotel search route too
+app.get('/api/hotels/search', authenticateToken, async (req, res) => {
     try {
-        const { cityCode, checkInDate, checkOutDate, adults, rooms } = req.query;
+        const { 
+            cityCode, 
+            latitude,
+            longitude,
+            checkInDate, 
+            checkOutDate, 
+            adults, 
+            roomQuantity,
+            radius,
+            currency,
+            ratings,
+            amenities
+        } = req.query;
 
-        if (!cityCode || !checkInDate || !checkOutDate) {
+        if ((!cityCode && (!latitude || !longitude)) || !checkInDate || !checkOutDate) {
             return res.status(400).json({
                 success: false,
-                error: 'City code, check-in date, and check-out date are required'
+                error: 'City code (or lat/lng), check-in date, and check-out date are required'
             });
         }
 
         const searchParams = {
-            cityCode,
+            cityCode: cityCode?.toUpperCase(),
+            latitude: latitude ? parseFloat(latitude) : undefined,
+            longitude: longitude ? parseFloat(longitude) : undefined,
             checkInDate,
             checkOutDate,
             adults: adults ? parseInt(adults) : 1,
-            rooms: rooms ? parseInt(rooms) : 1
+            roomQuantity: roomQuantity ? parseInt(roomQuantity) : 1,
+            radius: radius ? parseInt(radius) : 5,
+            currency: currency || 'USD',
+            ratings: ratings ? ratings.split(',').map(Number) : undefined,
+            amenities: amenities ? amenities.split(',') : undefined
         };
+
+        console.log('🏨 Hotel search params:', searchParams);
 
         const hotels = await amadeus.searchHotels(searchParams);
 
+        await database.logAnalyticsEvent(req.user.id, 'hotel_search', {
+            ...searchParams,
+            resultsCount: hotels.hotels.length
+        });
+
         res.json({
             success: true,
-            data: hotels
+            data: hotels,
+            searchParams: searchParams
         });
     } catch (error) {
-        console.error('Hotel search error:', error);
+        console.error('❌ Hotel search endpoint error:', error);
         res.status(500).json({
             success: false,
-            error: 'Failed to search hotels'
+            error: 'Failed to search hotels',
+            message: error.message
         });
     }
 });
-
 // Trip Routes
 app.get('/api/trips', authenticateToken, async (req, res) => {
     try {
@@ -1187,6 +1265,7 @@ process.on('SIGTERM', async () => {
 startServer();
 
 module.exports = app;
+
 
 
 

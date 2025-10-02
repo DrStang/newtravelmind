@@ -248,11 +248,11 @@ io.on('connection', (socket) => {
             console.log('Received ai_chat from user:', socket.userId);
             console.log('Message:', message);
             const userContext = {
-            ...context,
-            userId: socket.userId,
-            userPreferences: socket.user.preferences || [],
-            travelStyle: socket.user.travel_style
-    };
+                ...context,
+                userId: socket.userId,
+                userPreferences: socket.user.preferences || [],
+                travelStyle: socket.user.travel_style
+            };
 
             const response = await ollama.chat(message, userContext, context.mode || 'chat');
 
@@ -269,21 +269,21 @@ io.on('connection', (socket) => {
 
             // Cache response
             if (redis && redis.isAvailable()) {
-              redis.setConversationCache(socket.userId, response).catch(err => {
-                console.warn('Cache set failed:', err.message);
-      });
-    }
+                redis.setConversationCache(socket.userId, response).catch(err => {
+                    console.warn('Cache set failed:', err.message);
+                });
+            }
 
-          } catch (error) {
+        } catch (error) {
             console.error('AI chat error:', error);
             socket.emit('ai_response', {
-              success: false,
-              error: 'AI assistant temporarily unavailable',
-              fallback: "I'm having trouble right now. Please try again in a moment.",
-              timestamp: new Date().toISOString()
+                success: false,
+                error: 'AI assistant temporarily unavailable',
+                fallback: "I'm having trouble right now. Please try again in a moment.",
+                timestamp: new Date().toISOString()
+            });
+        }
     });
-  }
-});
 
     // Location updates
     // Location updates
@@ -293,39 +293,39 @@ io.on('connection', (socket) => {
 
             await database.saveUserLocation(socket.userId, lat, lng, accuracy);
 
-        // Get weather and nearby recommendations
+            // Get weather and nearby recommendations
             const weather = await googlePlaces.getWeatherInfo({ lat, lng });
-        
-        // ✅ FIX: Try multiple place types if first search returns no results
+
+            // ✅ FIX: Try multiple place types if first search returns no results
             let nearbyPlaces = [];
             const placeTypes = ['restaurant', 'tourist_attraction', 'lodging', 'cafe'];
-        
+
             for (const type of placeTypes) {
-            nearbyPlaces = await googlePlaces.searchNearby({ lat, lng }, type, 500);
-            if (nearbyPlaces.length > 0) {
-                break; // Found results, stop searching
+                nearbyPlaces = await googlePlaces.searchNearby({ lat, lng }, type, 500);
+                if (nearbyPlaces.length > 0) {
+                    break; // Found results, stop searching
+                }
             }
+
+            socket.emit('location_context', {
+                weather,
+                nearbyRecommendations: nearbyPlaces.slice(0, 5),
+                timestamp: new Date().toISOString(),
+                // ✅ Add message if no places found
+                message: nearbyPlaces.length === 0 ? 'No nearby places found. Try increasing search radius.' : undefined
+            });
+
+        } catch (error) {
+            console.error('Location update error:', error);
+            // ✅ FIX: Send error response to client instead of crashing
+            socket.emit('location_context', {
+                weather: null,
+                nearbyRecommendations: [],
+                error: 'Failed to get location context',
+                timestamp: new Date().toISOString()
+            });
         }
-
-        socket.emit('location_context', {
-            weather,
-            nearbyRecommendations: nearbyPlaces.slice(0, 5),
-            timestamp: new Date().toISOString(),
-            // ✅ Add message if no places found
-            message: nearbyPlaces.length === 0 ? 'No nearby places found. Try increasing search radius.' : undefined
-        });
-
-    } catch (error) {
-        console.error('Location update error:', error);
-        // ✅ FIX: Send error response to client instead of crashing
-        socket.emit('location_context', {
-            weather: null,
-            nearbyRecommendations: [],
-            error: 'Failed to get location context',
-            timestamp: new Date().toISOString()
-        });
-    }
-});
+    });
 
     // Trip updates
     socket.on('trip_update', async (data) => {
@@ -780,12 +780,12 @@ app.get('/api/weather', async (req, res) => {
 // backend/server.js - Update the flight search route
 app.get('/api/flights/search', authenticateToken, async (req, res) => {
     try {
-        const { 
-            origin, 
-            destination, 
-            departureDate, 
-            returnDate, 
-            adults, 
+        const {
+            origin,
+            destination,
+            departureDate,
+            returnDate,
+            adults,
             children,
             infants,
             travelClass,
@@ -841,11 +841,15 @@ app.get('/api/flights/search', authenticateToken, async (req, res) => {
 
         const flights = await amadeus.searchFlights(searchParams);
 
-        // Log analytics
-        await database.logAnalyticsEvent(req.user.id, 'flight_search', {
-            ...searchParams,
-            resultsCount: flights.offers.length
-        });
+        // Log analytics - but don't let it break the response
+        try {
+            await database.logAnalyticsEvent(req.user.id, 'flight_search', {
+                ...searchParams,
+                resultsCount: flights.offers.length
+            });
+        } catch (analyticsError) {
+            console.error('⚠️ Analytics logging failed (non-critical):', analyticsError.message);
+        }
 
         res.json({
             success: true,
@@ -863,16 +867,16 @@ app.get('/api/flights/search', authenticateToken, async (req, res) => {
     }
 });
 
-// Update hotel search route too
+// Update hotel search route with same pattern
 app.get('/api/hotels/search', authenticateToken, async (req, res) => {
     try {
-        const { 
-            cityCode, 
+        const {
+            cityCode,
             latitude,
             longitude,
-            checkInDate, 
-            checkOutDate, 
-            adults, 
+            checkInDate,
+            checkOutDate,
+            adults,
             roomQuantity,
             radius,
             currency,
@@ -905,10 +909,15 @@ app.get('/api/hotels/search', authenticateToken, async (req, res) => {
 
         const hotels = await amadeus.searchHotels(searchParams);
 
-        await database.logAnalyticsEvent(req.user.id, 'hotel_search', {
-            ...searchParams,
-            resultsCount: hotels.hotels.length
-        });
+        // Log analytics - non-blocking
+        try {
+            await database.logAnalyticsEvent(req.user.id, 'hotel_search', {
+                ...searchParams,
+                resultsCount: hotels.hotels.length
+            });
+        } catch (analyticsError) {
+            console.error('⚠️ Analytics logging failed (non-critical):', analyticsError.message);
+        }
 
         res.json({
             success: true,
@@ -921,6 +930,31 @@ app.get('/api/hotels/search', authenticateToken, async (req, res) => {
             success: false,
             error: 'Failed to search hotels',
             message: error.message
+        });
+    }
+});
+
+// Add a new endpoint to get user analytics
+app.get('/api/analytics/events', authenticateToken, async (req, res) => {
+    try {
+        const { eventType, dateFrom, dateTo, limit } = req.query;
+
+        const events = await database.getAnalyticsEvents(req.user.id, {
+            eventType,
+            dateFrom,
+            dateTo,
+            limit: limit || 50
+        });
+
+        res.json({
+            success: true,
+            data: events
+        });
+    } catch (error) {
+        console.error('Analytics events error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to get analytics events'
         });
     }
 });
@@ -1265,7 +1299,6 @@ process.on('SIGTERM', async () => {
 startServer();
 
 module.exports = app;
-
 
 
 

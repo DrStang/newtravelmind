@@ -532,6 +532,7 @@ const App = () => {
                         setTrips={setTrips}
                         setCurrentTrip={setCurrentTrip}
                         sendChatMessage={sendChatMessage}
+                        setChatOpen={setChatOpen}
                     />
                 )}
 
@@ -1380,66 +1381,9 @@ const HotelSearch = ({trip, token}) => {
 };
 
 // ===================================
-// ITINERARY VIEW COMPONENT
-// ===================================
-const ItineraryView = ({trip, itinerary}) => {
-    if (!itinerary) {
-        return (
-            <div className="bg-white rounded-xl shadow-lg p-12 text-center">
-                <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4"/>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No itinerary yet</h3>
-                <p className="text-gray-500">Generate an itinerary to see your day-by-day plan</p>
-            </div>
-        );
-    }
-
-    return (
-        <div className="bg-white rounded-xl shadow-lg p-6">
-            <div className="flex items-center justify-between mb-6">
-                <div>
-                    <h3 className="text-2xl font-bold text-gray-900">{trip.title}</h3>
-                    <p className="text-gray-600">{trip.destination} • {trip.duration} days</p>
-                </div>
-                <div className="text-right">
-                    <div className="text-sm text-gray-500">Total Budget</div>
-                    <div className="text-2xl font-bold text-gray-900">${trip.budget}</div>
-                </div>
-            </div>
-
-            <div className="prose max-w-none">
-                <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-6 mb-6">
-                    <h4 className="text-lg font-semibold text-gray-900 mb-3">📋 Your AI-Generated Itinerary</h4>
-                    <div className="text-gray-700 whitespace-pre-wrap leading-relaxed">
-                        {typeof itinerary === 'string' ? itinerary : itinerary.itinerary}
-                    </div>
-                </div>
-
-                {/* Quick Actions */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-                    <button
-                        className="flex items-center justify-center space-x-2 bg-blue-100 text-blue-700 px-4 py-3 rounded-lg hover:bg-blue-200 transition-colors">
-                        <Plane className="w-5 h-5"/>
-                        <span>Add Flights</span>
-                    </button>
-                    <button
-                        className="flex items-center justify-center space-x-2 bg-green-100 text-green-700 px-4 py-3 rounded-lg hover:bg-green-200 transition-colors">
-                        <Star className="w-5 h-5"/>
-                        <span>Add Hotels</span>
-                    </button>
-                    <button
-                        className="flex items-center justify-center space-x-2 bg-purple-100 text-purple-700 px-4 py-3 rounded-lg hover:bg-purple-200 transition-colors">
-                        <MapPin className="w-5 h-5"/>
-                        <span>Add Activities</span>
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-};
-// ===================================
 // ENHANCED PLANNING MODE COMPONENT
 // ===================================
-const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMessage }) => {
+const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMessage, setChatOpen }) => {
     const [view, setView] = useState('create'); // 'create', 'trips', 'itinerary', 'flights', 'hotels'
     const [selectedTrip, setSelectedTrip] = useState(null);
     const [formData, setFormData] = useState({
@@ -1511,27 +1455,80 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
         if (!itineraryText) return [];
 
         const days = [];
-        const dayPattern = /\*\*Day (\d+):?\s*(.*?)\*\*/gi;
-        const sections = itineraryText.split(dayPattern);
+        const lines = itineraryText.split('\n');
+        let currentDay = null;
+        let currentSection = '';
 
-        for (let i = 1; i < sections.length; i += 3) {
-            const dayNumber = sections[i];
-            const dayTitle = sections[i + 1];
-            const dayContent = sections[i + 2];
+        lines.forEach(line => {
+            line = line.trim();
+            if (!line) return;
+
+            // Match day headers like "**Day 1: Exploring Tokyo**" or "Day 1 - Arrival"
+            const dayMatch = line.match(/\*?\*?Day\s+(\d+)[:\-\s]*(.*?)\*?\*?/i);
+            if (dayMatch) {
+                if (currentDay) {
+                    days.push(currentDay);
+                }
+                currentDay = {
+                    number: parseInt(dayMatch[1]),
+                    title: dayMatch[2].replace(/\*/g, '').trim() || 'Exploration Day',
+                    activities: [],
+                    totalCost: 0
+                };
+                return;
+            }
+
+            // Extract cost from line (matches $XX, $X.XX, $XXX, etc.)
+            const costMatch = line.match(/\$(\d+(?:\.\d{2})?)/);
+            if (costMatch && currentDay) {
+                currentDay.totalCost += parseFloat(costMatch[1]);
+            }
+
+            // Add activity lines (skip empty or header-only lines)
+            if (currentDay && line.length > 3 && !line.match(/^#+/)) {
+                // Clean up the line
+                const cleanLine = line
+                    .replace(/^\*+\s*/, '') // Remove leading asterisks
+                    .replace(/\*+$/, '')     // Remove trailing asterisks
+                    .replace(/^-\s*/, '')    // Remove leading dash
+                    .replace(/^\d+\.\s*/, '') // Remove leading numbers
+                    .trim();
+
+                if (cleanLine) {
+                    currentDay.activities.push(cleanLine);
+                }
+            }
+        });
+
+        if (currentDay) {
+            days.push(currentDay);
+        }
+
+        // If no structured days found, create a single day
+        if (days.length === 0) {
+            const activities = lines
+                .filter(line => line.trim().length > 3)
+                .map(line => line.replace(/^\*+\s*/, '').replace(/\*+$/, '').trim());
 
             days.push({
-                number: dayNumber,
-                title: dayTitle,
-                content: dayContent
+                number: 1,
+                title: 'Full Itinerary',
+                activities: activities,
+                totalCost: 0
             });
         }
 
-        // If no day pattern found, return whole itinerary as single day
-        if (days.length === 0) {
-            return [{ number: '1', title: 'Full Itinerary', content: itineraryText }];
-        }
-
         return days;
+    };
+    const getDayDate = (startDate, dayNumber) => {
+        if (!startDate) return null;
+        const date = new Date(startDate);
+        date.setDate(date.getDate() + (dayNumber - 1));
+        return date.toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric'
+        });
     };
 
     // ITINERARY VIEW with cards
@@ -1555,9 +1552,22 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                             <h2 className="text-3xl font-bold text-gray-900 mb-2">
                                 {selectedTrip.title || `${selectedTrip.destination} Trip`}
                             </h2>
-                            <p className="text-gray-600">
-                                {selectedTrip.destination} • {selectedTrip.duration} days • ${selectedTrip.budget}
-                            </p>
+                            <div className="flex items-center space-x-4 text-gray-600">
+                            <span className="flex items-center space-x-1">
+                                <MapPin className="w-4 h-4" />
+                                <span>{selectedTrip.destination}</span>
+                            </span>
+                                <span className="flex items-center space-x-1">
+                                <Calendar className="w-4 h-4" />
+                                <span>{selectedTrip.duration} days</span>
+                            </span>
+                                {selectedTrip.budget && (
+                                    <span className="flex items-center space-x-1">
+                                    <span>💰</span>
+                                    <span>${selectedTrip.budget} budget</span>
+                                </span>
+                                )}
+                            </div>
                         </div>
                         <button
                             onClick={() => setView('trips')}
@@ -1568,52 +1578,114 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                     </div>
                 </div>
 
-                {/* Day Cards */}
-                <div className="space-y-6 mb-8">
-                    {days.map((day, index) => (
-                        <div key={index} className="bg-white rounded-xl shadow-lg overflow-hidden">
-                            <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-4">
-                                <div className="flex items-center space-x-3">
-                                    <div className="bg-white/20 rounded-full w-10 h-10 flex items-center justify-center font-bold">
-                                        {day.number}
+                {/* Individual Day Cards */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                    {days.map((day) => {
+                        const dayDate = getDayDate(selectedTrip.startDate, day.number);
+
+                        return (
+                            <div key={day.number} className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
+                                {/* Card Header */}
+                                <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-4">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <div className="flex items-center space-x-2 mb-1">
+                                                <span className="text-2xl font-bold">Day {day.number}</span>
+                                                {dayDate && (
+                                                    <span className="text-blue-100 text-sm">• {dayDate}</span>
+                                                )}
+                                            </div>
+                                            <h3 className="text-lg font-semibold">{day.title}</h3>
+                                        </div>
+                                        {day.totalCost > 0 && (
+                                            <div className="text-right">
+                                                <div className="text-xs text-blue-100">Estimated</div>
+                                                <div className="text-2xl font-bold">${day.totalCost.toFixed(0)}</div>
+                                            </div>
+                                        )}
                                     </div>
-                                    <h3 className="text-xl font-semibold">{day.title}</h3>
+                                </div>
+
+                                {/* Card Body - Activities */}
+                                <div className="p-6">
+                                    <ul className="space-y-3">
+                                        {day.activities.map((activity, idx) => (
+                                            <li key={idx} className="flex items-start space-x-3 text-gray-700">
+                                                <span className="text-blue-500 mt-1">•</span>
+                                                <span className="flex-1 leading-relaxed">{activity}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+
+                                {/* Card Footer - Quick Actions */}
+                                <div className="border-t border-gray-100 px-6 py-3 bg-gray-50">
+                                    <button
+                                        onClick={() => sendChatMessage(`Tell me more details about Day ${day.number}: ${day.title} in ${selectedTrip.destination}`)}
+                                        className="text-sm text-blue-600 hover:text-blue-700 flex items-center space-x-1"
+                                    >
+                                        <MessageCircle className="w-4 h-4" />
+                                        <span>Ask AI for more details</span>
+                                    </button>
                                 </div>
                             </div>
-                            <div className="p-6">
-                                <div
-                                    className="prose prose-sm max-w-none text-gray-700 leading-relaxed"
-                                    dangerouslySetInnerHTML={{ __html: formatItinerary(day.content) }}
-                                />
+                        );
+                    })}
+                </div>
+
+                {/* Trip Summary Card */}
+                <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl shadow-lg p-6 mb-8">
+                    <h3 className="text-xl font-semibold text-gray-900 mb-4">Trip Summary</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                            <div className="text-sm text-gray-600 mb-1">Total Duration</div>
+                            <div className="text-2xl font-bold text-gray-900">{selectedTrip.duration} days</div>
+                        </div>
+                        <div>
+                            <div className="text-sm text-gray-600 mb-1">Estimated Total Cost</div>
+                            <div className="text-2xl font-bold text-gray-900">
+                                ${days.reduce((sum, day) => sum + day.totalCost, 0).toFixed(0)}
                             </div>
                         </div>
-                    ))}
+                        <div>
+                            <div className="text-sm text-gray-600 mb-1">Budget Remaining</div>
+                            <div className="text-2xl font-bold text-green-600">
+                                ${Math.max(0, (selectedTrip.budget || 0) - days.reduce((sum, day) => sum + day.totalCost, 0)).toFixed(0)}
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Action Buttons */}
                 <div className="bg-white rounded-xl shadow-lg p-6">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-4">Complete Your Trip</h3>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-4">Complete Your Trip Booking</h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <button
                             onClick={() => setView('flights')}
-                            className="flex items-center justify-center space-x-3 bg-blue-600 text-white px-6 py-4 rounded-lg hover:bg-blue-700 transition-colors"
+                            className="flex flex-col items-center justify-center space-y-2 bg-blue-600 text-white px-6 py-6 rounded-lg hover:bg-blue-700 transition-colors"
                         >
-                            <Plane className="w-6 h-6" />
-                            <span className="font-medium">Search Flights</span>
+                            <Plane className="w-8 h-8" />
+                            <span className="font-medium text-lg">Search Flights</span>
+                            <span className="text-xs text-blue-100">Compare prices & book</span>
                         </button>
                         <button
                             onClick={() => setView('hotels')}
-                            className="flex items-center justify-center space-x-3 bg-green-600 text-white px-6 py-4 rounded-lg hover:bg-green-700 transition-colors"
+                            className="flex flex-col items-center justify-center space-y-2 bg-green-600 text-white px-6 py-6 rounded-lg hover:bg-green-700 transition-colors"
                         >
-                            <Star className="w-6 h-6" />
-                            <span className="font-medium">Search Hotels</span>
+                            <Star className="w-8 h-8" />
+                            <span className="font-medium text-lg">Search Hotels</span>
+                            <span className="text-xs text-green-100">Find perfect accommodations</span>
                         </button>
                         <button
-                            onClick={() => sendChatMessage(`Find activities, food tours, and experiences in ${selectedTrip.destination}`)}
-                            className="flex items-center justify-center space-x-3 bg-purple-600 text-white px-6 py-4 rounded-lg hover:bg-purple-700 transition-colors"
+                            onClick={() => {
+                                setChatOpen(true);
+                                sendChatMessage(`Find the best activities, food tours, cooking classes, and unique experiences in ${selectedTrip.destination}. Include specific recommendations with prices.`);
+                            }}
+                            className="flex flex-col items-center justify-center space-y-2 bg-purple-600 text-white px-6 py-6 rounded-lg hover:bg-purple-700 transition-colors"
                         >
-                            <MapPin className="w-6 h-6" />
-                            <span className="font-medium">Find Activities</span>
+                            <MapPin className="w-8 h-8" />
+                            <span className="font-medium text-lg">Find Activities</span>
+                            <span className="text-xs text-purple-100">Tours, dining & experiences</span>
                         </button>
                     </div>
                 </div>

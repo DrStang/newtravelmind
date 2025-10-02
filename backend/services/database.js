@@ -104,7 +104,7 @@ class DatabaseService {
             CREATE TABLE IF NOT EXISTS ai_conversations (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 user_id INT NOT NULL,
-                user_message JSON,
+                user_message MEDIUMTEXT,
                 ai_response JSON,
                 context JSON,
                 model_used VARCHAR(100),
@@ -414,3 +414,4 @@ class DatabaseService {
 }
 
 module.exports = { DatabaseService };
+

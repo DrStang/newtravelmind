@@ -815,9 +815,8 @@ const Header = ({ user, logout, currentMode, setCurrentMode, connected, location
             </div>
         </header>
     );
-};
-// ===================================
-// FLIGHT SEARCH COMPONENT
+};// ===================================
+// FLIGHT SEARCH COMPONENT - CORRECTED
 // ===================================
 const FlightSearch = ({trip, token}) => {
     const [searchParams, setSearchParams] = useState({
@@ -828,9 +827,10 @@ const FlightSearch = ({trip, token}) => {
         adults: 1,
         travelClass: 'ECONOMY'
     });
-    const [flights, setFlights] = useState([]);
+    const [flights, setFlights] = useState(null); // Changed from [] to null
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [expandedFlight, setExpandedFlight] = useState(null); // Add this for details
 
     const searchFlights = async () => {
         if (!searchParams.origin || !searchParams.destination || !searchParams.departureDate) {
@@ -846,19 +846,29 @@ const FlightSearch = ({trip, token}) => {
                 origin: searchParams.origin,
                 destination: searchParams.destination,
                 departureDate: searchParams.departureDate,
-                returnDate: searchParams.returnDate || '',
                 adults: searchParams.adults,
                 travelClass: searchParams.travelClass
             });
+
+            // Only add returnDate if it exists
+            if (searchParams.returnDate) {
+                queryParams.append('returnDate', searchParams.returnDate);
+            }
+
+            console.log('Searching flights with params:', Object.fromEntries(queryParams));
 
             const response = await fetch(`${API_BASE_URL}/flights/search?${queryParams}`, {
                 headers: {Authorization: `Bearer ${token}`}
             });
 
             const data = await response.json();
+            console.log('Flight search response:', data); // Debug log
 
             if (data.success) {
-                setFlights(data.data);
+                setFlights(data.data); // This contains {offers: [...], meta: {...}}
+                if (data.data.offers.length === 0) {
+                    setError('No flights found for this route and date. Try different criteria.');
+                }
             } else {
                 setError(data.error || 'Failed to search flights');
             }
@@ -872,9 +882,29 @@ const FlightSearch = ({trip, token}) => {
 
     const formatDuration = (duration) => {
         if (!duration) return 'N/A';
-        const hours = Math.floor(parseInt(duration.replace('PT', '').replace('H', '')) / 60);
-        const minutes = parseInt(duration.replace('PT', '').replace('H', '')) % 60;
+        const match = duration.match(/PT(\d+H)?(\d+M)?/);
+        if (!match) return duration;
+        
+        const hours = match[1] ? parseInt(match[1]) : 0;
+        const minutes = match[2] ? parseInt(match[2]) : 0;
         return `${hours}h ${minutes}m`;
+    };
+
+    const formatTime = (dateTimeString) => {
+        const date = new Date(dateTimeString);
+        return date.toLocaleTimeString('en-US', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            hour12: true 
+        });
+    };
+
+    const formatDate = (dateTimeString) => {
+        const date = new Date(dateTimeString);
+        return date.toLocaleDateString('en-US', { 
+            month: 'short', 
+            day: 'numeric'
+        });
     };
 
     return (
@@ -890,7 +920,7 @@ const FlightSearch = ({trip, token}) => {
                         </label>
                         <input
                             type="text"
-                            placeholder="e.g., JFK, LAX"
+                            placeholder="e.g., JFK, LAX, IAD"
                             maxLength={3}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 uppercase"
                             value={searchParams.origin}
@@ -907,7 +937,7 @@ const FlightSearch = ({trip, token}) => {
                         </label>
                         <input
                             type="text"
-                            placeholder="e.g., CDG, LHR"
+                            placeholder="e.g., CDG, LHR, SJO"
                             maxLength={3}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 uppercase"
                             value={searchParams.destination}
@@ -1000,119 +1030,245 @@ const FlightSearch = ({trip, token}) => {
             </div>
 
             {/* Results */}
-            {flights.length > 0 && (
+            {flights && flights.offers && flights.offers.length > 0 && (
                 <div className="space-y-4">
                     <div className="flex items-center justify-between">
                         <h3 className="text-xl font-semibold text-gray-900">
-                            Available Flights ({flights.length})
+                            Available Flights ({flights.offers.length})
                         </h3>
-                        <div className="flex items-center space-x-2">
-                            <select className="px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                                <option>Price: Low to High</option>
-                                <option>Price: High to Low</option>
-                                <option>Duration: Shortest</option>
-                                <option>Departure: Earliest</option>
-                            </select>
+                        <div className="text-sm text-gray-600">
+                            Showing results for {searchParams.origin} → {searchParams.destination}
                         </div>
                     </div>
 
-                    {flights.map((flight, index) => (
-                        <div key={flight.id || index}
-                             className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow">
-                            <div className="flex items-start justify-between mb-4">
-                                <div className="flex-1">
-                                    <div className="flex items-center space-x-4 mb-4">
-                                        <div
-                                            className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-medium">
-                                            {flight.validatingAirlineCodes?.[0] || 'Airline'}
+                    {flights.offers.map((offer, index) => {
+                        const outbound = offer.itineraries[0];
+                        const returnFlight = offer.itineraries[1];
+                        const isExpanded = expandedFlight === index;
+
+                        return (
+                            <div key={offer.id || index}
+                                 className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow">
+                                
+                                {/* Outbound Flight */}
+                                <div className="mb-4">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center space-x-3">
+                                            <div className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-medium">
+                                                {offer.validatingAirlineCodes?.[0] || 'Airline'}
+                                            </div>
+                                            <div className="text-sm text-gray-500">
+                                                Outbound • {formatDate(outbound.segments[0].departure.at)}
+                                            </div>
+                                            <div className="text-sm text-gray-500">
+                                                {outbound.segments.length === 1 ? 'Direct' : `${outbound.segments.length - 1} stop(s)`}
+                                            </div>
                                         </div>
-                                        <div className="text-sm text-gray-500">
-                                            Flight #{flight.id?.substring(0, 8)}
+                                        <div className="text-sm text-gray-600">
+                                            {formatDuration(outbound.duration)}
                                         </div>
                                     </div>
 
-                                    {/* Itinerary Segments */}
-                                    {flight.itineraries?.map((itinerary, iIndex) => (
-                                        <div key={iIndex} className="mb-4">
-                                            <div className="flex items-center space-x-4 text-sm text-gray-500 mb-3">
-                        <span className="font-medium">
-                          {iIndex === 0 ? 'Outbound' : 'Return'}
-                        </span>
-                                                <span>Duration: {formatDuration(itinerary.duration)}</span>
-                                                <span>{itinerary.segments?.length || 0} stop{itinerary.segments?.length !== 1 ? 's' : ''}</span>
+                                    {/* Flight segments visualization */}
+                                    <div className="flex items-center space-x-4">
+                                        <div className="text-center">
+                                            <div className="text-2xl font-bold text-gray-900">
+                                                {formatTime(outbound.segments[0].departure.at)}
+                                            </div>
+                                            <div className="text-sm text-gray-600">
+                                                {outbound.segments[0].departure.iataCode}
+                                            </div>
+                                        </div>
+
+                                        <div className="flex-1 mx-4">
+                                            <div className="flex items-center justify-center">
+                                                <div className="flex-1 border-t-2 border-gray-300"></div>
+                                                <Plane className="w-5 h-5 text-blue-600 mx-2"/>
+                                                <div className="flex-1 border-t-2 border-gray-300"></div>
+                                            </div>
+                                            <div className="text-center text-xs text-gray-500 mt-1">
+                                                {outbound.segments.map(s => `${s.carrierCode}${s.number}`).join(', ')}
+                                            </div>
+                                        </div>
+
+                                        <div className="text-center">
+                                            <div className="text-2xl font-bold text-gray-900">
+                                                {formatTime(outbound.segments[outbound.segments.length - 1].arrival.at)}
+                                            </div>
+                                            <div className="text-sm text-gray-600">
+                                                {outbound.segments[outbound.segments.length - 1].arrival.iataCode}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Return Flight */}
+                                {returnFlight && (
+                                    <div className="mb-4 pt-4 border-t">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <div className="flex items-center space-x-3">
+                                                <div className="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-sm font-medium">
+                                                    Return
+                                                </div>
+                                                <div className="text-sm text-gray-500">
+                                                    {formatDate(returnFlight.segments[0].departure.at)}
+                                                </div>
+                                                <div className="text-sm text-gray-500">
+                                                    {returnFlight.segments.length === 1 ? 'Direct' : `${returnFlight.segments.length - 1} stop(s)`}
+                                                </div>
+                                            </div>
+                                            <div className="text-sm text-gray-600">
+                                                {formatDuration(returnFlight.duration)}
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center space-x-4">
+                                            <div className="text-center">
+                                                <div className="text-2xl font-bold text-gray-900">
+                                                    {formatTime(returnFlight.segments[0].departure.at)}
+                                                </div>
+                                                <div className="text-sm text-gray-600">
+                                                    {returnFlight.segments[0].departure.iataCode}
+                                                </div>
                                             </div>
 
-                                            {itinerary.segments?.map((segment, sIndex) => (
-                                                <div key={sIndex} className="flex items-center space-x-4 mb-3">
-                                                    <div className="flex-1 flex items-center">
-                                                        <div className="text-center">
-                                                            <div className="text-2xl font-bold text-gray-900">
-                                                                {new Date(segment.departure.at).toLocaleTimeString('en-US', {
-                                                                    hour: '2-digit',
-                                                                    minute: '2-digit'
-                                                                })}
-                                                            </div>
-                                                            <div
-                                                                className="text-sm text-gray-600">{segment.departure.iataCode}</div>
-                                                        </div>
+                                            <div className="flex-1 mx-4">
+                                                <div className="flex items-center justify-center">
+                                                    <div className="flex-1 border-t-2 border-gray-300"></div>
+                                                    <Plane className="w-5 h-5 text-purple-600 mx-2 transform rotate-180"/>
+                                                    <div className="flex-1 border-t-2 border-gray-300"></div>
+                                                </div>
+                                                <div className="text-center text-xs text-gray-500 mt-1">
+                                                    {returnFlight.segments.map(s => `${s.carrierCode}${s.number}`).join(', ')}
+                                                </div>
+                                            </div>
 
-                                                        <div className="flex-1 mx-4">
-                                                            <div className="flex items-center justify-center">
-                                                                <div
-                                                                    className="flex-1 border-t-2 border-gray-300"></div>
-                                                                <Plane className="w-4 h-4 text-gray-400 mx-2"/>
-                                                                <div
-                                                                    className="flex-1 border-t-2 border-gray-300"></div>
-                                                            </div>
-                                                            <div className="text-center text-xs text-gray-500 mt-1">
-                                                                {segment.carrierCode} {segment.number}
-                                                            </div>
-                                                        </div>
+                                            <div className="text-center">
+                                                <div className="text-2xl font-bold text-gray-900">
+                                                    {formatTime(returnFlight.segments[returnFlight.segments.length - 1].arrival.at)}
+                                                </div>
+                                                <div className="text-sm text-gray-600">
+                                                    {returnFlight.segments[returnFlight.segments.length - 1].arrival.iataCode}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
 
-                                                        <div className="text-center">
-                                                            <div className="text-2xl font-bold text-gray-900">
-                                                                {new Date(segment.arrival.at).toLocaleTimeString('en-US', {
-                                                                    hour: '2-digit',
-                                                                    minute: '2-digit'
-                                                                })}
+                                {/* Price and Actions */}
+                                <div className="flex items-center justify-between pt-4 border-t">
+                                    <div>
+                                        <div className="text-3xl font-bold text-blue-600">
+                                            ${offer.price?.total || 'N/A'}
+                                        </div>
+                                        <div className="text-sm text-gray-500">
+                                            {offer.price?.currency || 'USD'} total • {searchParams.adults} passenger{searchParams.adults > 1 ? 's' : ''}
+                                        </div>
+                                    </div>
+
+                                    <div className="flex space-x-2">
+                                        <button
+                                            onClick={() => setExpandedFlight(isExpanded ? null : index)}
+                                            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm"
+                                        >
+                                            {isExpanded ? 'Hide Details' : 'View Details'}
+                                        </button>
+                                        <button
+                                            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                                            Select Flight
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Expanded Details */}
+                                {isExpanded && (
+                                    <div className="mt-4 pt-4 border-t bg-gray-50 rounded-lg p-4 space-y-4">
+                                        <div>
+                                            <h4 className="font-semibold mb-3">Complete Itinerary</h4>
+                                            
+                                            {/* All outbound segments */}
+                                            <div className="mb-4">
+                                                <div className="text-sm font-medium text-gray-700 mb-2">Outbound Journey</div>
+                                                {outbound.segments.map((segment, idx) => (
+                                                    <div key={idx} className="mb-3 pb-3 border-b last:border-b-0">
+                                                        <div className="flex justify-between items-start">
+                                                            <div>
+                                                                <div className="font-medium">
+                                                                    {segment.departure.iataCode} → {segment.arrival.iataCode}
+                                                                </div>
+                                                                <div className="text-sm text-gray-600">
+                                                                    {segment.carrierCode} {segment.number} • {formatDuration(segment.duration)}
+                                                                </div>
                                                             </div>
-                                                            <div
-                                                                className="text-sm text-gray-600">{segment.arrival.iataCode}</div>
+                                                            <div className="text-right text-sm">
+                                                                <div>{formatTime(segment.departure.at)}</div>
+                                                                <div className="text-gray-500">to</div>
+                                                                <div>{formatTime(segment.arrival.at)}</div>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    ))}
-                                </div>
+                                                ))}
+                                            </div>
 
-                                <div className="ml-6 text-right">
-                                    <div className="text-3xl font-bold text-gray-900 mb-2">
-                                        ${flight.price?.total || 'N/A'}
+                                            {/* All return segments */}
+                                            {returnFlight && (
+                                                <div>
+                                                    <div className="text-sm font-medium text-gray-700 mb-2">Return Journey</div>
+                                                    {returnFlight.segments.map((segment, idx) => (
+                                                        <div key={idx} className="mb-3 pb-3 border-b last:border-b-0">
+                                                            <div className="flex justify-between items-start">
+                                                                <div>
+                                                                    <div className="font-medium">
+                                                                        {segment.departure.iataCode} → {segment.arrival.iataCode}
+                                                                    </div>
+                                                                    <div className="text-sm text-gray-600">
+                                                                        {segment.carrierCode} {segment.number} • {formatDuration(segment.duration)}
+                                                                    </div>
+                                                                </div>
+                                                                <div className="text-right text-sm">
+                                                                    <div>{formatTime(segment.departure.at)}</div>
+                                                                    <div className="text-gray-500">to</div>
+                                                                    <div>{formatTime(segment.arrival.at)}</div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Price breakdown */}
+                                        <div>
+                                            <h4 className="font-semibold mb-2">Price Breakdown</h4>
+                                            <div className="bg-white rounded p-3 space-y-1 text-sm">
+                                                <div className="flex justify-between">
+                                                    <span>Base Fare:</span>
+                                                    <span>${offer.price.base}</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span>Taxes & Fees:</span>
+                                                    <span>${(parseFloat(offer.price.total) - parseFloat(offer.price.base)).toFixed(2)}</span>
+                                                </div>
+                                                <div className="flex justify-between font-semibold pt-2 border-t">
+                                                    <span>Total:</span>
+                                                    <span>${offer.price.total}</span>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="text-sm text-gray-500 mb-4">
-                                        {flight.price?.currency || 'USD'} per person
-                                    </div>
-                                    <button
-                                        className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors">
-                                        Book Now
-                                    </button>
-                                    <button
-                                        className="w-full mt-2 bg-gray-100 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-200 transition-colors text-sm">
-                                        View Details
-                                    </button>
-                                </div>
+                                )}
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
 
-            {!loading && flights.length === 0 && searchParams.origin && (
+            {/* No results state */}
+            {flights && flights.offers && flights.offers.length === 0 && (
                 <div className="bg-white rounded-xl shadow-lg p-12 text-center">
                     <Plane className="w-16 h-16 text-gray-300 mx-auto mb-4"/>
                     <h3 className="text-lg font-medium text-gray-900 mb-2">No flights found</h3>
-                    <p className="text-gray-500">Try adjusting your search criteria</p>
+                    <p className="text-gray-500">Try adjusting your search criteria or different dates</p>
                 </div>
             )}
         </div>
@@ -3317,3 +3473,4 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+

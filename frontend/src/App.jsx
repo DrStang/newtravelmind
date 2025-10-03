@@ -1714,8 +1714,8 @@ const ActivitiesSearch = ({ trip, token, location, sendChatMessage }) => {
     const [aiInsights, setAiInsights] = useState({});
 
     const searchActivities = async () => {
-        if (!location && !trip?.destination) {
-            setError('Location is required to search activities');
+        if (!location || !location.lat || !location.lng) {
+            setError('Location is required to search activities. Please enable location services.');
             return;
         }
 
@@ -1723,9 +1723,9 @@ const ActivitiesSearch = ({ trip, token, location, sendChatMessage }) => {
         setError('');
 
         try {
-            // Use actual location or default coordinates for trip destination
-            const lat = location?.lat || 41.3851; // Barcelona default
-            const lng = location?.lng || 2.1734;
+            // ✅ Use actual location only - no defaults
+            const lat = location.lat;
+            const lng = location.lng;
 
             const response = await fetch(
                 `${API_BASE_URL}/activities/search?latitude=${lat}&longitude=${lng}&radius=${searchRadius}`,
@@ -1786,8 +1786,10 @@ const ActivitiesSearch = ({ trip, token, location, sendChatMessage }) => {
     };
 
     useEffect(() => {
-        searchActivities();
-    }, []);
+        if (location && location.lat && location.lng) {
+            searchActivities();
+        }
+    }, [location, searchRadius]);
 
     return (
         <div className="space-y-6">

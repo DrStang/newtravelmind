@@ -208,72 +208,61 @@ const useLocation = () => {
 const useSocket = (token, setChatMessages, setNearbyPlaces) => {
     const [socket, setSocket] = useState(null);
     const [connected, setConnected] = useState(false);
+    const handlersAttached = useRef(false);
 
     useEffect(() => {
-        if (token) {
-            const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
-            const WS_URL = API_BASE_URL.replace('/api', '');
-
-            console.log('Connecting to Socket.IO at:', WS_URL);
+        if (token && !socket) {
+            const WS_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api').replace('/api', '');
 
             const newSocket = io(WS_URL, {
                 auth: { token },
                 transports: ['websocket', 'polling'],
-                withCredentials: true,
-                forceNew: true,
-                timeout: 20000,
-                autoConnect: true,
-                reconnection: true,
-                reconnectionDelay: 1000,
-                reconnectionAttempts: 5
+                withCredentials: true
             });
 
             newSocket.on('connect', () => {
                 setConnected(true);
-                console.log('✅ Socket connected successfully');
-                console.log('Socket ID:', newSocket.id);
+                console.log('✅ Socket connected');
             });
 
-            newSocket.on('disconnect', (reason) => {
+            newSocket.on('disconnect', () => {
                 setConnected(false);
-                console.log('❌ Socket disconnected:', reason);
+                console.log('❌ Socket disconnected');
             });
 
-            newSocket.on('connect_error', (error) => {
-                setConnected(false);
-                console.error('🔴 Socket connection error:', error);
-            });
+            // Only attach message handlers once
+            if (!handlersAttached.current) {
+                newSocket.on('ai_response', (data) => {
+                    if (setChatMessages) {
+                        setChatMessages(prev => [...prev, {
+                            type: 'ai',
+                            content: data.success ? data.data.message : data.fallback,
+                            timestamp: new Date(),
+                            model: data.data?.model
+                        }]);
+                    }
+                });
 
-            // Fixed: Now using the passed setChatMessages function
-            newSocket.on('ai_response', (data) => {
-                if (setChatMessages) {
-                    setChatMessages(prev => [...prev, {
-                        type: 'ai',
-                        content: data.success ? data.data.message : data.fallback,
-                        timestamp: new Date(),
-                        model: data.data?.model
-                    }]);
-                }
-            });
+                newSocket.on('location_context', (data) => {
+                    if (setNearbyPlaces) {
+                        setNearbyPlaces(data.nearbyRecommendations || []);
+                    }
+                });
 
-            newSocket.on('location_context', (data) => {
-                if (setNearbyPlaces) {
-                    setNearbyPlaces(data.nearbyRecommendations || []);
-                }
-            });
+                handlersAttached.current = true;
+            }
 
             setSocket(newSocket);
 
             return () => {
-                console.log('🔌 Cleaning up socket connection');
+                handlersAttached.current = false;
                 newSocket.close();
             };
         }
-    }, [token, setChatMessages, setNearbyPlaces]);
+    }, [token]);
 
     return { socket, connected };
 };
-
 // ===================================
 // MAIN APP COMPONENT
 // ===================================
@@ -1710,12 +1699,279 @@ const HotelSearch = ({trip, token}) => {
         </div>
     );
 };
+// Add this component after HotelSearch and before PlanningMode
 
+// ===================================
+// ACTIVITIES SEARCH COMPONENT
+// ===================================
+const ActivitiesSearch = ({ trip, token, location, sendChatMessage }) => {
+    const [activities, setActivities] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const [searchRadius, setSearchRadius] = useState(1);
+    const [selectedActivity, setSelectedActivity] = useState(null);
+    const [aiInsightLoading, setAiInsightLoading] = useState(false);
+    const [aiInsights, setAiInsights] = useState({});
+
+    const searchActivities = async () => {
+        if (!location && !trip?.destination) {
+            setError('Location is required to search activities');
+            return;
+        }
+
+        setLoading(true);
+        setError('');
+
+        try {
+            // Use actual location or default coordinates for trip destination
+            const lat = location?.lat || 41.3851; // Barcelona default
+            const lng = location?.lng || 2.1734;
+
+            const response = await fetch(
+                `${API_BASE_URL}/activities/search?latitude=${lat}&longitude=${lng}&radius=${searchRadius}`,
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            const data = await response.json();
+
+            if (data.success) {
+                setActivities(data.data.activities || []);
+                if (data.data.activities?.length === 0) {
+                    setError('No activities found in this area. Try increasing the search radius.');
+                }
+            } else {
+                setError(data.error || 'Failed to search activities');
+            }
+        } catch (err) {
+            console.error('Activities search error:', err);
+            setError('Failed to search activities. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const getAIInsight = async (activity) => {
+        setAiInsightLoading(true);
+        setSelectedActivity(activity);
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/ai/chat`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    message: `Analyze this activity and give me practical insights: ${activity.name}. Description: ${activity.shortDescription || 'N/A'}. Price: ${activity.price?.amount} ${activity.price?.currencyCode}. What makes this special? Any tips for booking or visiting? Keep it concise and helpful.`,
+                    context: {
+                        mode: 'analysis',
+                        activity: activity
+                    }
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                setAiInsights(prev => ({
+                    ...prev,
+                    [activity.id]: data.data.message
+                }));
+            }
+        } catch (error) {
+            console.error('AI insight error:', error);
+        } finally {
+            setAiInsightLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        searchActivities();
+    }, []);
+
+    return (
+        <div className="space-y-6">
+            {/* Search Controls */}
+            <div className="bg-white rounded-xl shadow-lg p-6">
+                <h3 className="text-xl font-semibold text-gray-900 mb-4">Search Activities & Tours</h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Search Radius
+                        </label>
+                        <select
+                            value={searchRadius}
+                            onChange={(e) => setSearchRadius(parseInt(e.target.value))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        >
+                            <option value={1}>1 km</option>
+                            <option value={5}>5 km</option>
+                            <option value={10}>10 km</option>
+                            <option value={20}>20 km</option>
+                        </select>
+                    </div>
+
+                    <div className="flex items-end">
+                        <button
+                            onClick={searchActivities}
+                            disabled={loading}
+                            className="w-full bg-gradient-to-r from-orange-600 to-red-600 text-white py-3 rounded-lg hover:from-orange-700 hover:to-red-700 transition-colors disabled:opacity-50 flex items-center justify-center"
+                        >
+                            {loading ? (
+                                <>
+                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                                    Searching...
+                                </>
+                            ) : (
+                                <>
+                                    <MapPin className="w-5 h-5 mr-2" />
+                                    Search Activities
+                                </>
+                            )}
+                        </button>
+                    </div>
+                </div>
+
+                {error && (
+                    <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-3">
+                        <p className="text-red-700 text-sm">{error}</p>
+                    </div>
+                )}
+            </div>
+
+            {/* Results */}
+            {activities.length > 0 && (
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-xl font-semibold text-gray-900">
+                            Available Activities ({activities.length})
+                        </h3>
+                    </div>
+
+                    {activities.map((activity) => (
+                        <div key={activity.id} className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
+                            <div className="flex flex-col md:flex-row">
+                                {/* Activity Image */}
+                                {activity.pictures && activity.pictures.length > 0 ? (
+                                    <div className="md:w-64 h-48 bg-gray-200">
+                                        <img
+                                            src={activity.pictures[0]}
+                                            alt={activity.name}
+                                            className="w-full h-full object-cover"
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="md:w-64 h-48 bg-gradient-to-br from-orange-200 to-red-300 flex items-center justify-center">
+                                        <Star className="w-16 h-16 text-white" />
+                                    </div>
+                                )}
+
+                                {/* Activity Details */}
+                                <div className="flex-1 p-6">
+                                    <div className="flex items-start justify-between mb-4">
+                                        <div className="flex-1">
+                                            <h4 className="text-xl font-semibold text-gray-900 mb-2">{activity.name}</h4>
+                                            <p className="text-gray-600 text-sm mb-3">{activity.shortDescription}</p>
+
+                                            {/* Rating */}
+                                            {activity.rating && (
+                                                <div className="flex items-center space-x-2 mb-3">
+                                                    <div className="flex">
+                                                        {[...Array(5)].map((_, i) => (
+                                                            <Star
+                                                                key={i}
+                                                                className={`w-4 h-4 ${
+                                                                    i < Math.floor(activity.rating) ? 'text-yellow-400 fill-current' : 'text-gray-300'
+                                                                }`}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                    <span className="text-sm text-gray-600">({activity.rating})</span>
+                                                </div>
+                                            )}
+
+                                            {/* Location */}
+                                            {activity.geoCode && (
+                                                <p className="text-sm text-gray-500 mb-2">
+                                                    📍 {activity.geoCode.latitude.toFixed(4)}, {activity.geoCode.longitude.toFixed(4)}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        <div className="ml-6 text-right">
+                                            {activity.price && (
+                                                <>
+                                                    <div className="text-sm text-gray-500 mb-1">From</div>
+                                                    <div className="text-3xl font-bold text-gray-900 mb-2">
+                                                        {activity.price.currencyCode} {activity.price.amount}
+                                                    </div>
+                                                </>
+                                            )}
+
+                                            href={activity.bookingLink || '#'}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="block w-full bg-orange-600 text-white px-6 py-3 rounded-lg hover:bg-orange-700 transition-colors text-center whitespace-nowrap mb-2"
+                                            >
+                                            Book Now
+                                        </a>
+                                        <button
+                                            onClick={() => getAIInsight(activity)}
+                                            disabled={aiInsightLoading && selectedActivity?.id === activity.id}
+                                            className="w-full bg-purple-100 text-purple-700 px-6 py-2 rounded-lg hover:bg-purple-200 transition-colors text-sm flex items-center justify-center space-x-2"
+                                        >
+                                            {aiInsightLoading && selectedActivity?.id === activity.id ? (
+                                                <>
+                                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-700"></div>
+                                                    <span>Getting AI Insight...</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Zap className="w-4 h-4" />
+                                                    <span>AI Insight</span>
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* AI Insights */}
+                                {aiInsights[activity.id] && (
+                                    <div className="mt-4 bg-purple-50 border border-purple-200 rounded-lg p-4">
+                                        <div className="flex items-start space-x-2">
+                                            <Zap className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" />
+                                            <div>
+                                                <h5 className="font-semibold text-purple-900 mb-2">AI Insight</h5>
+                                                <p className="text-sm text-purple-800 leading-relaxed whitespace-pre-wrap">
+                                                    {aiInsights[activity.id]}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+            )}
+
+            {!loading && activities.length === 0 && !error && (
+                <div className="bg-white rounded-xl shadow-lg p-12 text-center">
+                    <MapPin className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Search for activities</h3>
+                    <p className="text-gray-500">Click "Search Activities" to find tours and experiences nearby</p>
+                </div>
+            )}
+        </div>
+    );
+};
 // ===================================
 // ENHANCED PLANNING MODE COMPONENT
 // ===================================
 const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMessage, setChatOpen }) => {
-    const [view, setView] = useState('create'); // 'create', 'trips', 'itinerary', 'flights', 'hotels'
+    const [view, setView] = useState('create'); // 'create', 'trips', 'itinerary', 'flights', 'hotels', 'activities'
     const [selectedTrip, setSelectedTrip] = useState(null);
     const [formData, setFormData] = useState({
         destination: '',
@@ -2251,11 +2507,8 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                             <span className="text-xs text-green-100">Find perfect accommodations</span>
                         </button>
                         <button
-                            onClick={() => {
-                                setChatOpen(true);
-                                sendChatMessage(`Find the best activities, food tours, cooking classes, and unique experiences in ${selectedTrip.destination}. Include specific recommendations with prices.`);
-                            }}
-                            className="flex flex-col items-center justify-center space-y-2 bg-purple-600 text-white px-6 py-6 rounded-lg hover:bg-purple-700 transition-colors"
+                            onClick={() => setView('activities')}
+                            className="flex flex-col items-center justify-center space-y-2 bg-orange-600 text-white px-6 py-6 rounded-lg hover:bg-orange-700 transition-colors"
                         >
                             <MapPin className="w-8 h-8" />
                             <span className="font-medium text-lg">Find Activities</span>
@@ -2266,7 +2519,21 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
             </div>
         );
     }
-
+    // ACTIVITIES VIEW
+    if (view === 'activities' && selectedTrip) {
+        return (
+            <div className="max-w-7xl mx-auto px-4 py-8">
+                <button
+                    onClick={() => setView('itinerary')}
+                    className="flex items-center space-x-2 text-blue-600 hover:text-blue-700 mb-6"
+                >
+                    <span>←</span>
+                    <span>Back to Itinerary</span>
+                </button>
+                <ActivitiesSearch trip={selectedTrip} token={token} location={location} sendChatMessage={sendChatMessage} />
+            </div>
+        );
+    }
     // FLIGHTS VIEW
     if (view === 'flights' && selectedTrip) {
         return (

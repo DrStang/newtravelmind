@@ -369,6 +369,66 @@ class AmadeusService {
             throw error;
         }
     }
+    // backend/services/amadeus.js - Add this method to AmadeusService
+
+async searchAirports(keyword) {
+    const token = await this.getAccessToken();
+
+    try {
+        const url = `${this.baseUrl}/v1/reference-data/locations?subType=AIRPORT,CITY&keyword=${encodeURIComponent(keyword)}&page[limit]=20`;
+
+        console.log(`🔍 Searching airports: ${keyword}`);
+
+        const response = await fetch(url, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Accept': 'application/json'
+            }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(`Amadeus airport search error: ${data.errors?.[0]?.detail || 'Unknown error'}`);
+        }
+
+        // Format the response
+        const airports = (data.data || []).map(location => ({
+            id: location.id,
+            type: location.type,
+            subType: location.subType,
+            name: location.name,
+            detailedName: location.detailedName,
+            iataCode: location.iataCode,
+            address: {
+                cityName: location.address?.cityName,
+                cityCode: location.address?.cityCode,
+                countryName: location.address?.countryName,
+                countryCode: location.address?.countryCode,
+                stateCode: location.address?.stateCode,
+                regionCode: location.address?.regionCode
+            },
+            geoCode: {
+                latitude: location.geoCode?.latitude,
+                longitude: location.geoCode?.longitude
+            },
+            timeZone: location.timeZoneOffset
+        }));
+
+        console.log(`✅ Found ${airports.length} airports`);
+
+        return {
+            airports,
+            meta: {
+                count: airports.length
+            }
+        };
+
+    } catch (error) {
+        console.error('❌ Amadeus airport search error:', error);
+        throw error;
+    }
+}
 
     async searchActivities(params) {
         const token = await this.getAccessToken();
@@ -409,3 +469,4 @@ class AmadeusService {
 }
 
 module.exports = { AmadeusService };
+

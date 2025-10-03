@@ -323,6 +323,95 @@ class DatabaseService {
             throw error;
         }
     }
+    async createTripFlight(userId, tripId, flightData) {
+        try {
+            // First check if trip_flights table exists, if not create it
+            await this.pool.query(`
+            CREATE TABLE IF NOT EXISTS trip_flights (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                trip_id INT NOT NULL,
+                user_id INT NOT NULL,
+                offer_id VARCHAR(255),
+                origin VARCHAR(10),
+                destination VARCHAR(10),
+                departure_date DATE,
+                return_date DATE,
+                price DECIMAL(10,2),
+                currency VARCHAR(10),
+                airline VARCHAR(50),
+                airline_name VARCHAR(255),
+                itinerary_data JSON,
+                passengers INT,
+                travel_class VARCHAR(50),
+                status VARCHAR(50) DEFAULT 'selected',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (trip_id) REFERENCES trips(id) ON DELETE CASCADE,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                INDEX idx_trip (trip_id),
+                INDEX idx_user (user_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        `);
+
+            const result = await this.pool.query(`
+            INSERT INTO trip_flights (
+                trip_id, user_id, offer_id, origin, destination, 
+                departure_date, return_date, price, currency, airline, 
+                airline_name, itinerary_data, passengers, travel_class, 
+                status, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'selected', NOW())
+        `, [
+                tripId,
+                userId,
+                flightData.offerId,
+                flightData.origin,
+                flightData.destination,
+                flightData.departureDate,
+                flightData.returnDate || null,
+                flightData.price,
+                flightData.currency,
+                flightData.airline,
+                flightData.airlineName,
+                JSON.stringify(flightData.itinerary),
+                flightData.passengers,
+                flightData.travelClass
+            ]);
+
+            return Number(result.insertId);
+        } catch (error) {
+            console.error('Create trip flight error:', error);
+            throw error;
+        }
+    }
+
+    async getTripFlights(tripId, userId) {
+        try {
+            const flights = await this.pool.query(`
+            SELECT * FROM trip_flights 
+            WHERE trip_id = ? AND user_id = ?
+            ORDER BY departure_date ASC
+        `, [tripId, userId]);
+
+            return flights.map(f => this.convertBigIntToNumber({
+                ...f,
+                itinerary_data: this.safeJsonParse(f.itinerary_data, {})
+            }));
+        } catch (error) {
+            console.error('Get trip flights error:', error);
+            throw error;
+        }
+    }
+
+    async deleteTripFlight(flightId, userId) {
+        try {
+            await this.pool.query(`
+            DELETE FROM trip_flights 
+            WHERE id = ? AND user_id = ?
+        `, [flightId, userId]);
+        } catch (error) {
+            console.error('Delete trip flight error:', error);
+            throw error;
+        }
+    }
 
     async saveConversation(userId, userMessage, aiResponse, context, model, responseTime) {
         try {
@@ -364,25 +453,25 @@ class DatabaseService {
         try {
             // First check if analytics_events table exists
             const tableExists = await this.pool.query(`
-                SELECT COUNT(*) as count 
-                FROM information_schema.tables 
-                WHERE table_schema = DATABASE() 
-                AND table_name = 'analytics_events'
+                SELECT COUNT(*) as count
+                FROM information_schema.tables
+                WHERE table_schema = DATABASE()
+                  AND table_name = 'analytics_events'
             `);
 
             if (tableExists[0].count === 0) {
                 // Create the table if it doesn't exist
                 await this.pool.query(`
                     CREATE TABLE IF NOT EXISTS analytics_events (
-                        id INT AUTO_INCREMENT PRIMARY KEY,
-                        user_id INT NOT NULL,
-                        event_type VARCHAR(100) NOT NULL,
+                                                                    id INT AUTO_INCREMENT PRIMARY KEY,
+                                                                    user_id INT NOT NULL,
+                                                                    event_type VARCHAR(100) NOT NULL,
                         event_data JSON,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         INDEX idx_user_event (user_id, event_type),
                         INDEX idx_created (created_at),
                         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 `);
                 console.log('✅ Created analytics_events table');
             }
@@ -444,7 +533,7 @@ class DatabaseService {
     async getAnalyticsEvents(userId, filters = {}) {
         try {
             let query = `
-                SELECT * FROM analytics_events 
+                SELECT * FROM analytics_events
                 WHERE user_id = ?
             `;
             let params = [userId];

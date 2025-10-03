@@ -522,6 +522,7 @@ const App = () => {
                         setCurrentTrip={setCurrentTrip}
                         sendChatMessage={sendChatMessage}
                         setChatOpen={setChatOpen}
+                        location={location}
                     />
                 )}
 
@@ -1972,7 +1973,7 @@ const ActivitiesSearch = ({ trip, token, location, sendChatMessage }) => {
 // ===================================
 // ENHANCED PLANNING MODE COMPONENT
 // ===================================
-const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMessage, setChatOpen }) => {
+const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMessage, setChatOpen, location }) => {
     const [view, setView] = useState('create'); // 'create', 'trips', 'itinerary', 'flights', 'hotels', 'activities'
     const [selectedTrip, setSelectedTrip] = useState(null);
     const [formData, setFormData] = useState({

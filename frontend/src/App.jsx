@@ -1480,7 +1480,12 @@ const HotelSearch = ({trip, token}) => {
             const data = await response.json();
 
             if (data.success) {
-                setHotels(data.data);
+                // ✅ Fix: Access the hotels array correctly
+                setHotels(data.data.hotels || []);
+
+                if (!data.data.hotels || data.data.hotels.length === 0) {
+                    setError('No hotels found for this location and dates');
+                }
             } else {
                 setError(data.error || 'Failed to search hotels');
             }
@@ -2534,9 +2539,9 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                     <span>Back to Itinerary</span>
                 </button>
                 <ActivitiesSearch trip={selectedTrip} token={token} location={location} sendChatMessage={sendChatMessage} />
-                
+
             </div>
-            
+
         );
     }
     // FLIGHTS VIEW

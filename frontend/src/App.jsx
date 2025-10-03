@@ -2534,17 +2534,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                     <span>Back to Itinerary</span>
                 </button>
                 <ActivitiesSearch trip={selectedTrip} token={token} location={location} sendChatMessage={sendChatMessage} />
-                <button
-                    onClick={() => {
-                        setChatOpen(true);
-                        sendChatMessage(`Find the best activities, food tours, cooking classes, and unique experiences in ${selectedTrip.destination}. Include specific recommendations with prices.`);
-                    }}
-                    className="flex flex-col items-center justify-center space-y-2 bg-purple-600 text-white px-6 py-6 rounded-lg hover:bg-purple-700 transition-colors"
-                >
-                    <MapPin className="w-8 h-8" />
-                    <span className="font-medium text-lg">Find Activities</span>
-                    <span className="text-xs text-purple-100">Tours, dining & experiences</span>
-                </button>
+                
             </div>
             
         );

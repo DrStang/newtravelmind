@@ -1238,6 +1238,35 @@ app.get('/api/airports/search', authenticateToken, async (req, res) => {
         });
     }
 });
+app.get('/api/activities/search', async (req, res) => {
+    try {
+        const { latitude, longitude, radius = 1 } = req.query;
+
+        if (!latitude || !longitude) {
+            return res.status(400).json({
+                success: false,
+                error: 'Latitude and longitude are required'
+            });
+        }
+
+        const activities = await amadeus.searchActivities({
+            latitude: parseFloat(latitude),
+            longitude: parseFloat(longitude),
+            radius: parseInt(radius)
+        });
+
+        res.json({
+            success: true,
+            data: activities
+        });
+    } catch (error) {
+        console.error('Activities search error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to search activities'
+        });
+    }
+});
 // Serve uploaded files
 app.use('/uploads', express.static('uploads'));
 

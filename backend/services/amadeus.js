@@ -22,7 +22,7 @@ class AmadeusService {
         try {
             const response = await fetch(`${this.baseUrl}/v1/security/oauth2/token`, {
                 method: 'POST',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/x-www-form-urlencoded'
                 },
                 body: `grant_type=client_credentials&client_id=${this.apiKey}&client_secret=${this.apiSecret}`
@@ -49,12 +49,12 @@ class AmadeusService {
     async searchFlights(params) {
         const token = await this.getAccessToken();
 
-        const { 
-            origin, 
-            destination, 
-            departureDate, 
-            returnDate, 
-            adults = 1, 
+        const {
+            origin,
+            destination,
+            departureDate,
+            returnDate,
+            adults = 1,
             children = 0,
             infants = 0,
             travelClass = 'ECONOMY',
@@ -76,7 +76,7 @@ class AmadeusService {
 
         try {
             console.log(`🔍 Searching flights: ${origin} → ${destination} on ${departureDate}`);
-            
+
             const response = await fetch(url, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -109,7 +109,7 @@ class AmadeusService {
                 oneWay: offer.oneWay,
                 lastTicketingDate: offer.lastTicketingDate,
                 numberOfBookableSeats: offer.numberOfBookableSeats,
-                
+
                 // Price information
                 price: {
                     currency: offer.price.currency,
@@ -196,12 +196,12 @@ class AmadeusService {
     async searchHotels(params) {
         const token = await this.getAccessToken();
 
-        const { 
-            cityCode, 
+        const {
+            cityCode,
             latitude,
             longitude,
-            checkInDate, 
-            checkOutDate, 
+            checkInDate,
+            checkOutDate,
             adults = 1,
             roomQuantity = 1,
             radius = 5,
@@ -216,7 +216,7 @@ class AmadeusService {
         try {
             // First, search for hotels by city or location
             let searchUrl = `${this.baseUrl}/v1/reference-data/locations/hotels/by-city?cityCode=${cityCode}`;
-            
+
             if (latitude && longitude) {
                 searchUrl = `${this.baseUrl}/v1/reference-data/locations/hotels/by-geocode?latitude=${latitude}&longitude=${longitude}`;
             }
@@ -290,7 +290,7 @@ class AmadeusService {
                 dupeId: offer.hotel.dupeId,
                 latitude: offer.hotel.latitude,
                 longitude: offer.hotel.longitude,
-                
+
                 // Available offers
                 offers: offer.offers?.map(hotelOffer => ({
                     id: hotelOffer.id,
@@ -298,17 +298,17 @@ class AmadeusService {
                     checkOutDate: hotelOffer.checkOutDate,
                     rateCode: hotelOffer.rateCode,
                     rateFamilyEstimated: hotelOffer.rateFamilyEstimated,
-                    
+
                     room: {
                         type: hotelOffer.room?.type,
                         typeEstimated: hotelOffer.room?.typeEstimated,
                         description: hotelOffer.room?.description?.text
                     },
-                    
+
                     guests: {
                         adults: hotelOffer.guests?.adults
                     },
-                    
+
                     price: {
                         currency: hotelOffer.price?.currency,
                         base: parseFloat(hotelOffer.price?.base),
@@ -320,7 +320,7 @@ class AmadeusService {
                             included: tax.included
                         }))
                     },
-                    
+
                     policies: {
                         cancellation: hotelOffer.policies?.cancellation,
                         paymentType: hotelOffer.policies?.paymentType
@@ -371,64 +371,64 @@ class AmadeusService {
     }
     // backend/services/amadeus.js - Add this method to AmadeusService
 
-async searchAirports(keyword) {
-    const token = await this.getAccessToken();
+    async searchAirports(keyword) {
+        const token = await this.getAccessToken();
 
-    try {
-        const url = `${this.baseUrl}/v1/reference-data/locations?subType=AIRPORT,CITY&keyword=${encodeURIComponent(keyword)}&page[limit]=20`;
+        try {
+            const url = `${this.baseUrl}/v1/reference-data/locations?subType=AIRPORT,CITY&keyword=${encodeURIComponent(keyword)}&page[limit]=20`;
 
-        console.log(`🔍 Searching airports: ${keyword}`);
+            console.log(`🔍 Searching airports: ${keyword}`);
 
-        const response = await fetch(url, {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Accept': 'application/json'
+            const response = await fetch(url, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'application/json'
+                }
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(`Amadeus airport search error: ${data.errors?.[0]?.detail || 'Unknown error'}`);
             }
-        });
 
-        const data = await response.json();
+            // Format the response
+            const airports = (data.data || []).map(location => ({
+                id: location.id,
+                type: location.type,
+                subType: location.subType,
+                name: location.name,
+                detailedName: location.detailedName,
+                iataCode: location.iataCode,
+                address: {
+                    cityName: location.address?.cityName,
+                    cityCode: location.address?.cityCode,
+                    countryName: location.address?.countryName,
+                    countryCode: location.address?.countryCode,
+                    stateCode: location.address?.stateCode,
+                    regionCode: location.address?.regionCode
+                },
+                geoCode: {
+                    latitude: location.geoCode?.latitude,
+                    longitude: location.geoCode?.longitude
+                },
+                timeZone: location.timeZoneOffset
+            }));
 
-        if (!response.ok) {
-            throw new Error(`Amadeus airport search error: ${data.errors?.[0]?.detail || 'Unknown error'}`);
+            console.log(`✅ Found ${airports.length} airports`);
+
+            return {
+                airports,
+                meta: {
+                    count: airports.length
+                }
+            };
+
+        } catch (error) {
+            console.error('❌ Amadeus airport search error:', error);
+            throw error;
         }
-
-        // Format the response
-        const airports = (data.data || []).map(location => ({
-            id: location.id,
-            type: location.type,
-            subType: location.subType,
-            name: location.name,
-            detailedName: location.detailedName,
-            iataCode: location.iataCode,
-            address: {
-                cityName: location.address?.cityName,
-                cityCode: location.address?.cityCode,
-                countryName: location.address?.countryName,
-                countryCode: location.address?.countryCode,
-                stateCode: location.address?.stateCode,
-                regionCode: location.address?.regionCode
-            },
-            geoCode: {
-                latitude: location.geoCode?.latitude,
-                longitude: location.geoCode?.longitude
-            },
-            timeZone: location.timeZoneOffset
-        }));
-
-        console.log(`✅ Found ${airports.length} airports`);
-
-        return {
-            airports,
-            meta: {
-                count: airports.length
-            }
-        };
-
-    } catch (error) {
-        console.error('❌ Amadeus airport search error:', error);
-        throw error;
     }
-}
 
     async searchActivities(params) {
         const token = await this.getAccessToken();
@@ -469,4 +469,3 @@ async searchAirports(keyword) {
 }
 
 module.exports = { AmadeusService };
-

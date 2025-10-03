@@ -1908,7 +1908,7 @@ const ActivitiesSearch = ({ trip, token, location, sendChatMessage }) => {
                                                     </div>
                                                 </>
                                             )}
-
+                                        <a
                                             href={activity.bookingLink || '#'}
                                             target="_blank"
                                             rel="noopener noreferrer"

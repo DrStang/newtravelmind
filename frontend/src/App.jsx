@@ -818,7 +818,7 @@ const Header = ({ user, logout, currentMode, setCurrentMode, connected, location
 };// ===================================
 // FLIGHT SEARCH COMPONENT - CORRECTED
 // ===================================
-const FlightSearch = ({trip, token}) => {
+const FlightSearch = ({trip, token, onFlightSelected}) => {
     const [searchParams, setSearchParams] = useState({
         origin: '',
         destination: trip?.destination?.split(',')[0] || '',
@@ -827,10 +827,140 @@ const FlightSearch = ({trip, token}) => {
         adults: 1,
         travelClass: 'ECONOMY'
     });
-    const [flights, setFlights] = useState(null); // Changed from [] to null
+    const [flights, setFlights] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
-    const [expandedFlight, setExpandedFlight] = useState(null); // Add this for details
+    const [expandedFlight, setExpandedFlight] = useState(null);
+    const [showAirportLookup, setShowAirportLookup] = useState(false);
+    const [lookupField, setLookupField] = useState('');
+
+    const getAirlineName = (code) => {
+        const airlines = {
+            'AA': 'American Airlines',
+            'UA': 'United Airlines',
+            'DL': 'Delta Air Lines',
+            'CM': 'Copa Airlines',
+            'BA': 'British Airways',
+            'LH': 'Lufthansa',
+            'AF': 'Air France',
+            'KL': 'KLM',
+            'IB': 'Iberia',
+            'AC': 'Air Canada',
+            'AV': 'Avianca',
+            'LA': 'LATAM Airlines',
+            'NK': 'Spirit Airlines',
+            'F9': 'Frontier Airlines',
+            'B6': 'JetBlue',
+            'WN': 'Southwest Airlines',
+            'AS': 'Alaska Airlines',
+            'SY': 'Sun Country Airlines',
+            'G4': 'Allegiant Air'
+        };
+        return airlines[code] || code;
+    };
+
+    const AirportLookupModal = ({ isOpen, onClose, onSelect, fieldName }) => {
+        const [searchTerm, setSearchTerm] = useState('');
+        const [airports, setAirports] = useState([]);
+        const [searching, setSearching] = useState(false);
+        const [searchError, setSearchError] = useState('');
+
+        useEffect(() => {
+            if (searchTerm.length >= 2) {
+                const timer = setTimeout(() => {
+                    searchAirports();
+                }, 500);
+                return () => clearTimeout(timer);
+            } else {
+                setAirports([]);
+            }
+        }, [searchTerm]);
+
+        const searchAirports = async () => {
+            setSearching(true);
+            setSearchError('');
+
+            try {
+                const response = await fetch(
+                    `${API_BASE_URL}/airports/search?keyword=${encodeURIComponent(searchTerm)}`,
+                    { headers: { Authorization: `Bearer ${token}` } }
+                );
+
+                const data = await response.json();
+
+                if (data.success) {
+                    setAirports(data.data);
+                    if (data.data.length === 0) {
+                        setSearchError('No airports found');
+                    }
+                } else {
+                    setSearchError(data.error);
+                }
+            } catch (err) {
+                setSearchError('Search failed');
+            } finally {
+                setSearching(false);
+            }
+        };
+
+        const handleSelect = (airport) => {
+            onSelect(airport.iataCode, fieldName);
+            setSearchTerm('');
+            setAirports([]);
+            onClose();
+        };
+
+        if (!isOpen) return null;
+
+        return (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] overflow-hidden shadow-2xl">
+                    <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-2xl font-bold">Find Airport Code</h2>
+                            <button onClick={onClose} className="text-white/80 hover:text-white">✕</button>
+                        </div>
+                        <div className="relative">
+                            <input
+                                type="text"
+                                placeholder="Search city or airport name..."
+                                className="w-full px-4 py-3 rounded-lg text-gray-900"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                autoFocus
+                            />
+                        </div>
+                    </div>
+
+                    <div className="p-6 overflow-y-auto max-h-[60vh]">
+                        {searching && <div className="text-center py-8">Searching...</div>}
+                        {searchError && <div className="text-red-600">{searchError}</div>}
+                        {!searching && airports.length > 0 && (
+                            <div className="space-y-2">
+                                {airports.map((airport) => (
+                                    <button
+                                        key={airport.id}
+                                        onClick={() => handleSelect(airport)}
+                                        className="w-full text-left p-4 border rounded-lg hover:bg-blue-50"
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <div className="font-bold text-blue-600 text-lg">{airport.iataCode}</div>
+                                                <div className="font-semibold">{airport.name}</div>
+                                                <div className="text-sm text-gray-600">
+                                                    {airport.address?.cityName}, {airport.address?.countryName}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
+    };
 
     const searchFlights = async () => {
         if (!searchParams.origin || !searchParams.destination || !searchParams.departureDate) {
@@ -850,22 +980,18 @@ const FlightSearch = ({trip, token}) => {
                 travelClass: searchParams.travelClass
             });
 
-            // Only add returnDate if it exists
             if (searchParams.returnDate) {
                 queryParams.append('returnDate', searchParams.returnDate);
             }
-
-            console.log('Searching flights with params:', Object.fromEntries(queryParams));
 
             const response = await fetch(`${API_BASE_URL}/flights/search?${queryParams}`, {
                 headers: {Authorization: `Bearer ${token}`}
             });
 
             const data = await response.json();
-            console.log('Flight search response:', data); // Debug log
 
             if (data.success) {
-                setFlights(data.data); // This contains {offers: [...], meta: {...}}
+                setFlights(data.data);
                 if (data.data.offers.length === 0) {
                     setError('No flights found for this route and date. Try different criteria.');
                 }
@@ -884,7 +1010,6 @@ const FlightSearch = ({trip, token}) => {
         if (!duration) return 'N/A';
         const match = duration.match(/PT(\d+H)?(\d+M)?/);
         if (!match) return duration;
-        
         const hours = match[1] ? parseInt(match[1]) : 0;
         const minutes = match[2] ? parseInt(match[2]) : 0;
         return `${hours}h ${minutes}m`;
@@ -892,19 +1017,61 @@ const FlightSearch = ({trip, token}) => {
 
     const formatTime = (dateTimeString) => {
         const date = new Date(dateTimeString);
-        return date.toLocaleTimeString('en-US', { 
-            hour: '2-digit', 
+        return date.toLocaleTimeString('en-US', {
+            hour: '2-digit',
             minute: '2-digit',
-            hour12: true 
+            hour12: true
         });
     };
 
     const formatDate = (dateTimeString) => {
         const date = new Date(dateTimeString);
-        return date.toLocaleDateString('en-US', { 
-            month: 'short', 
+        return date.toLocaleDateString('en-US', {
+            month: 'short',
             day: 'numeric'
         });
+    };
+
+    const handleSelectFlight = async (offer) => {
+        try {
+            const airlineName = getAirlineName(offer.validatingAirlineCodes[0]);
+
+            const response = await fetch(`${API_BASE_URL}/flights/save-selection`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    tripId: trip?.id,
+                    flightData: {
+                        offerId: offer.id,
+                        origin: searchParams.origin,
+                        destination: searchParams.destination,
+                        departureDate: searchParams.departureDate,
+                        returnDate: searchParams.returnDate,
+                        price: offer.price.total,
+                        currency: offer.price.currency,
+                        airline: offer.validatingAirlineCodes[0],
+                        airlineName: airlineName,
+                        itinerary: offer.itineraries,
+                        passengers: searchParams.adults,
+                        travelClass: searchParams.travelClass
+                    }
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                alert(`Flight added to your trip!\n\n${airlineName}\n$${offer.price.total}\n\nReturning to itinerary...`);
+                if (onFlightSelected) {
+                    onFlightSelected(data.data);
+                }
+            }
+        } catch (error) {
+            alert('Error saving flight. Please try again.');
+        }
     };
 
     return (
@@ -915,43 +1082,53 @@ const FlightSearch = ({trip, token}) => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            From (Airport Code)
-                        </label>
-                        <input
-                            type="text"
-                            placeholder="e.g., JFK, LAX, IAD"
-                            maxLength={3}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 uppercase"
-                            value={searchParams.origin}
-                            onChange={(e) => setSearchParams(prev => ({
-                                ...prev,
-                                origin: e.target.value.toUpperCase()
-                            }))}
-                        />
+                        <label className="block text-sm font-medium text-gray-700 mb-2">From</label>
+                        <div className="flex space-x-2">
+                            <input
+                                type="text"
+                                placeholder="e.g., JFK, LAX, IAD"
+                                maxLength={3}
+                                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 uppercase"
+                                value={searchParams.origin}
+                                onChange={(e) => setSearchParams(prev => ({ ...prev, origin: e.target.value.toUpperCase() }))}
+                            />
+                            <button
+                                onClick={() => {
+                                    setLookupField('origin');
+                                    setShowAirportLookup(true);
+                                }}
+                                className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                            >
+                                🔍
+                            </button>
+                        </div>
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            To (Airport Code)
-                        </label>
-                        <input
-                            type="text"
-                            placeholder="e.g., CDG, LHR, SJO"
-                            maxLength={3}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 uppercase"
-                            value={searchParams.destination}
-                            onChange={(e) => setSearchParams(prev => ({
-                                ...prev,
-                                destination: e.target.value.toUpperCase()
-                            }))}
-                        />
+                        <label className="block text-sm font-medium text-gray-700 mb-2">To</label>
+                        <div className="flex space-x-2">
+                            <input
+                                type="text"
+                                placeholder="e.g., CDG, LHR, SJO"
+                                maxLength={3}
+                                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 uppercase"
+                                value={searchParams.destination}
+                                onChange={(e) => setSearchParams(prev => ({ ...prev, destination: e.target.value.toUpperCase() }))}
+                            />
+                            <button
+                                onClick={() => {
+                                    setLookupField('destination');
+                                    setShowAirportLookup(true);
+                                }}
+                                className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                            >
+                                🔍
+                            </button>
+                        </div>
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Departure Date
-                        </label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Departure Date</label>
                         <input
                             type="date"
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
@@ -961,9 +1138,7 @@ const FlightSearch = ({trip, token}) => {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Return Date (Optional)
-                        </label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Return Date (Optional)</label>
                         <input
                             type="date"
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
@@ -973,9 +1148,7 @@ const FlightSearch = ({trip, token}) => {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Passengers
-                        </label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Passengers</label>
                         <select
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                             value={searchParams.adults}
@@ -988,9 +1161,7 @@ const FlightSearch = ({trip, token}) => {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Class
-                        </label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Class</label>
                         <select
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                             value={searchParams.travelClass}
@@ -1029,6 +1200,13 @@ const FlightSearch = ({trip, token}) => {
                 </button>
             </div>
 
+            <AirportLookupModal
+                isOpen={showAirportLookup}
+                onClose={() => setShowAirportLookup(false)}
+                onSelect={(code, field) => setSearchParams(prev => ({ ...prev, [field]: code }))}
+                fieldName={lookupField}
+            />
+
             {/* Results */}
             {flights && flights.offers && flights.offers.length > 0 && (
                 <div className="space-y-4">
@@ -1045,17 +1223,18 @@ const FlightSearch = ({trip, token}) => {
                         const outbound = offer.itineraries[0];
                         const returnFlight = offer.itineraries[1];
                         const isExpanded = expandedFlight === index;
+                        const airlineName = getAirlineName(offer.validatingAirlineCodes?.[0]);
 
                         return (
                             <div key={offer.id || index}
                                  className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow">
-                                
+
                                 {/* Outbound Flight */}
                                 <div className="mb-4">
                                     <div className="flex items-center justify-between mb-3">
                                         <div className="flex items-center space-x-3">
                                             <div className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-medium">
-                                                {offer.validatingAirlineCodes?.[0] || 'Airline'}
+                                                {airlineName}
                                             </div>
                                             <div className="text-sm text-gray-500">
                                                 Outbound • {formatDate(outbound.segments[0].departure.at)}
@@ -1069,7 +1248,6 @@ const FlightSearch = ({trip, token}) => {
                                         </div>
                                     </div>
 
-                                    {/* Flight segments visualization */}
                                     <div className="flex items-center space-x-4">
                                         <div className="text-center">
                                             <div className="text-2xl font-bold text-gray-900">
@@ -1174,6 +1352,7 @@ const FlightSearch = ({trip, token}) => {
                                             {isExpanded ? 'Hide Details' : 'View Details'}
                                         </button>
                                         <button
+                                            onClick={() => handleSelectFlight(offer)}
                                             className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
                                             Select Flight
                                         </button>
@@ -1185,8 +1364,7 @@ const FlightSearch = ({trip, token}) => {
                                     <div className="mt-4 pt-4 border-t bg-gray-50 rounded-lg p-4 space-y-4">
                                         <div>
                                             <h4 className="font-semibold mb-3">Complete Itinerary</h4>
-                                            
-                                            {/* All outbound segments */}
+
                                             <div className="mb-4">
                                                 <div className="text-sm font-medium text-gray-700 mb-2">Outbound Journey</div>
                                                 {outbound.segments.map((segment, idx) => (
@@ -1210,7 +1388,6 @@ const FlightSearch = ({trip, token}) => {
                                                 ))}
                                             </div>
 
-                                            {/* All return segments */}
                                             {returnFlight && (
                                                 <div>
                                                     <div className="text-sm font-medium text-gray-700 mb-2">Return Journey</div>
@@ -1237,7 +1414,6 @@ const FlightSearch = ({trip, token}) => {
                                             )}
                                         </div>
 
-                                        {/* Price breakdown */}
                                         <div>
                                             <h4 className="font-semibold mb-2">Price Breakdown</h4>
                                             <div className="bg-white rounded p-3 space-y-1 text-sm">
@@ -1263,7 +1439,6 @@ const FlightSearch = ({trip, token}) => {
                 </div>
             )}
 
-            {/* No results state */}
             {flights && flights.offers && flights.offers.length === 0 && (
                 <div className="bg-white rounded-xl shadow-lg p-12 text-center">
                     <Plane className="w-16 h-16 text-gray-300 mx-auto mb-4"/>
@@ -1552,6 +1727,8 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
         interests: []
     });
     const [loading, setLoading] = useState(false);
+            const [savedFlights, setSavedFlights] = useState([]);
+            const [loadingFlights, setLoadingFlights] = useState(false);
 
     const interestOptions = [
         'Adventure', 'Culture', 'Food', 'History', 'Nature', 'Nightlife',
@@ -1605,7 +1782,82 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                 : [...prev.interests, interest]
         }));
     };
+    const loadSavedFlights = async (tripId) => {
+            if (!tripId) return;
 
+            setLoadingFlights(true);
+            try {
+            const response = await fetch(`${API_BASE_URL}/trips/${tripId}/flights`, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+            const data = await response.json();
+
+            if (data.success) {
+            setSavedFlights(data.data);
+        }
+        } catch (error) {
+            console.error('Load flights error:', error);
+        } finally {
+            setLoadingFlights(false);
+        }
+        };
+
+// Load flights when viewing itinerary
+        useEffect(() => {
+            if (view === 'itinerary' && selectedTrip) {
+            loadSavedFlights(selectedTrip.id);
+        }
+        }, [view, selectedTrip]);
+
+// Function to open airline booking
+        const openAirlineBooking = (flight) => {
+            const bookingUrls = {
+            'AA': `https://www.aa.com/booking/search`,
+            'UA': `https://www.united.com/en/us`,
+            'DL': `https://www.delta.com`,
+            'CM': `https://www.copaair.com/en/web/us`,
+            'BA': `https://www.britishairways.com`,
+            'LH': `https://www.lufthansa.com`,
+            'AF': `https://www.airfrance.com`,
+            'KL': `https://www.klm.com`
+        };
+
+        const url = bookingUrls[flight.airline] || `https://www.google.com/travel/flights?q=flights+from+${flight.origin}+to+${flight.destination}+on+${flight.departure_date}`;
+            window.open(url, '_blank');
+        };
+
+// Function to remove flight
+        const removeFlightFromTrip = async (flightId) => {
+            if (!confirm('Remove this flight from your trip?')) return;
+
+            try {
+            const response = await fetch(`${API_BASE_URL}/trips/${selectedTrip.id}/flights/${flightId}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` }
+        });
+
+            const data = await response.json();
+
+            if (data.success) {
+            setSavedFlights(prev => prev.filter(f => f.id !== flightId));
+        }
+        } catch (error) {
+            console.error('Remove flight error:', error);
+        }
+        };
+
+// Format helper functions
+        const formatFlightTime = (dateString) => {
+            if (!dateString) return '';
+            const date = new Date(dateString);
+            return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+        };
+
+        const formatFlightDate = (dateString) => {
+            if (!dateString) return '';
+            const date = new Date(dateString);
+            return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        };
     // Parse itinerary into day cards (similar to old site)
     const parseItinerary = (itineraryText) => {
         if (!itineraryText) return [];
@@ -1788,7 +2040,173 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                         );
                     })}
                 </div>
+            {/* Saved Flights Section */}
+            {savedFlights.length > 0 && (
+                <div className="mb-8">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-2xl font-bold text-gray-900 flex items-center">
+                            <Plane className="w-6 h-6 mr-2 text-blue-600" />
+                            Your Selected Flights
+                        </h3>
+                        <span className="text-sm text-gray-600">
+                {savedFlights.length} flight{savedFlights.length !== 1 ? 's' : ''} saved
+            </span>
+                    </div>
 
+                    <div className="space-y-4">
+                        {savedFlights.map((flight) => {
+                            const itinerary = flight.itinerary_data;
+                            const outbound = itinerary?.[0];
+                            const returnFlight = itinerary?.[1];
+
+                            return (
+                                <div key={flight.id} className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-blue-500">
+                                    {/* Flight Header */}
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div className="flex items-center space-x-3">
+                                            <div className="bg-blue-100 text-blue-700 px-4 py-2 rounded-full font-medium">
+                                                {flight.airline_name || flight.airline}
+                                            </div>
+                                            <div>
+                                                <div className="font-semibold text-gray-900">
+                                                    {flight.origin} → {flight.destination}
+                                                </div>
+                                                <div className="text-sm text-gray-600">
+                                                    {flight.passengers} passenger{flight.passengers > 1 ? 's' : ''} • {flight.travel_class}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="text-3xl font-bold text-blue-600">
+                                                ${parseFloat(flight.price).toFixed(2)}
+                                            </div>
+                                            <div className="text-sm text-gray-500">{flight.currency}</div>
+                                        </div>
+                                    </div>
+
+                                    {/* Outbound Flight Details */}
+                                    {outbound && outbound.segments && (
+                                        <div className="mb-4">
+                                            <div className="text-sm font-medium text-gray-700 mb-2 flex items-center">
+                                                <Plane className="w-4 h-4 mr-1 text-blue-600" />
+                                                Outbound - {formatFlightDate(flight.departure_date)}
+                                            </div>
+                                            <div className="bg-gray-50 rounded-lg p-4">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="text-center">
+                                                        <div className="text-2xl font-bold text-gray-900">
+                                                            {formatFlightTime(outbound.segments[0]?.departure?.at)}
+                                                        </div>
+                                                        <div className="text-sm text-gray-600">
+                                                            {outbound.segments[0]?.departure?.iataCode}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex-1 px-4">
+                                                        <div className="flex items-center justify-center">
+                                                            <div className="flex-1 border-t-2 border-gray-300"></div>
+                                                            <Plane className="w-5 h-5 text-blue-600 mx-2" />
+                                                            <div className="flex-1 border-t-2 border-gray-300"></div>
+                                                        </div>
+                                                        <div className="text-center text-xs text-gray-500 mt-1">
+                                                            {outbound.segments.length === 1 ? 'Direct' : `${outbound.segments.length - 1} stop(s)`}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="text-center">
+                                                        <div className="text-2xl font-bold text-gray-900">
+                                                            {formatFlightTime(outbound.segments[outbound.segments.length - 1]?.arrival?.at)}
+                                                        </div>
+                                                        <div className="text-sm text-gray-600">
+                                                            {outbound.segments[outbound.segments.length - 1]?.arrival?.iataCode}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Return Flight Details */}
+                                    {returnFlight && returnFlight.segments && (
+                                        <div className="mb-4">
+                                            <div className="text-sm font-medium text-gray-700 mb-2 flex items-center">
+                                                <Plane className="w-4 h-4 mr-1 text-purple-600 transform rotate-180" />
+                                                Return - {formatFlightDate(flight.return_date)}
+                                            </div>
+                                            <div className="bg-purple-50 rounded-lg p-4">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="text-center">
+                                                        <div className="text-2xl font-bold text-gray-900">
+                                                            {formatFlightTime(returnFlight.segments[0]?.departure?.at)}
+                                                        </div>
+                                                        <div className="text-sm text-gray-600">
+                                                            {returnFlight.segments[0]?.departure?.iataCode}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex-1 px-4">
+                                                        <div className="flex items-center justify-center">
+                                                            <div className="flex-1 border-t-2 border-purple-300"></div>
+                                                            <Plane className="w-5 h-5 text-purple-600 mx-2 transform rotate-180" />
+                                                            <div className="flex-1 border-t-2 border-purple-300"></div>
+                                                        </div>
+                                                        <div className="text-center text-xs text-gray-500 mt-1">
+                                                            {returnFlight.segments.length === 1 ? 'Direct' : `${returnFlight.segments.length - 1} stop(s)`}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="text-center">
+                                                        <div className="text-2xl font-bold text-gray-900">
+                                                            {formatFlightTime(returnFlight.segments[returnFlight.segments.length - 1]?.arrival?.at)}
+                                                        </div>
+                                                        <div className="text-sm text-gray-600">
+                                                            {returnFlight.segments[returnFlight.segments.length - 1]?.arrival?.iataCode}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Action Buttons */}
+                                    <div className="flex space-x-3 pt-4 border-t">
+                                        <button
+                                            onClick={() => openAirlineBooking(flight)}
+                                            className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2 font-medium"
+                                        >
+                                            <Plane className="w-5 h-5" />
+                                            <span>Book with {flight.airline_name || 'Airline'}</span>
+                                        </button>
+                                        <button
+                                            onClick={() => removeFlightFromTrip(flight.id)}
+                                            className="px-4 py-3 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+                                        >
+                                            Remove
+                                        </button>
+                                    </div>
+
+                                    {/* Booking Tips */}
+                                    <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                        <p className="text-sm text-blue-800">
+                                            💡 <strong>Tip:</strong> Clicking "Book with {flight.airline_name || 'Airline'}" will open the airline's website.
+                                            Have your dates ({formatFlightDate(flight.departure_date)}{flight.return_date && ` - ${formatFlightDate(flight.return_date)}`})
+                                            and passenger info ready.
+                                        </p>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
+            {/* Loading State */}
+            {loadingFlights && (
+                <div className="mb-8 bg-white rounded-xl shadow-lg p-12 text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                    <p className="text-gray-600">Loading saved flights...</p>
+                </div>
+            )}
                 {/* Trip Summary Card */}
                 <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl shadow-lg p-6 mb-8">
                     <h3 className="text-xl font-semibold text-gray-900 mb-4">Trip Summary</h3>
@@ -1854,13 +2272,24 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
         return (
             <div className="max-w-7xl mx-auto px-4 py-8">
                 <button
-                    onClick={() => setView('itinerary')}
+                    onClick={() => {
+                        setView('itinerary');
+                        loadSavedFlights(selectedTrip.id); // Refresh flights
+                    }}
                     className="flex items-center space-x-2 text-blue-600 hover:text-blue-700 mb-6"
                 >
                     <span>←</span>
                     <span>Back to Itinerary</span>
                 </button>
-                <FlightSearch trip={selectedTrip} token={token} />
+                <FlightSearch
+                    trip={selectedTrip}
+                    token={token}
+                    onFlightSelected={(flight) => {
+                        // Refresh saved flights and go back to itinerary
+                        loadSavedFlights(selectedTrip.id);
+                        setView('itinerary');
+                    }}
+                />
             </div>
         );
     }
@@ -3473,4 +3902,3 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
-

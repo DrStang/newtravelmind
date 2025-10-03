@@ -1144,7 +1144,100 @@ app.get('/api/analytics/dashboard', authenticateToken, async (req, res) => {
         });
     }
 });
+app.post('/api/flights/save-selection', authenticateToken, async (req, res) => {
+    try {
+        const { tripId, flightData } = req.body;
 
+        if (!tripId || !flightData) {
+            return res.status(400).json({
+                success: false,
+                error: 'Trip ID and flight data are required'
+            });
+        }
+
+        // All the database logic is now handled by DatabaseService
+        const flightId = await database.createTripFlight(req.user.id, tripId, flightData);
+
+        res.json({
+            success: true,
+            data: {
+                id: flightId,
+                message: 'Flight selection saved successfully'
+            }
+        });
+    } catch (error) {
+        console.error('Save flight selection error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to save flight selection'
+        });
+    }
+});
+
+app.get('/api/trips/:tripId/flights', authenticateToken, async (req, res) => {
+    try {
+        const { tripId } = req.params;
+
+        const flights = await database.getTripFlights(tripId, req.user.id);
+
+        res.json({
+            success: true,
+            data: flights
+        });
+    } catch (error) {
+        console.error('Get trip flights error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to get trip flights'
+        });
+    }
+});
+
+app.delete('/api/trips/:tripId/flights/:flightId', authenticateToken, async (req, res) => {
+    try {
+        const { flightId } = req.params;
+
+        await database.deleteTripFlight(flightId, req.user.id);
+
+        res.json({
+            success: true,
+            message: 'Flight removed from trip'
+        });
+    } catch (error) {
+        console.error('Delete trip flight error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to delete flight'
+        });
+    }
+});
+app.get('/api/airports/search', authenticateToken, async (req, res) => {
+    try {
+        const { keyword } = req.query;
+
+        if (!keyword || keyword.length < 2) {
+            return res.status(400).json({
+                success: false,
+                error: 'Search keyword must be at least 2 characters'
+            });
+        }
+
+        const result = await amadeus.searchAirports(keyword);
+
+        res.json({
+            success: true,
+            data: result.airports,
+            meta: result.meta
+        });
+    } catch (error) {
+        console.error('Airport search endpoint error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to search airports',
+            message: error.message
+        });
+    }
+});
 // Serve uploaded files
 app.use('/uploads', express.static('uploads'));
 
@@ -1299,7 +1392,6 @@ process.on('SIGTERM', async () => {
 startServer();
 
 module.exports = app;
-
 
 
 

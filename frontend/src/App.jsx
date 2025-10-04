@@ -779,14 +779,14 @@ const Header = ({ user, logout, currentMode, setCurrentMode, connected, location
                                 <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center">
                                     <User className="w-4 h-4 text-white" />
                                 </div>
-                                <span className="hidden sm:inline">{user.name}</span>
+                                <span className="hidden sm:inline">{formData.name}</span>
                             </button>
 
                             {showUserMenu && (
                                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border py-1 z-50">
                                     <div className="px-4 py-2 border-b">
-                                        <p className="text-sm font-medium text-gray-900">{user.name}</p>
-                                        <p className="text-xs text-gray-500">{user.email}</p>
+                                        <p className="text-sm font-medium text-gray-900">{formData.name}</p>
+                                        <p className="text-xs text-gray-500">{formData.email}</p>
                                     </div>
                                     <button
                                         onClick={() => {
@@ -4179,3 +4179,4 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+

@@ -84,19 +84,35 @@ const useAuth = () => {
     const [token, setToken] = useState(localStorage.getItem('token'));
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        if (token) {
-            // For demo, set a mock user
-            setUser({
-                id: 1,
-                name: 'Demo User',
-                email: 'demo@travelmind.ai',
-                preferences: ['culture', 'food', 'sightseeing'],
-                travelStyle: 'moderate'
-            });
+useEffect(() => {
+    if (token) {
+        // ✅ Decode the JWT to get user info
+        try {
+            const tokenParts = token.split('.');
+            if (tokenParts.length === 3) {
+                const payload = JSON.parse(atob(tokenParts[1]));
+                
+                // Set user from JWT payload
+                setUser({
+                    id: payload.id,
+                    name: payload.name,
+                    email: payload.email,
+                    preferences: payload.preferences || ['culture', 'food', 'sightseeing'],
+                    travelStyle: payload.travelStyle || 'moderate'
+                });
+            } else {
+                // Invalid token format, clear it
+                localStorage.removeItem('token');
+                setToken(null);
+            }
+        } catch (error) {
+            console.error('Token decode error:', error);
+            localStorage.removeItem('token');
+            setToken(null);
         }
-        setLoading(false);
-    }, [token]);
+    }
+    setLoading(false);
+}, [token]);
 
     const login = async (email, password) => {
         try {
@@ -4179,5 +4195,6 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 

@@ -48,7 +48,7 @@ class OllamaService {
                     'Authorization': `Bearer ${this.openaiKey}`
                 },
                 body: JSON.stringify({
-                    model: 'gpt-3.5-turbo',
+                    model: 'gpt-4o mini',
                     messages: [
                         { role: 'system', content: this.getSystemPrompt(modelType) },
                         { role: 'user', content: prompt }
@@ -142,7 +142,7 @@ class OllamaService {
 
     getSystemPrompt(modelType) {
         const prompts = {
-            planning: 'You are an expert travel planner. Create detailed, personalized itineraries with specific times, costs, and logistics.',
+            planning: 'You are an expert travel planner. Create detailed, personalized itineraries with specific times, costs, and logistics. Include hotel recommendations',
             companion: 'You are a real-time travel companion. Provide immediate, location-specific assistance. Be concise but helpful.',
             translation: 'You are a professional translator specializing in travel contexts.',
             analysis: 'You are a travel analytics expert. Analyze travel data to provide insights and recommendations.',
@@ -228,3 +228,4 @@ Include specific venue names, addresses, and booking recommendations where possi
 }
 
 module.exports = { OllamaService };
+

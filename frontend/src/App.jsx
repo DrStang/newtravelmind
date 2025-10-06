@@ -1992,21 +1992,67 @@ const ActivitiesSearch = ({ trip, token, location, sendChatMessage }) => {
     );
 };
 // Map Modal Component
-const MapModal = ({ isOpen, onClose, dayTitle, locations, apiKey }) => {
+const MapModal = ({ isOpen, onClose, dayTitle, locations, destination, token }) => {
+    const [coordinates, setCoordinates] = useState([]);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (isOpen && locations.length > 0) {
+            fetchCoordinates();
+        }
+    }, [isOpen, locations]);
+
+    const fetchCoordinates = async () => {
+        setLoading(true);
+        try {
+            const response = await fetch(`${API_BASE_URL}/places/coordinates`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ locations, destination })
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                setCoordinates(data.data.locations);
+            }
+        } catch (error) {
+            console.error('Failed to fetch coordinates:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     if (!isOpen) return null;
 
-    // Extract location names from the day's activities
-    const locationQuery = locations.join(' OR ');
-    const mapUrl = `https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${encodeURIComponent(locationQuery)}`;
+    // Calculate center point of all coordinates
+    const getCenterCoords = () => {
+        if (coordinates.length === 0) return { lat: 0, lng: 0 };
+        
+        const avgLat = coordinates.reduce((sum, loc) => sum + loc.lat, 0) / coordinates.length;
+        const avgLng = coordinates.reduce((sum, loc) => sum + loc.lng, 0) / coordinates.length;
+        
+        return { lat: avgLat, lng: avgLng };
+    };
+
+    const center = getCenterCoords();
+    const markers = coordinates.map(loc => `markers=color:red%7Clabel:${encodeURIComponent(loc.name.charAt(0))}%7C${loc.lat},${loc.lng}`).join('&');
+    
+    // Static Maps API URL (no API key exposure issue with proper backend setup)
+    const mapUrl = coordinates.length > 0
+        ? `https://maps.googleapis.com/maps/api/staticmap?center=${center.lat},${center.lng}&zoom=13&size=800x600&${markers}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 'YOUR_KEY'}`
+        : null;
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
+            <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-auto shadow-2xl">
                 <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6">
                     <div className="flex items-center justify-between">
                         <div>
                             <h2 className="text-2xl font-bold">{dayTitle}</h2>
-                            <p className="text-blue-100 text-sm mt-1">Locations on map</p>
+                            <p className="text-blue-100 text-sm mt-1">{destination}</p>
                         </div>
                         <button
                             onClick={onClose}
@@ -2017,22 +2063,41 @@ const MapModal = ({ isOpen, onClose, dayTitle, locations, apiKey }) => {
                     </div>
                 </div>
 
-                <div className="h-[600px]">
-                    <iframe
-                        width="100%"
-                        height="100%"
-                        frameBorder="0"
-                        style={{ border: 0 }}
-                        src={mapUrl}
-                        allowFullScreen
-                    />
-                </div>
-
-                <div className="p-4 bg-gray-50 border-t">
-                    <div className="flex items-center space-x-2 text-sm text-gray-600">
-                        <MapPin className="w-4 h-4" />
-                        <span>Showing: {locations.join(', ')}</span>
-                    </div>
+                <div className="p-6">
+                    {loading ? (
+                        <div className="flex items-center justify-center h-96">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                            <span className="ml-3 text-gray-600">Loading map...</span>
+                        </div>
+                    ) : coordinates.length > 0 ? (
+                        <div>
+                            <img
+                                src={mapUrl}
+                                alt="Location map"
+                                className="w-full rounded-lg shadow-lg"
+                            />
+                            
+                            <div className="mt-6 space-y-2">
+                                <h3 className="font-semibold text-gray-900 flex items-center">
+                                    <MapPin className="w-5 h-5 mr-2 text-blue-600" />
+                                    Locations on this map:
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {coordinates.map((loc, idx) => (
+                                        <div key={idx} className="bg-gray-50 rounded-lg p-3">
+                                            <div className="font-medium text-gray-900">{loc.name}</div>
+                                            <div className="text-sm text-gray-600">{loc.formatted_address}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="text-center py-12 text-gray-500">
+                            <MapPin className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                            <p>No locations found for this day</p>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
@@ -2562,7 +2627,8 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                                         onClose={() => setMapModalOpen(false)}
                                         dayTitle={selectedDayForMap ? `Day ${selectedDayForMap.number}: ${selectedDayForMap.title}` : ''}
                                         locations={selectedDayForMap?.locations || []}
-                                        apiKey={import.meta.env.GOOGLE_MAPS_API_KEY}
+                                        destination={selectedTrip?.destination || ''}
+                                        token={token}
                                     />
 
                                     {/* Booking Tips */}
@@ -4295,6 +4361,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

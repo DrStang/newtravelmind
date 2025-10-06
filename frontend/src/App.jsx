@@ -1991,12 +1991,61 @@ const ActivitiesSearch = ({ trip, token, location, sendChatMessage }) => {
         </div>
     );
 };
+// Map Modal Component
+const MapModal = ({ isOpen, onClose, dayTitle, locations, apiKey }) => {
+    if (!isOpen) return null;
+
+    // Extract location names from the day's activities
+    const locationQuery = locations.join(' OR ');
+    const mapUrl = `https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${encodeURIComponent(locationQuery)}`;
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
+                <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h2 className="text-2xl font-bold">{dayTitle}</h2>
+                            <p className="text-blue-100 text-sm mt-1">Locations on map</p>
+                        </div>
+                        <button
+                            onClick={onClose}
+                            className="text-white/80 hover:text-white transition-colors"
+                        >
+                            <X className="w-6 h-6" />
+                        </button>
+                    </div>
+                </div>
+
+                <div className="h-[600px]">
+                    <iframe
+                        width="100%"
+                        height="100%"
+                        frameBorder="0"
+                        style={{ border: 0 }}
+                        src={mapUrl}
+                        allowFullScreen
+                    />
+                </div>
+
+                <div className="p-4 bg-gray-50 border-t">
+                    <div className="flex items-center space-x-2 text-sm text-gray-600">
+                        <MapPin className="w-4 h-4" />
+                        <span>Showing: {locations.join(', ')}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
 // ===================================
 // ENHANCED PLANNING MODE COMPONENT
 // ===================================
 const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMessage, setChatOpen, location }) => {
     const [view, setView] = useState('create'); // 'create', 'trips', 'itinerary', 'flights', 'hotels', 'activities'
     const [selectedTrip, setSelectedTrip] = useState(null);
+    const [mapModalOpen, setMapModalOpen] = useState(false);
+    const [selectedDayForMap, setSelectedDayForMap] = useState(null);
     const [formData, setFormData] = useState({
         destination: '',
         duration: '',
@@ -2218,6 +2267,39 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
             day: 'numeric'
         });
     };
+      // Helper function to extract location names from activities
+    const extractLocations = (activities) => {
+        // Try to extract place names - look for patterns like "Visit X", "Explore Y", etc.
+        const locations = activities
+            .map(activity => {
+                // Remove common prefixes and clean up
+                const cleaned = activity
+                    .replace(/^(Visit|Explore|See|Discover|Tour|Walk through|Experience)\s+/i, '')
+                    .replace(/\s*\(.*?\)/g, '') // Remove parentheses
+                    .replace(/\s*-.*$/g, '')     // Remove everything after dash
+                    .replace(/\$\d+(\.\d{2})?/g, '') // Remove prices
+                    .trim();
+                
+                // Take first part before comma or period
+                const firstPart = cleaned.split(/[,.]|and |or /i)[0].trim();
+                
+                // Only include if it looks like a place name (not too long, not empty)
+                if (firstPart.length > 0 && firstPart.length < 50) {
+                    return firstPart;
+                }
+                return null;
+            })
+            .filter(Boolean)
+            .slice(0, 5); // Limit to 5 locations to avoid cluttering
+
+        return locations.length > 0 ? locations : [selectedTrip?.destination || 'Location'];
+    };
+
+    const openMapForDay = (day) => {
+        const locations = extractLocations(day.activities);
+        setSelectedDayForMap({ ...day, locations });
+        setMapModalOpen(true);
+    };
 
     // ITINERARY VIEW with cards
     if (view === 'itinerary' && selectedTrip) {
@@ -2285,12 +2367,22 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                                             </div>
                                             <h3 className="text-lg font-semibold">{day.title}</h3>
                                         </div>
+                                        <div className="flex items-center space-x-2">
+                        {/* ADD MAP BUTTON HERE */}
+                                            <button
+                                                onClick={() => openMapForDay(day)}
+                                                className="bg-white/20 hover:bg-white/30 text-white p-2 rounded-lg transition-colors"
+                                                title="View on map"
+                                            >
+                                                <MapPin className="w-5 h-5" />
+                                            </button>
                                         {day.totalCost > 0 && (
                                             <div className="text-right">
                                                 <div className="text-xs text-blue-100">Estimated</div>
                                                 <div className="text-2xl font-bold">${day.totalCost.toFixed(0)}</div>
                                             </div>
                                         )}
+                                         </div>   
                                     </div>
                                 </div>
 
@@ -2464,6 +2556,14 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                                             Remove
                                         </button>
                                     </div>
+                                    {/* Map Modal */}
+                                    <MapModal
+                                        isOpen={mapModalOpen}
+                                        onClose={() => setMapModalOpen(false)}
+                                        dayTitle={selectedDayForMap ? `Day ${selectedDayForMap.number}: ${selectedDayForMap.title}` : ''}
+                                        locations={selectedDayForMap?.locations || []}
+                                        apiKey={import.meta.env.GOOGLE_MAPS_API_KEY}
+                                    />
 
                                     {/* Booking Tips */}
                                     <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
@@ -4195,6 +4295,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

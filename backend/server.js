@@ -933,6 +933,57 @@ app.get('/api/hotels/search', authenticateToken, async (req, res) => {
         });
     }
 });
+app.post('/api/places/coordinates', authenticateToken, async (req, res) => {
+    try {
+        const { locations, destination } = req.body;
+
+        if (!locations || locations.length === 0) {
+            return res.status(400).json({
+                success: false,
+                error: 'Locations array is required'
+            });
+        }
+
+        const results = [];
+
+        // Search for each location to get coordinates
+        for (const locationName of locations.slice(0, 5)) { // Limit to 5
+            try {
+                const searchQuery = `${locationName}, ${destination}`;
+                const response = await fetch(
+                    `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(searchQuery)}&key=${process.env.GOOGLE_MAPS_API_KEY}`
+                );
+                const data = await response.json();
+
+                if (data.status === 'OK' && data.results.length > 0) {
+                    const place = data.results[0];
+                    results.push({
+                        name: locationName,
+                        lat: place.geometry.location.lat,
+                        lng: place.geometry.location.lng,
+                        formatted_address: place.formatted_address
+                    });
+                }
+            } catch (error) {
+                console.error(`Error geocoding ${locationName}:`, error);
+            }
+        }
+
+        res.json({
+            success: true,
+            data: {
+                locations: results,
+                count: results.length
+            }
+        });
+    } catch (error) {
+        console.error('Coordinates fetch error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch coordinates'
+        });
+    }
+});
 
 // Add a new endpoint to get user analytics
 app.get('/api/analytics/events', authenticateToken, async (req, res) => {
@@ -1421,6 +1472,7 @@ process.on('SIGTERM', async () => {
 startServer();
 
 module.exports = app;
+
 
 
 

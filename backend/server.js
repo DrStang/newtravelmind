@@ -27,6 +27,8 @@ const { RedisService } = require('./services/redis');
 const app = express();
 const httpServer = createServer(app);
 const PORT = process.env.PORT || 3001;
+app.set('trust proxy', 1);
+
 
 // Initialize services
 const ollama = new OllamaService();
@@ -1472,6 +1474,7 @@ process.on('SIGTERM', async () => {
 startServer();
 
 module.exports = app;
+
 
 
 

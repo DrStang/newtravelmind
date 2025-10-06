@@ -2361,7 +2361,9 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
     };
 
     const openMapForDay = (day) => {
+        console.log('Opening map for day:', day); // Debug log
         const locations = extractLocations(day.activities);
+        console.log('Extracted locations:', locations); // Debug log
         setSelectedDayForMap({ ...day, locations });
         setMapModalOpen(true);
     };
@@ -2625,15 +2627,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                                             Remove
                                         </button>
                                     </div>
-                                    {/* Map Modal */}
-                                    <MapModal
-                                        isOpen={mapModalOpen}
-                                        onClose={() => setMapModalOpen(false)}
-                                        dayTitle={selectedDayForMap ? `Day ${selectedDayForMap.number}: ${selectedDayForMap.title}` : ''}
-                                        locations={selectedDayForMap?.locations || []}
-                                        destination={selectedTrip?.destination || ''}
-                                        token={token}
-                                    />
+                                    
 
                                     {/* Booking Tips */}
                                     <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
@@ -2710,6 +2704,15 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                         </button>
                     </div>
                 </div>
+                {/* Map Modal */}
+                <MapModal
+                    isOpen={mapModalOpen}
+                    onClose={() => setMapModalOpen(false)}
+                    dayTitle={selectedDayForMap ? `Day ${selectedDayForMap.number}: ${selectedDayForMap.title}` : ''}
+                    locations={selectedDayForMap?.locations || []}
+                    destination={selectedTrip?.destination || ''}
+                    token={token}
+                />
             </div>
         );
     }
@@ -4365,6 +4368,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

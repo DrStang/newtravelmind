@@ -48,7 +48,7 @@ class OllamaService {
                     'Authorization': `Bearer ${this.openaiKey}`
                 },
                 body: JSON.stringify({
-                    model: 'gpt-4o mini',
+                    model: 'gpt-4o-mini',
                     messages: [
                         { role: 'system', content: this.getSystemPrompt(modelType) },
                         { role: 'user', content: prompt }
@@ -62,13 +62,19 @@ class OllamaService {
             clearTimeout(timeoutId);
 
             if (!response.ok) {
-                throw new Error(`OpenAI API error: ${response.status}`);
+                const errorData = await response.json();
+                console.error('OpenAI API error details:', {
+                    status: response.status,
+                    error: errorData,
+                    model: 'gpt-4o-mini'
+                });
+                throw new Error(`OpenAI API error: ${response.status} - ${errorData.error?.message || 'Unknown'}`);
             }
 
             const data = await response.json();
             return {
                 message: data.choices[0].message.content,
-                model: 'gpt-4o mini',
+                model: 'gpt-4o-mini',
                 tokens: data.usage.total_tokens,
                 responseTime: Date.now() - Date.now(),
                 timestamp: new Date().toISOString()
@@ -228,4 +234,5 @@ Include specific venue names, addresses, and booking recommendations where possi
 }
 
 module.exports = { OllamaService };
+
 

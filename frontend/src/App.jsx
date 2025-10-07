@@ -3025,7 +3025,6 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                                 )}
                             </button>
                         </form>
-                        </div>
                         </div>        
                 </div>
             )}
@@ -4501,6 +4500,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

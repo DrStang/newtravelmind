@@ -3024,8 +3024,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                                 )}
                             </button>
                         </div>
-                    </div>
-                )}
+                    )}
 
                 {!isCreating && trips.length > 0 && (
                     <div className="space-y-4">
@@ -3074,6 +3073,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                                     ))}
                                 </div>
                             )}
+                        </div>
 
                             {!isCreating && trips.length === 0 && (
                                 <div className="text-center py-12">
@@ -4498,6 +4498,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

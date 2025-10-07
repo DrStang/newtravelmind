@@ -3026,28 +3026,27 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                         </div>
                     </div>
                 )}
-                        
-                {/* Recent Trips List */}
+
                 {!isCreating && trips.length > 0 && (
-                                <div className="space-y-4">
-                                    <h4 className="text-lg font-semibold text-gray-900">Your Trips</h4>
-                                    {trips.map(trip => (
-                                        <div 
-                                            key={trip.id} 
-                                            className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
-                                            onClick={() => setSelectedTripId(trip.id)}
-                                        >
-                                            <div className="flex items-start justify-between">
-                                                <div className="flex-1">
-                                                    <div className="flex items-center space-x-2 mb-1">
-                                                        <h5 className="font-semibold text-gray-900">{trip.title}</h5>
-                                                        {trip.status === 'active' && (
-                                                            <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-semibold flex items-center">
-                                                                <Check className="w-3 h-3 mr-1" />
-                                                                ACTIVE
-                                                            </span>
-                                                        )}
-                                                    </div>
+                    <div className="space-y-4">
+                        <h4 className="text-lg font-semibold text-gray-900">Your Trips</h4>
+                        {trips.map(trip => (
+                            <div 
+                                key={trip.id} 
+                                className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                                onClick={() => setSelectedTripId(trip.id)}
+                            >
+                                <div className="flex items-start justify-between">
+                                    <div className="flex-1">
+                                        <div className="flex items-center space-x-2 mb-1">
+                                            <h5 className="font-semibold text-gray-900">{trip.title}</h5>
+                                            {trip.status === 'active' && (
+                                                <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-semibold flex items-center">
+                                                    <Check className="w-3 h-3 mr-1" />
+                                                    ACTIVE
+                                                </span>
+                                            )}
+                                                </div>
                                                     <p className="text-gray-600 text-sm">{trip.destination}</p>
                                                     <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
                                                         <span>{trip.duration} days</span>
@@ -4499,6 +4498,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

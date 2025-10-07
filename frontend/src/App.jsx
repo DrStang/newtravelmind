@@ -3024,10 +3024,11 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                                 )}
                             </button>
                         </div>
-                        </div>        
-            )}
-                        {/* Recent Trips List */}
-                            {!isCreating && trips.length > 0 && (
+                    </div>
+                )}
+                        
+                {/* Recent Trips List */}
+                {!isCreating && trips.length > 0 && (
                                 <div className="space-y-4">
                                     <h4 className="text-lg font-semibold text-gray-900">Your Trips</h4>
                                     {trips.map(trip => (
@@ -4498,6 +4499,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

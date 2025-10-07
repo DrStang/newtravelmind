@@ -643,6 +643,93 @@ app.post('/api/ai/generate-itinerary', authenticateToken, async (req, res) => {
         });
     }
 });
+// Activate/deactivate trip
+app.patch('/api/trips/:id/activate', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        // First, deactivate all other trips
+        await database.pool.query(
+            'UPDATE trips SET status = ? WHERE user_id = ? AND status = ?',
+            ['planning', req.user.id, 'active']
+        );
+        
+        // Activate this trip
+        await database.updateTrip(id, req.user.id, { status: 'active' });
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Activate trip error:', error);
+        res.status(500).json({ success: false, error: 'Failed to activate trip' });
+    }
+});
+
+// Update itinerary (for editing)
+app.patch('/api/trips/:id/itinerary', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { itinerary } = req.body;
+        
+        await database.updateTrip(id, req.user.id, { itinerary });
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Update itinerary error:', error);
+        res.status(500).json({ success: false, error: 'Failed to update itinerary' });
+    }
+});
+
+// Add manual booking
+app.post('/api/trips/:id/bookings', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const bookingData = req.body;
+        
+        const trip = await database.getTripById(id, req.user.id);
+        const bookings = trip.booking_data ? JSON.parse(trip.booking_data) : [];
+        
+        bookings.push({
+            id: Date.now().toString(),
+            ...bookingData,
+            createdAt: new Date().toISOString()
+        });
+        
+        await database.updateTrip(id, req.user.id, { 
+            booking_data: JSON.stringify(bookings) 
+        });
+        
+        res.json({ success: true, data: bookings });
+    } catch (error) {
+        console.error('Add booking error:', error);
+        res.status(500).json({ success: false, error: 'Failed to add booking' });
+    }
+});
+
+// Add reminder
+app.post('/api/trips/:id/reminders', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const reminderData = req.body;
+        
+        const trip = await database.getTripById(id, req.user.id);
+        const reminders = trip.reminders ? JSON.parse(trip.reminders) : [];
+        
+        reminders.push({
+            id: Date.now().toString(),
+            ...reminderData,
+            createdAt: new Date().toISOString()
+        });
+        
+        await database.updateTrip(id, req.user.id, { 
+            reminders: JSON.stringify(reminders) 
+        });
+        
+        res.json({ success: true, data: reminders });
+    } catch (error) {
+        console.error('Add reminder error:', error);
+        res.status(500).json({ success: false, error: 'Failed to add reminder' });
+    }
+});
 
 app.post('/api/ai/translate', authenticateToken, async (req, res) => {
     try {
@@ -1474,6 +1561,7 @@ process.on('SIGTERM', async () => {
 startServer();
 
 module.exports = app;
+
 
 
 

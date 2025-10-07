@@ -3025,7 +3025,6 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                             </button>
                         </div>
                         </div>        
-                </div>
             )}
                         {/* Recent Trips List */}
                             {!isCreating && trips.length > 0 && (
@@ -4499,6 +4498,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

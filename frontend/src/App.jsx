@@ -2113,6 +2113,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
     const [selectedTripId, setSelectedTripId] = useState(null);
     const [mapModalOpen, setMapModalOpen] = useState(false);
     const [selectedDayForMap, setSelectedDayForMap] = useState(null);
+    const [isCreating, setIsCreating] = useState(false);
     const [formData, setFormData] = useState({
         destination: '',
         duration: '',
@@ -4497,6 +4498,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

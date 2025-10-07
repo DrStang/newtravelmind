@@ -2132,7 +2132,6 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
     ];
 
     const handleCreateTrip = async (e) => {
-        e.preventDefault();
         if (!formData.destination || !formData.duration) return;
 
         setLoading(true);
@@ -2899,7 +2898,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                             </button>
                         </div>
                         {isCreating && (
-                        <form onSubmit={handleCreateTrip} className="space-y-6">
+                        <div className="space-y-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -3008,7 +3007,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                             </div>
 
                             <button
-                                type="submit"
+                                onClick={handleCreateTrip}
                                 disabled={loading || !formData.destination || !formData.duration}
                                 className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                             >
@@ -3024,7 +3023,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                                     </>
                                 )}
                             </button>
-                        </form>
+                        </div>
                         </div>        
                 </div>
             )}
@@ -4500,6 +4499,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

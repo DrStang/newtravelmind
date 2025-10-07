@@ -2179,33 +2179,6 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
         }));
     };
     
-    // NEW: Handle trip updates from TripManager
-    const handleTripUpdate = (updatedTrip) => {
-        setTrips(prev => prev.map(trip => 
-            trip.id === updatedTrip.id ? updatedTrip : trip
-        ));
-        if (currentTrip?.id === updatedTrip.id) {
-            setCurrentTrip(updatedTrip);
-        }
-    };
-
-    // NEW: Handle trip activation
-    const handleTripActivate = async (tripId) => {
-        // Update trips list - deactivate all others, activate this one
-        setTrips(prev => prev.map(trip => ({
-            ...trip,
-            status: trip.id === tripId ? 'active' : (trip.status === 'active' ? 'planning' : trip.status)
-        })));
-        
-        // Set as current trip
-        const activatedTrip = trips.find(t => t.id === tripId);
-        if (activatedTrip) {
-            setCurrentTrip({ ...activatedTrip, status: 'active' });
-        }
-    };
-
-    // NEW: Get the selected trip for detail view
-    const selectedTrip = selectedTripId ? trips.find(t => t.id === selectedTripId) : null;
 
     const loadSavedFlights = async (tripId) => {
             if (!tripId) return;
@@ -2831,6 +2804,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                                 className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
                                 onClick={() => {
                                     setSelectedTrip(trip);
+                                    setSelectedTripId(trip.id);
                                     setView('itinerary');
                                 }}
                             >
@@ -2898,7 +2872,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Trip Creation Form */}
                 <div className="lg:col-span-2">
-                    {selectedTripID && selectedTrip ? (
+                    {selectedTripID ? (
                         <div>
                             <button
                                 onCLick={() => setSelectedTripId(null)}
@@ -3051,7 +3025,6 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                                 )}
                             </button>
                         </form>
-                    </div>
                 </div>
             )}
                         {/* Recent Trips List */}
@@ -4517,6 +4490,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

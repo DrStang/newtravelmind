@@ -4319,6 +4319,9 @@ const MemoryMode = ({user, token, memories, setMemories, trips, dashboardData, s
 // ===================================
 // AI CHAT COMPONENT
 // ===================================
+// ===================================
+// AI CHAT COMPONENT
+// ===================================
 const AIChat = ({isOpen, onClose, messages, onSendMessage, currentMode, connected}) => {
     const [input, setInput] = useState('');
     const messagesEndRef = useRef(null);
@@ -4398,7 +4401,7 @@ const AIChat = ({isOpen, onClose, messages, onSendMessage, currentMode, connecte
                         <div className="text-center text-gray-500">
                             <MessageCircle className="w-12 h-12 text-gray-300 mx-auto mb-3"/>
                             <p className="text-sm mb-4">
-                                Hi! I'm your AI travel assistant. I can help you with planning, real-time assistance, and memory creation.
+                                Hi! I&apos;m your AI travel assistant. I can help you with planning, real-time assistance, and memory creation.
                             </p>
                             <div className="text-left">
                                 <p className="text-xs font-medium text-gray-700 mb-2">Quick actions for {currentMode} mode:</p>
@@ -4438,17 +4441,23 @@ const AIChat = ({isOpen, onClose, messages, onSendMessage, currentMode, connecte
                 </div>
 
                 {/* Input */}
-                <form onSubmit={handleSubmit} className="p-4 border-t bg-gray-50 rounded-b-xl">
+                <div className="p-4 border-t bg-gray-50 rounded-b-xl">
                     <div className="flex space-x-2">
                         <input
                             type="text"
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault();
+                                    handleSubmit(e);
+                                }
+                            }}
                             placeholder="Ask me anything..."
                             className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                         />
                         <button
-                            type="submit"
+                            onClick={handleSubmit}
                             disabled={!input.trim()}
                             className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
@@ -4469,7 +4478,7 @@ const AIChat = ({isOpen, onClose, messages, onSendMessage, currentMode, connecte
                             ))}
                         </div>
                     )}
-                </form>
+                </div>
             </div>
         </div>
     );
@@ -4492,6 +4501,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

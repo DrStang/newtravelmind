@@ -2906,6 +2906,32 @@ if (view === 'create' && !selectedTripId) {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Trip Creation Form */}
                 <div className="lg:col-span-2">
+                    selectedTripId ? (
+                        <div>
+                            <button
+                                onClick={() => setView('trips')}
+                                className="mb-4 text-blue-600 hover:text-blue-700 flex items-center"
+                            >
+                                ← Back to all trips
+                            </button>
+                            <TripManager
+                                trip={selectedTrip}
+                                onUpdate={handleTripUpdate}
+                                onActivate={handleTripActivate}
+                                token={token}
+                            />
+                        </div>    
+                    ) : (
+                    <div className="bg-white rounded-xl shadow-lg p-6">
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-xl font-semibold text-gray-900 mb-6">Plan New Trip</h3>
+                            <button
+                                onClick={() => setIsCreating(!isCreating)}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                            >
+                                {isCreating ? 'Cancel' : 'New Trip'}
+                            </button>
+                        </div>
                         {isCreating && (
                         <div className="space-y-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -3033,8 +3059,71 @@ if (view === 'create' && !selectedTripId) {
                                 )}
                             </button>
                         </div>
-                    );
-                    }                    
+                    )}
+                        {!isCreating && trips.length > 0 && (
+                    <div className="space-y-4">
+                        <h4 className="text-lg font-semibold text-gray-900">Your Trips</h4>
+                        {trips.map(trip => (
+                            <div 
+                                key={trip.id} 
+                                className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                                onClick={() => setSelectedTripId(trip.id)}
+                                >
+                                <div className="flex items-start justify-between">
+                                    <div className="flex-1">
+                                        <div className="flex items-center space-x-2 mb-1">
+                                            <h5 className="font-semibold text-gray-900">{trip.title}</h5>
+                                            {trip.status === 'active' && (
+                                                <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-semibold flex items-center">
+                                                    <Check className="w-3 h-3 mr-1" />
+                                                    ACTIVE
+                                                </span>
+                                            )}
+                                                </div>
+                                                    <p className="text-gray-600 text-sm">{trip.destination}</p>
+                                                    <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
+                                                        <span>{trip.duration} days</span>
+                                                        {trip.budget && <span>${trip.budget}</span>}
+                                                        <span className={`px-2 py-1 rounded-full ${
+                                                            trip.status === 'active' ? 'bg-green-100 text-green-700' :
+                                                                trip.status === 'completed' ? 'bg-blue-100 text-blue-700' :
+                                                                    'bg-gray-100 text-gray-700'
+                                                        }`}>
+                                                            {trip.status}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setSelectedTripId(trip.id);
+                                                    }}
+                                                    className="text-blue-600 hover:text-blue-700 text-sm"
+                                                >
+                                                    View Details →
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {!isCreating && trips.length === 0 && (
+                                <div className="text-center py-12">
+                                    <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                                    <h3 className="text-lg font-medium text-gray-900 mb-2">No trips yet</h3>
+                                    <p className="text-gray-500 mb-4">Start planning your first adventure!</p>
+                                    <button
+                                        onClick={() => setIsCreating(true)}
+                                        className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+                                    >
+                                        Create First Trip
+                                    </button>
+                                        </div>
+                            )}
+                        </div>
+                    )}
+                </div>
 
                 if (selectedTripId) {
         const tripToShow = trips.find(t => t.id === selectedTripId);
@@ -4550,6 +4639,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

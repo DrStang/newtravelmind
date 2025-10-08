@@ -2107,7 +2107,661 @@ const MapModal = ({ isOpen, onClose, dayTitle, locations, destination, token }) 
 // ===================================
 // ENHANCED PLANNING MODE COMPONENT
 // ===================================
-</div>
+
+const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMessage, setChatOpen, location }) => {
+    const [view, setView] = useState('create'); // 'create', 'trips', 'itinerary', 'flights', 'hotels', 'activities'
+    const [selectedTrip, setSelectedTrip] = useState(null);
+    const [selectedTripId, setSelectedTripId] = useState(null);
+    const [mapModalOpen, setMapModalOpen] = useState(false);
+    const [selectedDayForMap, setSelectedDayForMap] = useState(null);
+    const [isCreating, setIsCreating] = useState(false);
+    const [formData, setFormData] = useState({
+        destination: '',
+        duration: '',
+        budget: '',
+        startDate: '',
+        endDate: '',
+        travelStyle: user?.travelStyle || 'moderate',
+        interests: []
+    });
+    const [loading, setLoading] = useState(false);
+    const [savedFlights, setSavedFlights] = useState([]);
+    const [loadingFlights, setLoadingFlights] = useState(false);
+
+    const interestOptions = [
+        'Adventure', 'Culture', 'Food', 'History', 'Nature', 'Nightlife',
+        'Photography', 'Relaxation', 'Shopping', 'Sports'
+    ];
+
+    const handleTripUpdate = (updatedTrip) => {
+        setTrips(prev => prev.map(trip => 
+            trip.id === updatedTrip.id ? updatedTrip : trip
+        ));
+        if (selectedTrip?.id === updatedTrip.id) {
+            setSelectedTrip(updatedTrip);
+        }
+    };
+
+    const handleTripActivate = async (tripId) => {
+        setTrips(prev => prev.map(trip => ({
+            ...trip,
+            status: trip.id === tripId ? 'active' : (trip.status === 'active' ? 'planning' : trip.status)
+        })));
+        
+        const activatedTrip = trips.find(t => t.id === tripId);
+        if (activatedTrip) {
+            setCurrentTrip({ ...activatedTrip, status: 'active' });
+            setSelectedTrip({ ...activatedTrip, status: 'active' });
+        }
+    };
+
+    const handleCreateTrip = async (e) => {
+        e.preventDefault();
+        if (!formData.destination || !formData.duration) return;
+
+        setLoading(true);
+        try {
+            const response = await fetch(`${API_BASE_URL}/ai/generate-itinerary`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                const newTrip = {
+                    ...data.data.tripData,
+                    itinerary: data.data.itinerary
+                };
+
+                setTrips(prev => [newTrip, ...prev]);
+                setCurrentTrip(newTrip);
+                setSelectedTrip(newTrip);
+                setView('itinerary');
+
+                sendChatMessage(`I just created a new itinerary for ${formData.destination}! Can you give me some additional tips?`);
+            }
+        } catch (error) {
+            console.error('Trip creation error:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const toggleInterest = (interest) => {
+        setFormData(prev => ({
+            ...prev,
+            interests: prev.interests.includes(interest)
+                ? prev.interests.filter(i => i !== interest)
+                : [...prev.interests, interest]
+        }));
+    };
+
+    const loadSavedFlights = async (tripId) => {
+        if (!tripId) return;
+
+        setLoadingFlights(true);
+        try {
+            const response = await fetch(`${API_BASE_URL}/trips/${tripId}/flights`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                setSavedFlights(data.data);
+            }
+        } catch (error) {
+            console.error('Load flights error:', error);
+        } finally {
+            setLoadingFlights(false);
+        }
+    };
+
+    useEffect(() => {
+        const activeTrip = trips.find(t => t.status === 'active');
+        if (activeTrip && view === 'create' && !selectedTripId && !isCreating) {
+            setSelectedTrip(activeTrip);
+            setSelectedTripId(activeTrip.id);
+        }
+        
+        if (view === 'itinerary' && selectedTrip) {
+            loadSavedFlights(selectedTrip.id);
+        }
+    }, [trips, view, selectedTrip, selectedTripId, isCreating]);
+
+    const openAirlineBooking = (flight) => {
+        const bookingUrls = {
+            'AA': `https://www.aa.com/booking/search`,
+            'UA': `https://www.united.com/en/us`,
+            'DL': `https://www.delta.com`,
+            'CM': `https://www.copaair.com/en/web/us`,
+            'BA': `https://www.britishairways.com`,
+            'LH': `https://www.lufthansa.com`,
+            'AF': `https://www.airfrance.com`,
+            'KL': `https://www.klm.com`
+        };
+
+        const url = bookingUrls[flight.airline] || `https://www.google.com/travel/flights?q=flights+from+${flight.origin}+to+${flight.destination}+on+${flight.departure_date}`;
+        window.open(url, '_blank');
+    };
+
+    const removeFlightFromTrip = async (flightId) => {
+        if (!confirm('Remove this flight from your trip?')) return;
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/trips/${selectedTrip.id}/flights/${flightId}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                setSavedFlights(prev => prev.filter(f => f.id !== flightId));
+            }
+        } catch (error) {
+            console.error('Remove flight error:', error);
+        }
+    };
+
+    const formatFlightTime = (dateString) => {
+        if (!dateString) return '';
+        const date = new Date(dateString);
+        return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    };
+
+    const formatFlightDate = (dateString) => {
+        if (!dateString) return '';
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    };
+
+    const parseItinerary = (itineraryText) => {
+        if (!itineraryText) return [];
+
+        const days = [];
+        const lines = itineraryText.split('\n');
+        let currentDay = null;
+
+        lines.forEach(line => {
+            line = line.trim();
+            if (!line) return;
+
+            const dayMatch = line.match(/\*?\*?Day\s+(\d+)[:\-\s]*(.*?)\*?\*?/i);
+            if (dayMatch) {
+                if (currentDay) {
+                    days.push(currentDay);
+                }
+                currentDay = {
+                    number: parseInt(dayMatch[1]),
+                    title: dayMatch[2].replace(/\*/g, '').trim() || 'Exploration Day',
+                    activities: [],
+                    totalCost: 0
+                };
+                return;
+            }
+
+            const costMatch = line.match(/\$(\d+(?:\.\d{2})?)/);
+            if (costMatch && currentDay) {
+                currentDay.totalCost += parseFloat(costMatch[1]);
+            }
+
+            if (currentDay && line.length > 3 && !line.match(/^#+/)) {
+                const cleanLine = line
+                    .replace(/^\*+\s*/, '')
+                    .replace(/\*+$/, '')
+                    .replace(/^-\s*/, '')
+                    .replace(/^\d+\.\s*/, '')
+                    .trim();
+
+                if (cleanLine) {
+                    currentDay.activities.push(cleanLine);
+                }
+            }
+        });
+
+        if (currentDay) {
+            days.push(currentDay);
+        }
+
+        if (days.length === 0) {
+            const activities = lines
+                .filter(line => line.trim().length > 3)
+                .map(line => line.replace(/^\*+\s*/, '').replace(/\*+$/, '').trim());
+
+            days.push({
+                number: 1,
+                title: 'Full Itinerary',
+                activities: activities,
+                totalCost: 0
+            });
+        }
+
+        return days;
+    };
+
+    const getDayDate = (startDate, dayNumber) => {
+        if (!startDate) return null;
+        const date = new Date(startDate);
+        date.setDate(date.getDate() + (dayNumber - 1));
+        return date.toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric'
+        });
+    };
+
+    const extractLocations = (activities) => {
+        const locations = activities
+            .map(activity => {
+                const cleaned = activity
+                    .replace(/^(Visit|Explore|See|Discover|Tour|Walk through|Experience)\s+/i, '')
+                    .replace(/\s*\(.*?\)/g, '')
+                    .replace(/\s*-.*$/g, '')
+                    .replace(/\$\d+(\.\d{2})?/g, '')
+                    .trim();
+                
+                const firstPart = cleaned.split(/[,.]|and |or /i)[0].trim();
+                
+                if (firstPart.length > 0 && firstPart.length < 50) {
+                    return firstPart;
+                }
+                return null;
+            })
+            .filter(Boolean)
+            .slice(0, 5);
+
+        return locations.length > 0 ? locations : [selectedTrip?.destination || 'Location'];
+    };
+
+    const openMapForDay = (day) => {
+        const locations = extractLocations(day.activities);
+        setSelectedDayForMap({ ...day, locations });
+        setMapModalOpen(true);
+    };
+
+    // ITINERARY VIEW
+    if (view === 'itinerary' && selectedTrip) {
+        const days = parseItinerary(selectedTrip.itinerary?.itinerary || selectedTrip.itinerary);
+
+        return (
+            <div className="max-w-7xl mx-auto px-4 py-8">
+                <button
+                    onClick={() => setView('create')}
+                    className="flex items-center space-x-2 text-blue-600 hover:text-blue-700 mb-4"
+                >
+                    <span>←</span>
+                    <span>Back to Trip Planning</span>
+                </button>
+
+                <div className="flex items-center justify-between mb-8">
+                    <div>
+                        <h2 className="text-3xl font-bold text-gray-900 mb-2">
+                            {selectedTrip.title || `${selectedTrip.destination} Trip`}
+                        </h2>
+                        <div className="flex items-center space-x-4 text-gray-600">
+                            <span className="flex items-center space-x-1">
+                                <MapPin className="w-4 h-4" />
+                                <span>{selectedTrip.destination}</span>
+                            </span>
+                            <span className="flex items-center space-x-1">
+                                <Calendar className="w-4 h-4" />
+                                <span>{selectedTrip.duration} days</span>
+                            </span>
+                            {selectedTrip.budget && (
+                                <span className="flex items-center space-x-1">
+                                    <span>💰</span>
+                                    <span>${selectedTrip.budget} budget</span>
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => setView('trips')}
+                        className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors"
+                    >
+                        View All Trips
+                    </button>
+                </div>
+
+                {/* Day Cards */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                    {days.map((day) => {
+                        const dayDate = getDayDate(selectedTrip.startDate, day.number);
+
+                        return (
+                            <div key={day.number} className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
+                                <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-4">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <div className="flex items-center space-x-2 mb-1">
+                                                <span className="text-2xl font-bold">Day {day.number}</span>
+                                                {dayDate && (
+                                                    <span className="text-blue-100 text-sm">• {dayDate}</span>
+                                                )}
+                                            </div>
+                                            <h3 className="text-lg font-semibold">{day.title}</h3>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    openMapForDay(day);
+                                                }}
+                                                className="bg-white/20 hover:bg-white/30 text-white p-2 rounded-lg transition-colors flex flex-col items-center"
+                                                title="View on map"
+                                            >
+                                                <MapPin className="w-5 h-5" />
+                                                <span className="text-xs mt-1">Map</span>
+                                            </button>
+                                            {day.totalCost > 0 && (
+                                                <div className="text-right">
+                                                    <div className="text-xs text-blue-100">Estimated</div>
+                                                    <div className="text-2xl font-bold">${day.totalCost.toFixed(0)}</div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="p-6">
+                                    <ul className="space-y-3">
+                                        {day.activities.map((activity, idx) => (
+                                            <li key={idx} className="flex items-start space-x-3 text-gray-700">
+                                                <span className="text-blue-500 mt-1">•</span>
+                                                <span className="flex-1 leading-relaxed">{activity}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+
+                                <div className="border-t border-gray-100 px-6 py-3 bg-gray-50">
+                                    <button
+                                        onClick={() => sendChatMessage(`Tell me more details about Day ${day.number}: ${day.title} in ${selectedTrip.destination}`)}
+                                        className="text-sm text-blue-600 hover:text-blue-700 flex items-center space-x-1"
+                                    >
+                                        <MessageCircle className="w-4 h-4" />
+                                        <span>Ask AI for more details</span>
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+
+                {/* Saved Flights Section */}
+                {savedFlights.length > 0 && (
+                    <div className="mb-8">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-2xl font-bold text-gray-900 flex items-center">
+                                <Plane className="w-6 h-6 mr-2 text-blue-600" />
+                                Your Selected Flights
+                            </h3>
+                            <span className="text-sm text-gray-600">
+                                {savedFlights.length} flight{savedFlights.length !== 1 ? 's' : ''} saved
+                            </span>
+                        </div>
+
+                        <div className="space-y-4">
+                            {savedFlights.map((flight) => {
+                                const itinerary = flight.itinerary_data;
+                                const outbound = itinerary?.[0];
+                                const returnFlight = itinerary?.[1];
+
+                                return (
+                                    <div key={flight.id} className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-blue-500">
+                                        <div className="flex items-center justify-between mb-4">
+                                            <div className="flex items-center space-x-3">
+                                                <div className="bg-blue-100 text-blue-700 px-4 py-2 rounded-full font-medium">
+                                                    {flight.airline_name || flight.airline}
+                                                </div>
+                                                <div>
+                                                    <div className="font-semibold text-gray-900">
+                                                        {flight.origin} → {flight.destination}
+                                                    </div>
+                                                    <div className="text-sm text-gray-600">
+                                                        {flight.passengers} passenger{flight.passengers > 1 ? 's' : ''} • {flight.travel_class}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="text-3xl font-bold text-blue-600">
+                                                    ${parseFloat(flight.price).toFixed(2)}
+                                                </div>
+                                                <div className="text-sm text-gray-500">{flight.currency}</div>
+                                            </div>
+                                        </div>
+
+                                        {/* Outbound Flight */}
+                                        {outbound && outbound.segments && (
+                                            <div className="mb-4">
+                                                <div className="text-sm font-medium text-gray-700 mb-2 flex items-center">
+                                                    <Plane className="w-4 h-4 mr-1 text-blue-600" />
+                                                    Outbound - {formatFlightDate(flight.departure_date)}
+                                                </div>
+                                                <div className="bg-gray-50 rounded-lg p-4">
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="text-center">
+                                                            <div className="text-2xl font-bold text-gray-900">
+                                                                {formatFlightTime(outbound.segments[0]?.departure?.at)}
+                                                            </div>
+                                                            <div className="text-sm text-gray-600">
+                                                                {outbound.segments[0]?.departure?.iataCode}
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="flex-1 px-4">
+                                                            <div className="flex items-center justify-center">
+                                                                <div className="flex-1 border-t-2 border-gray-300"></div>
+                                                                <Plane className="w-5 h-5 text-blue-600 mx-2" />
+                                                                <div className="flex-1 border-t-2 border-gray-300"></div>
+                                                            </div>
+                                                            <div className="text-center text-xs text-gray-500 mt-1">
+                                                                {outbound.segments.length === 1 ? 'Direct' : `${outbound.segments.length - 1} stop(s)`}
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="text-center">
+                                                            <div className="text-2xl font-bold text-gray-900">
+                                                                {formatFlightTime(outbound.segments[outbound.segments.length - 1]?.arrival?.at)}
+                                                            </div>
+                                                            <div className="text-sm text-gray-600">
+                                                                {outbound.segments[outbound.segments.length - 1]?.arrival?.iataCode}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Return Flight */}
+                                        {returnFlight && returnFlight.segments && (
+                                            <div className="mb-4">
+                                                <div className="text-sm font-medium text-gray-700 mb-2 flex items-center">
+                                                    <Plane className="w-4 h-4 mr-1 text-purple-600 transform rotate-180" />
+                                                    Return - {formatFlightDate(flight.return_date)}
+                                                </div>
+                                                <div className="bg-purple-50 rounded-lg p-4">
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="text-center">
+                                                            <div className="text-2xl font-bold text-gray-900">
+                                                                {formatFlightTime(returnFlight.segments[0]?.departure?.at)}
+                                                            </div>
+                                                            <div className="text-sm text-gray-600">
+                                                                {returnFlight.segments[0]?.departure?.iataCode}
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="flex-1 px-4">
+                                                            <div className="flex items-center justify-center">
+                                                                <div className="flex-1 border-t-2 border-purple-300"></div>
+                                                                <Plane className="w-5 h-5 text-purple-600 mx-2 transform rotate-180" />
+                                                                <div className="flex-1 border-t-2 border-purple-300"></div>
+                                                            </div>
+                                                            <div className="text-center text-xs text-gray-500 mt-1">
+                                                                {returnFlight.segments.length === 1 ? 'Direct' : `${returnFlight.segments.length - 1} stop(s)`}
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="text-center">
+                                                            <div className="text-2xl font-bold text-gray-900">
+                                                                {formatFlightTime(returnFlight.segments[returnFlight.segments.length - 1]?.arrival?.at)}
+                                                            </div>
+                                                            <div className="text-sm text-gray-600">
+                                                                {returnFlight.segments[returnFlight.segments.length - 1]?.arrival?.iataCode}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <div className="flex space-x-3 pt-4 border-t">
+                                            <button
+                                                onClick={() => openAirlineBooking(flight)}
+                                                className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2 font-medium"
+                                            >
+                                                <Plane className="w-5 h-5" />
+                                                <span>Book with {flight.airline_name || 'Airline'}</span>
+                                            </button>
+                                            <button
+                                                onClick={() => removeFlightFromTrip(flight.id)}
+                                                className="px-4 py-3 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+                                            >
+                                                Remove
+                                            </button>
+                                        </div>
+
+                                        <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                            <p className="text-sm text-blue-800">
+                                                💡 <strong>Tip:</strong> Clicking "Book with {flight.airline_name || 'Airline'}" will open the airline's website.
+                                                Have your dates ({formatFlightDate(flight.departure_date)}{flight.return_date && ` - ${formatFlightDate(flight.return_date)}`})
+                                                and passenger info ready.
+                                            </p>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+
+                {loadingFlights && (
+                    <div className="mb-8 bg-white rounded-xl shadow-lg p-12 text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                        <p className="text-gray-600">Loading saved flights...</p>
+                    </div>
+                )}
+
+                {/* Trip Summary */}
+                <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl shadow-lg p-6 mb-8">
+                    <h3 className="text-xl font-semibold text-gray-900 mb-4">Trip Summary</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                            <div className="text-sm text-gray-600 mb-1">Total Duration</div>
+                            <div className="text-2xl font-bold text-gray-900">{selectedTrip.duration} days</div>
+                        </div>
+                        <div>
+                            <div className="text-sm text-gray-600 mb-1">Estimated Total Cost</div>
+                            <div className="text-2xl font-bold text-gray-900">
+                                ${days.reduce((sum, day) => sum + day.totalCost, 0).toFixed(0)}
+                            </div>
+                        </div>
+                        <div>
+                            <div className="text-sm text-gray-600 mb-1">Budget Remaining</div>
+                            <div className="text-2xl font-bold text-green-600">
+                                ${Math.max(0, (selectedTrip.budget || 0) - days.reduce((sum, day) => sum + day.totalCost, 0)).toFixed(0)}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="bg-white rounded-xl shadow-lg p-6">
+                    <h3 className="text-xl font-semibold text-gray-900 mb-4">Complete Your Trip Booking</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <button
+                            onClick={() => setView('flights')}
+                            className="flex flex-col items-center justify-center space-y-2 bg-blue-600 text-white px-6 py-6 rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                            <Plane className="w-8 h-8" />
+                            <span className="font-medium text-lg">Search Flights</span>
+                            <span className="text-xs text-blue-100">Compare prices & book</span>
+                        </button>
+                        <button
+                            onClick={() => setView('hotels')}
+                            className="flex flex-col items-center justify-center space-y-2 bg-green-600 text-white px-6 py-6 rounded-lg hover:bg-green-700 transition-colors"
+                        >
+                            <Star className="w-8 h-8" />
+                            <span className="font-medium text-lg">Search Hotels</span>
+                            <span className="text-xs text-green-100">Find perfect accommodations</span>
+                        </button>
+                        <button
+                            onClick={() => setView('activities')}
+                            className="flex flex-col items-center justify-center space-y-2 bg-orange-600 text-white px-6 py-6 rounded-lg hover:bg-orange-700 transition-colors"
+                        >
+                            <MapPin className="w-8 h-8" />
+                            <span className="font-medium text-lg">Find Activities</span>
+                            <span className="text-xs text-orange-100">Tours, dining & experiences</span>
+                        </button>
+                    </div>
+                </div>
+
+                <MapModal
+                    isOpen={mapModalOpen}
+                    onClose={() => setMapModalOpen(false)}
+                    dayTitle={selectedDayForMap ? `Day ${selectedDayForMap.number}: ${selectedDayForMap.title}` : ''}
+                    locations={selectedDayForMap?.locations || []}
+                    destination={selectedTrip?.destination || ''}
+                    token={token}
+                />
+            </div>
+        );
+    }
+
+    // ACTIVITIES VIEW
+    if (view === 'activities' && selectedTrip) {
+        return (
+            <div className="max-w-7xl mx-auto px-4 py-8">
+                <button
+                    onClick={() => setView('itinerary')}
+                    className="flex items-center space-x-2 text-blue-600 hover:text-blue-700 mb-6"
+                >
+                    <span>←</span>
+                    <span>Back to Itinerary</span>
+                </button>
+                <ActivitiesSearch trip={selectedTrip} token={token} location={location} sendChatMessage={sendChatMessage} />
+            </div>
+        );
+    }
+
+    // FLIGHTS VIEW
+    if (view === 'flights' && selectedTrip) {
+        return (
+            <div className="max-w-7xl mx-auto px-4 py-8">
+                <button
+                    onClick={() => {
+                        setView('itinerary');
+                        loadSavedFlights(selectedTrip.id);
+                    }}
+                    className="flex items-center space-x-2 text-blue-600 hover:text-blue-700 mb-6"
+                >
+                    <span>←</span>
+                    <span>Back to Itinerary</span>
+                </button>
+                <FlightSearch
+                    trip={selectedTrip}
+                    token={token}
+                    onFlightSelected={(flight) => {
+                        loadSavedFlights(selectedTrip.id);
+                        setView('itinerary');
+                    }}
+                />
+            </div>
         );
     }
 
@@ -3886,6 +4540,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

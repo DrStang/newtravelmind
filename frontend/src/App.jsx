@@ -2900,7 +2900,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                     {selectedTripId ? (
                         <div>
                             <button
-                                onCLick={() => setSelectedTripId(null)}
+                                onCLick={() => setView('trips')}
                                 className="mb-4 text-blue-600 hover:text-blue-700 flex items-center"
                             >
                                 ← Back to all trips
@@ -4523,6 +4523,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

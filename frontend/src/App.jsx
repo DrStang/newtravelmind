@@ -2131,6 +2131,31 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
         'Adventure', 'Culture', 'Food', 'History', 'Nature', 'Nightlife',
         'Photography', 'Relaxation', 'Shopping', 'Sports'
     ];
+     const handleTripUpdate = (updatedTrip) => {
+        setTrips(prev => prev.map(trip => 
+            trip.id === updatedTrip.id ? updatedTrip : trip
+        ));
+        if (currentTrip?.id === updatedTrip.id) {
+            setCurrentTrip(updatedTrip);
+        }
+        setSelectedTrip(updatedTrip);
+    };
+
+    // Handle trip activation
+    const handleTripActivate = async (tripId) => {
+        // Update trips list - deactivate all others, activate this one
+        setTrips(prev => prev.map(trip => ({
+            ...trip,
+            status: trip.id === tripId ? 'active' : (trip.status === 'active' ? 'planning' : trip.status)
+        })));
+        
+        // Set as current trip
+        const activatedTrip = trips.find(t => t.id === tripId);
+        if (activatedTrip) {
+            setCurrentTrip({ ...activatedTrip, status: 'active' });
+            setSelectedTrip({ ...activatedTrip, status: 'active' });
+        }
+    };
 
     const handleCreateTrip = async (e) => {
         if (!formData.destination || !formData.duration) return;
@@ -4498,6 +4523,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

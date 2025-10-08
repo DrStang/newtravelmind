@@ -557,38 +557,4 @@ const TripManager = ({ trip, onUpdate, onActivate, token }) => {
   );
 };
 
-// Demo wrapper with sample data
-const Demo = () => {
-  const [trip, setTrip] = useState({
-    id: 1,
-    title: 'Tokyo Adventure',
-    destination: 'Tokyo, Japan',
-    duration: 7,
-    budget: 2500,
-    startDate: '2025-11-01',
-    status: 'planning',
-    itinerary: 'Day 1: Arrival in Tokyo\n- Check into hotel in Shibuya\n- Evening walk around Shibuya Crossing\n- Dinner at local izakaya\n\nDay 2: Cultural Exploration\n- Morning visit to Senso-ji Temple\n- Lunch in Asakusa\n- Afternoon in Akihabara\n- Evening in Shinjuku\n\nDay 3: Modern Tokyo\n- TeamLab Borderless museum\n- Shopping in Harajuku\n- Meiji Shrine visit\n- Dinner in Roppongi',
-    booking_data: JSON.stringify([]),
-    reminders: JSON.stringify([])
-  });
-
-  return (
-    <div className="min-h-screen bg-gray-100 p-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Trip Manager Demo</h1>
-          <p className="text-gray-600">Click "Make Active" to unlock editing, bookings, and reminders</p>
-        </div>
-        
-        <TripManager 
-          trip={trip}
-          onUpdate={(updated) => setTrip(updated)}
-          onActivate={() => setTrip(prev => ({ ...prev, status: 'active' }))}
-          token="demo-token"
-        />
-      </div>
-    </div>
-  );
-};
-
-export default Demo;
+export default TripManager;

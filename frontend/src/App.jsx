@@ -2225,12 +2225,20 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
         }
         };
 
-// Load flights when viewing itinerary
-        useEffect(() => {
-            if (view === 'itinerary' && selectedTrip) {
-            loadSavedFlights(selectedTrip.id);
-        }
-        }, [view, selectedTrip]);
+// Combined useEffect for handling active trips and loading flights
+useEffect(() => {
+    // Auto-show active trip if one exists and we're on create view
+    const activeTrip = trips.find(t => t.status === 'active');
+    if (activeTrip && view === 'create' && !selectedTripId && !isCreating) {
+        setSelectedTrip(activeTrip);
+        setSelectedTripId(activeTrip.id);
+    }
+    
+    // Load saved flights when viewing a trip's itinerary
+    if (view === 'itinerary' && selectedTrip) {
+        loadSavedFlights(selectedTrip.id);
+    }
+}, [trips, view, selectedTrip, selectedTripId, isCreating]);
 
 // Function to open airline booking
         const openAirlineBooking = (flight) => {
@@ -2874,6 +2882,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
     }
 
     // DEFAULT: CREATE NEW TRIP VIEW
+if (view === 'create' && !selectedTripId) {
     return (
         <div className="max-w-7xl mx-auto px-4 py-8">
             <div className="mb-8">
@@ -2897,32 +2906,6 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Trip Creation Form */}
                 <div className="lg:col-span-2">
-                    {selectedTripId ? (
-                        <div>
-                            <button
-                                onClick={() => setView('trips')}
-                                className="mb-4 text-blue-600 hover:text-blue-700 flex items-center"
-                            >
-                                ← Back to all trips
-                            </button>
-                            <TripManager
-                                trip={selectedTrip}
-                                onUpdate={handleTripUpdate}
-                                onActivate={handleTripActivate}
-                                token={token}
-                            />
-                        </div>    
-                    ) : (
-                    <div className="bg-white rounded-xl shadow-lg p-6">
-                        <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-xl font-semibold text-gray-900 mb-6">Plan New Trip</h3>
-                            <button
-                                onClick={() => setIsCreating(!isCreating)}
-                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                            >
-                                {isCreating ? 'Cancel' : 'New Trip'}
-                            </button>
-                        </div>
                         {isCreating && (
                         <div className="space-y-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -3050,72 +3033,116 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                                 )}
                             </button>
                         </div>
-                    )}
+                    );
+                    }                    
 
-                {!isCreating && trips.length > 0 && (
-                    <div className="space-y-4">
-                        <h4 className="text-lg font-semibold text-gray-900">Your Trips</h4>
-                        {trips.map(trip => (
-                            <div 
-                                key={trip.id} 
-                                className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
-                                onClick={() => setSelectedTripId(trip.id)}
-                            >
-                                <div className="flex items-start justify-between">
-                                    <div className="flex-1">
-                                        <div className="flex items-center space-x-2 mb-1">
-                                            <h5 className="font-semibold text-gray-900">{trip.title}</h5>
-                                            {trip.status === 'active' && (
-                                                <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-semibold flex items-center">
-                                                    <Check className="w-3 h-3 mr-1" />
-                                                    ACTIVE
-                                                </span>
-                                            )}
-                                                </div>
-                                                    <p className="text-gray-600 text-sm">{trip.destination}</p>
-                                                    <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
-                                                        <span>{trip.duration} days</span>
-                                                        {trip.budget && <span>${trip.budget}</span>}
-                                                        <span className={`px-2 py-1 rounded-full ${
-                                                            trip.status === 'active' ? 'bg-green-100 text-green-700' :
-                                                                trip.status === 'completed' ? 'bg-blue-100 text-blue-700' :
-                                                                    'bg-gray-100 text-gray-700'
-                                                        }`}>
-                                                            {trip.status}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setSelectedTripId(trip.id);
-                                                    }}
-                                                    className="text-blue-600 hover:text-blue-700 text-sm"
-                                                >
-                                                    View Details →
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
+                if (selectedTripId) {
+        const tripToShow = trips.find(t => t.id === selectedTripId);
+        
+        return (
+            <div className="max-w-7xl mx-auto px-4 py-8">
+                <button
+                    onClick={() => {
+                        setSelectedTripId(null);
+                        setSelectedTrip(null);
+                        setView('create');
+                    }}
+                    className="mb-4 text-blue-600 hover:text-blue-700 flex items-center"
+                >
+                    ← Back to Trip Planning
+                </button>
+                <TripManager
+                    trip={tripToShow}
+                    onUpdate={handleTripUpdate}
+                    onActivate={handleTripActivate}
+                    token={token}
+                />
+            </div>
+        );
+    }
 
-                            {!isCreating && trips.length === 0 && (
-                                <div className="text-center py-12">
-                                    <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                                    <h3 className="text-lg font-medium text-gray-900 mb-2">No trips yet</h3>
-                                    <p className="text-gray-500 mb-4">Start planning your first adventure!</p>
-                                    <button
-                                        onClick={() => setIsCreating(true)}
-                                        className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
-                                    >
-                                        Create First Trip
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    )}
+                // PREVIOUSLY PLANNED TRIPS VIEW
+    if (view === 'trips') {
+        return (
+            <div className="max-w-7xl mx-auto px-4 py-8">
+                <div className="mb-8">
+                    <button
+                        onClick={() => {
+                            setView('create');
+                            setSelectedTripId(null);
+                        }}
+                        className="flex items-center space-x-2 text-blue-600 hover:text-blue-700 mb-4"
+                    >
+                        <span>←</span>
+                        <span>Back to Create New Trip</span>
+                    </button>
+                    <h2 className="text-3xl font-bold text-gray-900 mb-2">Previously Planned Trips</h2>
+                    <p className="text-gray-600">View and manage your planned trips</p>
                 </div>
+
+                {trips.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {trips.map(trip => (
+                            <div
+                                key={trip.id}
+                                className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+                                onClick={() => {
+                                    setSelectedTrip(trip);
+                                    setSelectedTripId(trip.id);
+                                }}
+                            >
+                                <div className="bg-gradient-to-r from-blue-500 to-purple-600 h-32 flex items-center justify-center">
+                                    <Plane className="w-16 h-16 text-white opacity-20" />
+                                </div>
+                                <div className="p-6">
+                                    <h3 className="font-bold text-lg text-gray-900 mb-2">
+                                        {trip.title || `${trip.destination} Trip`}
+                                    </h3>
+                                    <p className="text-gray-600 text-sm mb-4">{trip.destination}</p>
+                                    <div className="flex items-center justify-between text-sm text-gray-500 mb-3">
+                                        <span>{trip.duration} days</span>
+                                        {trip.budget && <span>${trip.budget}</span>}
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className={`inline-block px-3 py-1 rounded-full text-xs ${
+                                            trip.status === 'active' ? 'bg-green-100 text-green-700' :
+                                                trip.status === 'completed' ? 'bg-blue-100 text-blue-700' :
+                                                    'bg-gray-100 text-gray-700'
+                                        }`}>
+                                            {trip.status}
+                                        </span>
+                                        {trip.status !== 'active' && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleTripActivate(trip.id);
+                                                }}
+                                                className="text-xs text-blue-600 hover:text-blue-700"
+                                            >
+                                                Make Active
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="text-center py-12 bg-white rounded-xl shadow-lg">
+                        <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">No trips yet</h3>
+                        <p className="text-gray-500 mb-4">Create your first trip to get started!</p>
+                        <button
+                            onClick={() => setView('create')}
+                            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+                        >
+                            Create Your First Trip
+                        </button>
+                    </div>
+                )}
+            </div>
+        );
+    }
                 {/* Sidebar */}
                 <div className="space-y-6">
                     <div className="bg-white rounded-xl shadow-lg p-6">
@@ -4523,6 +4550,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

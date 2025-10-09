@@ -2223,15 +2223,24 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
 
     useEffect(() => {
         const activeTrip = trips.find(t => t.status === 'active');
-        if (activeTrip && view === 'create' && !selectedTripId && !isCreating) {
+        if (activeTrip) {
             setSelectedTrip(activeTrip);
             setSelectedTripId(activeTrip.id);
+            setView('itinerary');
+            loadSavedFlights(activeTrip.id);
+        } else {
+            setView('create');
+            setIsCreating(false);
+            setSelectedTrip(null);
+            setSelectedTripId(null);
         }
-        
-        if (view === 'itinerary' && selectedTrip) {
+    }, []);
+    
+    useEffect() => {    
+        if (view === 'itinerary' && selectedTrip?.id) {
             loadSavedFlights(selectedTrip.id);
         }
-    }, [trips, view, selectedTrip, selectedTripId, isCreating]);
+    }, [view, selectedTrip?.id]);
 
     const openAirlineBooking = (flight) => {
         const bookingUrls = {
@@ -2305,20 +2314,22 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                 return;
             }
 
-            const costMatch = line.match(/\$(\d+(?:\.\d{2})?)/);
+            const costMatch = line.match(/\$(\d+(?:,\d{3})*(?:\.\d{2})?)/);
             if (costMatch && currentDay) {
-                currentDay.totalCost += parseFloat(costMatch[1]);
+                currentDay.totalCost += parseFloat(costMatch[1].replace(/,/g, ''));
             }
 
             if (currentDay && line.length > 3 && !line.match(/^#+/)) {
                 const cleanLine = line
-                    .replace(/^\*+\s*/, '')
-                    .replace(/\*+$/, '')
-                    .replace(/^-\s*/, '')
-                    .replace(/^\d+\.\s*/, '')
+                    .replace(/^\*+\s*/, '')           // Remove leading asterisks
+                    .replace(/\*+$/, '')              // Remove trailing asterisks
+                    .replace(/\*\*(.*?)\*\*/g, '$1')  // Remove bold markdown
+                    .replace(/^-\s*/, '')             // Remove leading dash
+                    .replace(/^•\s*/, '')             // Remove bullet
+                    .replace(/^\d+\.\s*/, '')         // Remove numbered list
                     .trim();
-
-                if (cleanLine) {
+    
+                if (cleanLine && !cleanLine.match(/^(Day \d+)/i)) {
                     currentDay.activities.push(cleanLine);
                 }
             }
@@ -2328,10 +2339,17 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
             days.push(currentDay);
         }
 
-        if (days.length === 0) {
+    // Fallback if no structured days found
+        if (days.length === 0 && itineraryText.length > 0) {
             const activities = lines
                 .filter(line => line.trim().length > 3)
-                .map(line => line.replace(/^\*+\s*/, '').replace(/\*+$/, '').trim());
+                .map(line => line
+                    .replace(/^\*+\s*/, '')
+                    .replace(/\*+$/, '')
+                    .replace(/\*\*(.*?)\*\*/g, '$1')
+                    .trim()
+                )
+                .filter(line => line && !line.match(/^(Day \d+)/i));
 
             days.push({
                 number: 1,
@@ -2342,6 +2360,36 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
         }
 
         return days;
+    };
+    // Add a function to format activities for display
+    const formatActivityText = (text) => {
+        // Check if it's a section header (Morning Activity, Lunch, etc.)
+        const sectionMatch = text.match(/^(Morning Activity|Afternoon Activity|Evening Activity|Lunch|Dinner|Breakfast)(\s*\(.*?\))?:/i);
+        
+        if (sectionMatch) {
+            return {
+                type: 'header',
+                text: sectionMatch[1],
+                time: sectionMatch[2] ? sectionMatch[2].replace(/[()]/g, '').trim() : null
+            };
+        }
+        
+        // Check if it's an activity detail (Activity:, Venue:, etc.)
+        const detailMatch = text.match(/^(Activity|Venue|Address|Cost|Price Range|Note|Duration):\s*(.+)/i);
+        
+        if (detailMatch) {
+            return {
+                type: 'detail',
+                label: detailMatch[1],
+                value: detailMatch[2].trim()
+            };
+        }
+        
+        // Regular text
+        return {
+            type: 'text',
+            text: text
+        };
     };
 
     const getDayDate = (startDate, dayNumber) => {
@@ -2468,15 +2516,50 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                                     </div>
                                 </div>
 
+                                // In the itinerary view, replace the activities rendering section:
                                 <div className="p-6">
-                                    <ul className="space-y-3">
-                                        {day.activities.map((activity, idx) => (
-                                            <li key={idx} className="flex items-start space-x-3 text-gray-700">
-                                                <span className="text-blue-500 mt-1">•</span>
-                                                <span className="flex-1 leading-relaxed">{activity}</span>
-                                            </li>
-                                        ))}
-                                    </ul>
+                                    <div className="space-y-4">
+                                        {day.activities.map((activity, idx) => {
+                                            const formatted = formatActivityText(activity);
+                                            
+                                            if (formatted.type === 'header') {
+                                                return (
+                                                    <div key={idx} className="mt-4 first:mt-0">
+                                                        <h4 className="font-bold text-gray-900 text-base flex items-center">
+                                                            <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded mr-2 text-sm">
+                                                                {formatted.text}
+                                                            </span>
+                                                            {formatted.time && (
+                                                                <span className="text-sm text-gray-600 font-normal">
+                                                                    {formatted.time}
+                                                                </span>
+                                                            )}
+                                                        </h4>
+                                                    </div>
+                                                );
+                                            }
+                                            
+                                            if (formatted.type === 'detail') {
+                                                return (
+                                                    <div key={idx} className="ml-4 flex items-start space-x-2">
+                                                        <span className="font-semibold text-gray-700 text-sm min-w-[80px]">
+                                                            {formatted.label}:
+                                                        </span>
+                                                        <span className="text-gray-600 text-sm flex-1">
+                                                            {formatted.value}
+                                                        </span>
+                                                    </div>
+                                                );
+                                            }
+                                            
+                                            return (
+                                                <div key={idx} className="flex items-start space-x-3 text-gray-700 ml-2">
+                                                    <span className="text-blue-500 mt-1">•</span>
+                                                    <span className="flex-1 leading-relaxed text-sm">{formatted.text}</span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
 
                                 <div className="border-t border-gray-100 px-6 py-3 bg-gray-50">
@@ -4540,6 +4623,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

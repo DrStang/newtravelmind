@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     MessageCircle, MapPin, Plane, Calendar, Star, Camera,
     Navigation, Cloud, Sun, CloudRain, Settings, User,
-    TrendingUp, Clock, Heart, Globe, Zap, Book, X
+    TrendingUp, Clock, Heart, Globe, Zap, Book, X, Check, Bell
 } from 'lucide-react';
 import io from 'socket.io-client';
 import TripManager from './TripManager';
@@ -4540,6 +4540,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

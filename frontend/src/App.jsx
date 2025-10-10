@@ -2698,8 +2698,6 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                                         </div>
                                     </div>
                                 </div>
-
-                                // In the itinerary view, replace the activities rendering section:
                                 <div className="p-6">
                                     <div className="space-y-4">
                                         {day.activities.map((activity, idx) => {
@@ -4832,6 +4830,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

@@ -2642,7 +2642,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                     <span>←</span>
                     <span>Edit Active Trip</span>
                     </button>
-                }
+                )}
                 <div className="flex items-center justify-between mb-8">
                     <div>
                         <h2 className="text-3xl font-bold text-gray-900 mb-2">
@@ -5044,6 +5044,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

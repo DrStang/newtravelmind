@@ -2419,7 +2419,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
         }
     }, []);
     
-    useEffect() => {    
+    useEffect(() => {    
         if (view === 'itinerary' && selectedTrip?.id) {
             loadSavedFlights(selectedTrip.id);
         }
@@ -4832,6 +4832,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

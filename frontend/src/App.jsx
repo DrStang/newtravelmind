@@ -2622,13 +2622,27 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
         return (
             <div className="max-w-7xl mx-auto px-4 py-8">
                 <button
-                    onClick={() => setView('create')}
+                    onClick={() => {
+                    setView('create');
+                    setSelectedTrip(null);
+                    setSelectedTripId(null);
+                }}
                     className="flex items-center space-x-2 text-blue-600 hover:text-blue-700 mb-4"
                 >
                     <span>←</span>
                     <span>Back to Trip Planning</span>
                 </button>
-
+                {setSelectedTripId && (
+                    <button onClick={() => {
+                        setView('itinerary');
+                        setSelectedTripId(trip.id);
+                    }}
+                    className="flex items-center space-x-2 text-blue-600 hover:text-blue-700 mb-4"
+                >
+                    <span>←</span>
+                    <span>Edit Active Trip</span>
+                    </button>
+                }
                 <div className="flex items-center justify-between mb-8">
                     <div>
                         <h2 className="text-3xl font-bold text-gray-900 mb-2">
@@ -3149,7 +3163,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
         );
     }
 
-    // TRIP MANAGER VIEW (when selectedTripId is set but view is still 'create')
+    //TRIP MANAGER VIEW (when selectedTripId is set but view is still 'create')
     if (selectedTripId && view === 'create') {
         const tripToShow = trips.find(t => t.id === selectedTripId);
         
@@ -3159,10 +3173,11 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                     onClick={() => {
                         setSelectedTripId(null);
                         setSelectedTrip(null);
+                        setView('create');
                     }}
                     className="mb-4 text-blue-600 hover:text-blue-700 flex items-center"
                 >
-                    ← Back to Trip Planning
+                    ← Back to Create New Trip
                 </button>
                 <TripManager
                     trip={tripToShow}
@@ -5029,6 +5044,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

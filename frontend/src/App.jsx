@@ -2413,7 +2413,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
             loadSavedFlights(activeTrip.id);
         } else {
             setView('create');
-            setIsCreating(false);
+            setIsCreating(true);
             setSelectedTrip(null);
             setSelectedTripId(null);
         }
@@ -2741,16 +2741,6 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                                             );
                                         })}
                                     </div>
-                                </div>
-
-                                <div className="border-t border-gray-100 px-6 py-3 bg-gray-50">
-                                    <button
-                                        onClick={() => sendChatMessage(`Tell me more details about Day ${day.number}: ${day.title} in ${selectedTrip.destination}`)}
-                                        className="text-sm text-blue-600 hover:text-blue-700 flex items-center space-x-1"
-                                    >
-                                        <MessageCircle className="w-4 h-4" />
-                                        <span>Ask AI for more details</span>
-                                    </button>
                                 </div>
                                 <div className="border-t border-gray-100 px-6 py-3 bg-gray-50 flex items-center justify-between">
                                     <button
@@ -4830,6 +4820,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

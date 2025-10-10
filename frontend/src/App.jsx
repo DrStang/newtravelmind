@@ -295,6 +295,7 @@ const App = () => {
     const [nearbyPlaces, setNearbyPlaces] = useState([]);
     const [currentTrip, setCurrentTrip] = useState(null);
     const [dashboardData, setDashboardData] = useState(null);
+    const activeTrip = trips.find(t => t.status === 'active');
     const { socket, connected } = useSocket(token, setChatMessages, setNearbyPlaces);
 
 
@@ -423,7 +424,15 @@ const App = () => {
             ]);
         }
     };
-
+    const handleViewActiveTrip = () => {
+        if (activeTrip) {
+            // Navigate to planning mode and show active trip
+            setCurrentMode('planning');
+            setSelectedTrip(activeTrip);
+            setSelectedTripId(activeTrip.id);
+            setView('itinerary');
+        }
+    };
     const sendChatMessage = (message) => {
         const userMessage = {
             type: 'user',
@@ -527,6 +536,8 @@ const App = () => {
                 connected={connected}
                 location={location}
                 weather={weather}
+                activeTrip={activeTrip}
+                onViewActiveTrip={handleViewActiveTrip}
             />
 
             <main className="pb-20">
@@ -716,7 +727,7 @@ const AuthScreen = ({ login, register }) => {
 // ===================================
 // HEADER COMPONENT
 // ===================================
-const Header = ({ user, logout, currentMode, setCurrentMode, connected, location, weather }) => {
+const Header = ({ user, logout, currentMode, setCurrentMode, connected, location, weather, activeTrip, onViewActiveTrip }) => {
     const [showUserMenu, setShowUserMenu] = useState(false);
 
     const getWeatherIcon = () => {
@@ -771,6 +782,16 @@ const Header = ({ user, logout, currentMode, setCurrentMode, connected, location
 
                     {/* Status & User Menu */}
                     <div className="flex items-center space-x-4">
+                        {/* Active Trip Quick Access */}
+                        {activeTrip && currentMode === 'planning' && (
+                            <button
+                                onClick={onViewActiveTrip}
+                                className="hidden md:flex items-center space-x-2 bg-green-100 text-green-700 px-3 py-2 rounded-lg hover:bg-green-200 transition-colors text-sm"
+                            >
+                                <Check className="w-4 h-4" />
+                                <span>Active: {active.Trip.destination}</span>
+                            </button>
+                        )}
                         {/* Location & Weather */}
                         {location && (
                             <div className="hidden md:flex items-center space-x-3 text-sm text-gray-600">
@@ -3199,6 +3220,24 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                         <h2 className="text-3xl font-bold text-gray-900 mb-2">Plan Your Next Adventure</h2>
                         <p className="text-gray-600">Create a personalized AI-powered itinerary</p>
                     </div>
+                    <div className="flex items-center space-x-3">
+                    {/* Active Trip Shortcut */}
+                    {activeTrip && (
+                        <button
+                            onClick={() => {
+                                setSelectedTrip(activeTrip);
+                                setSelectedTripId(activeTrip.id);
+                                setView('itinerary');
+                            }}
+                            className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition-colors flex items-center space-x-2 shadow-lg"
+                        >
+                            <Check className="w-5 h-5" />
+                            <div className="text-left">
+                                <div className="text-xs opacity-90">Active Trip</div>
+                                <div className="font-semibold">{activeTrip.destination}</div>
+                            </div>
+                        </button>
+                    )}
                     {trips.length > 0 && (
                         <button
                             onClick={() => setView('trips')}
@@ -3210,6 +3249,43 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                     )}
                 </div>
             </div>
+        </div> 
+            {/* Active Trip Card - Show prominently if exists */}
+        {activeTrip && (
+            <div className="mb-8 bg-gradient-to-r from-green-500 to-blue-500 rounded-xl p-6 text-white shadow-xl">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <div className="flex items-center space-x-2 mb-2">
+                            <Check className="w-6 h-6" />
+                            <h3 className="text-2xl font-bold">Your Active Trip</h3>
+                        </div>
+                        <p className="text-xl mb-1">{activeTrip.title || `${activeTrip.destination} Trip`}</p>
+                        <div className="flex items-center space-x-4 text-green-100">
+                            <span>{activeTrip.duration} days</span>
+                            <span>•</span>
+                            <span>{activeTrip.destination}</span>
+                            {activeTrip.startDate && (
+                                <>
+                                    <span>•</span>
+                                    <span>Starts {new Date(activeTrip.startDate).toLocaleDateString()}</span>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => {
+                            setSelectedTrip(activeTrip);
+                            setSelectedTripId(activeTrip.id);
+                            setView('itinerary');
+                        }}
+                        className="bg-white text-green-600 px-6 py-3 rounded-lg hover:bg-green-50 transition-colors font-semibold"
+                    >
+                        View Itinerary →
+                    </button>
+                </div>
+            </div>
+        )}
+
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Trip Creation Form */}
@@ -5045,6 +5121,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

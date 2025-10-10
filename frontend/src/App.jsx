@@ -2104,6 +2104,179 @@ const MapModal = ({ isOpen, onClose, dayTitle, locations, destination, token }) 
         </div>
     );
 };
+// Add this new component before PlanningMode
+const DayEditor = ({ day, tripId, destination, onSave, onCancel, token }) => {
+    const [activities, setActivities] = useState([...day.activities]);
+    const [newActivity, setNewActivity] = useState('');
+    const [saving, setSaving] = useState(false);
+
+    const addActivity = () => {
+        if (newActivity.trim()) {
+            setActivities([...activities, newActivity.trim()]);
+            setNewActivity('');
+        }
+    };
+
+    const removeActivity = (index) => {
+        setActivities(activities.filter((_, i) => i !== index));
+    };
+
+    const updateActivity = (index, value) => {
+        const updated = [...activities];
+        updated[index] = value;
+        setActivities(updated);
+    };
+
+    const moveActivity = (index, direction) => {
+        if (
+            (direction === 'up' && index === 0) ||
+            (direction === 'down' && index === activities.length - 1)
+        ) {
+            return;
+        }
+
+        const updated = [...activities];
+        const newIndex = direction === 'up' ? index - 1 : index + 1;
+        [updated[index], updated[newIndex]] = [updated[newIndex], updated[index]];
+        setActivities(updated);
+    };
+
+    const handleSave = async () => {
+        setSaving(true);
+        try {
+            const response = await fetch(`${API_BASE_URL}/trips/${tripId}/days/${day.number}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    activities: activities,
+                    title: day.title
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                onSave({ ...day, activities });
+            } else {
+                alert('Failed to save changes');
+            }
+        } catch (error) {
+            console.error('Save error:', error);
+            alert('Failed to save changes');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
+                <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h2 className="text-2xl font-bold">Edit Day {day.number}</h2>
+                            <p className="text-blue-100 text-sm mt-1">{day.title} - {destination}</p>
+                        </div>
+                        <button
+                            onClick={onCancel}
+                            className="text-white/80 hover:text-white transition-colors"
+                        >
+                            <X className="w-6 h-6" />
+                        </button>
+                    </div>
+                </div>
+
+                <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
+                    {/* Current Activities */}
+                    <div className="space-y-3 mb-6">
+                        <h3 className="font-semibold text-gray-900 mb-3">Activities</h3>
+                        {activities.map((activity, index) => (
+                            <div key={index} className="flex items-start space-x-2 bg-gray-50 p-3 rounded-lg group">
+                                <div className="flex flex-col space-y-1">
+                                    <button
+                                        onClick={() => moveActivity(index, 'up')}
+                                        disabled={index === 0}
+                                        className="text-gray-400 hover:text-gray-600 disabled:opacity-30"
+                                        title="Move up"
+                                    >
+                                        ▲
+                                    </button>
+                                    <button
+                                        onClick={() => moveActivity(index, 'down')}
+                                        disabled={index === activities.length - 1}
+                                        className="text-gray-400 hover:text-gray-600 disabled:opacity-30"
+                                        title="Move down"
+                                    >
+                                        ▼
+                                    </button>
+                                </div>
+                                <textarea
+                                    value={activity}
+                                    onChange={(e) => updateActivity(index, e.target.value)}
+                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
+                                    rows={2}
+                                />
+                                <button
+                                    onClick={() => removeActivity(index)}
+                                    className="text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    title="Remove activity"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Add New Activity */}
+                    <div className="border-t pt-4">
+                        <h4 className="font-semibold text-gray-900 mb-3">Add New Activity</h4>
+                        <div className="flex space-x-2">
+                            <textarea
+                                value={newActivity}
+                                onChange={(e) => setNewActivity(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && e.ctrlKey) {
+                                        addActivity();
+                                    }
+                                }}
+                                placeholder="Enter new activity (Ctrl+Enter to add)"
+                                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
+                                rows={2}
+                            />
+                            <button
+                                onClick={addActivity}
+                                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                            >
+                                Add
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Footer */}
+                <div className="border-t p-4 flex justify-end space-x-3 bg-gray-50">
+                    <button
+                        onClick={onCancel}
+                        className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center space-x-2"
+                    >
+                        {saving && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
+                        <span>{saving ? 'Saving...' : 'Save Changes'}</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
 // ===================================
 // ENHANCED PLANNING MODE COMPONENT
 // ===================================
@@ -2115,6 +2288,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
     const [mapModalOpen, setMapModalOpen] = useState(false);
     const [selectedDayForMap, setSelectedDayForMap] = useState(null);
     const [isCreating, setIsCreating] = useState(false);
+    const [editingDay, setEditingDay] = useState(null);
     const [formData, setFormData] = useState({
         destination: '',
         duration: '',
@@ -2140,6 +2314,15 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
         if (selectedTrip?.id === updatedTrip.id) {
             setSelectedTrip(updatedTrip);
         }
+    };
+    const handleDaySave = (updatedDay) => {
+    // Update the trip's itinerary
+        const updatedItinerary = selectedTrip.itinerary?.itinerary || selectedTrip.itinerary;
+        // This would need to reconstruct the itinerary text with the updated day
+        // For now, we'll just refresh the trip
+        setEditingDay(null);
+        // Reload trip data
+        loadTrips();
     };
 
     const handleTripActivate = async (tripId) => {
@@ -2571,7 +2754,33 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                                         <span>Ask AI for more details</span>
                                     </button>
                                 </div>
+                                <div className="border-t border-gray-100 px-6 py-3 bg-gray-50 flex items-center justify-between">
+                                    <button
+                                        onClick={() => sendChatMessage(`Tell me more details about Day ${day.number}: ${day.title} in ${selectedTrip.destination}`)}
+                                        className="text-sm text-blue-600 hover:text-blue-700 flex items-center space-x-1"
+                                    >
+                                        <MessageCircle className="w-4 h-4" />
+                                        <span>Ask AI for more details</span>
+                                    </button>
+                                    <button
+                                        onClick={() => setEditingDay(day)}
+                                        className="text-sm text-purple-600 hover:text-purple-700 flex items-center space-x-1"
+                                    >
+                                        <span>Edit Day</span>
+                                        <span>✏️</span>
+                                    </button>
+                                </div>
                             </div>
+                            {editingDay && (
+                                <DayEditor
+                                    day={editingDay}
+                                    tripId={selectedTrip.id}
+                                    destination={selectedTrip.destination}
+                                    onSave={handleDaySave}
+                                    onCancel={() => setEditingDay(null)}
+                                    token={token}
+                                />
+                            )}
                         );
                     })}
                 </div>
@@ -4623,6 +4832,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

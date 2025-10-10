@@ -2771,16 +2771,6 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                                     </button>
                                 </div>
                             </div>
-                            {editingDay && (
-                                <DayEditor
-                                    day={editingDay}
-                                    tripId={selectedTrip.id}
-                                    destination={selectedTrip.destination}
-                                    onSave={handleDaySave}
-                                    onCancel={() => setEditingDay(null)}
-                                    token={token}
-                                />
-                            )}
                         );
                     })}
                 </div>
@@ -3011,6 +3001,16 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                     destination={selectedTrip?.destination || ''}
                     token={token}
                 />
+               {editingDay && (
+                    <DayEditor
+                        day={editingDay}
+                        tripId={selectedTrip.id}
+                        destination={selectedTrip.destination}
+                        onSave={handleDaySave}
+                        onCancel={() => setEditingDay(null)}
+                        token={token}
+                    />
+                )}
             </div>
         );
     }
@@ -4832,6 +4832,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

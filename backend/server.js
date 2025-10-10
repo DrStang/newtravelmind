@@ -806,6 +806,68 @@ app.get('/api/places/nearby', async (req, res) => {
         });
     }
 });
+// Add this route in your backend
+app.put('/api/trips/:tripId/days/:dayNumber', authenticateToken, async (req, res) => {
+    try {
+        const { tripId, dayNumber } = req.params;
+        const { activities, title } = req.body;
+
+        // Get current trip
+        const trip = await database.getTripById(tripId, req.user.id);
+        
+        if (!trip) {
+            return res.status(404).json({ success: false, error: 'Trip not found' });
+        }
+
+        // Parse current itinerary
+        const itineraryText = trip.itinerary?.itinerary || trip.itinerary;
+        const lines = itineraryText.split('\n');
+        const updatedLines = [];
+        let inTargetDay = false;
+        let dayUpdated = false;
+
+        for (let line of lines) {
+            const dayMatch = line.match(/Day\s+(\d+)/i);
+            
+            if (dayMatch) {
+                const lineDay = parseInt(dayMatch[1]);
+                
+                if (lineDay === parseInt(dayNumber)) {
+                    // Start of target day
+                    inTargetDay = true;
+                    updatedLines.push(`**Day ${dayNumber}: ${title}**`);
+                    activities.forEach(activity => {
+                        updatedLines.push(`* ${activity}`);
+                    });
+                    dayUpdated = true;
+                    continue;
+                } else if (inTargetDay) {
+                    // End of target day
+                    inTargetDay = false;
+                }
+            }
+            
+            if (!inTargetDay) {
+                updatedLines.push(line);
+            }
+        }
+
+        const newItinerary = updatedLines.join('\n');
+
+        // Update trip in database
+        await database.updateTrip(tripId, req.user.id, {
+            itinerary: JSON.stringify({ itinerary: newItinerary })
+        });
+
+        res.json({
+            success: true,
+            data: { itinerary: newItinerary }
+        });
+    } catch (error) {
+        console.error('Update day error:', error);
+        res.status(500).json({ success: false, error: 'Failed to update day' });
+    }
+});
 
 app.get('/api/places/:placeId', async (req, res) => {
     try {
@@ -1561,6 +1623,7 @@ process.on('SIGTERM', async () => {
 startServer();
 
 module.exports = app;
+
 
 
 

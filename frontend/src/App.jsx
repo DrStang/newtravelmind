@@ -3917,35 +3917,244 @@ const CompanionMode = ({user, token, location, weather, nearbyPlaces, currentTri
                                             </div>
                                         </div>
                                         {currentTrip && currentTrip.status === 'active' && (
-                <div className="mb-6 bg-gradient-to-r from-green-500 to-blue-500 rounded-xl p-6 text-white">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <div className="flex items-center space-x-2 mb-2">
-                                <Check className="w-5 h-5" />
-                                <h3 className="text-xl font-bold">Active Trip: {currentTrip.title}</h3>
-                            </div>
-                            <p className="text-white/90">{currentTrip.destination}</p>
-                            
-                            {/* Show upcoming bookings/reminders */}
-                            {currentTrip.reminders && JSON.parse(currentTrip.reminders).length > 0 && (
-                                <div className="mt-3 flex items-center space-x-2 text-sm">
-                                    <Bell className="w-4 h-4" />
-                                    <span>
-                                        {JSON.parse(currentTrip.reminders).length} reminder(s) active
-                                    </span>
-                                </div>
-                            )}
-                        </div>
-                        <button
-                            onClick={() => sendChatMessage(`Tell me about my active trip to ${currentTrip.destination}`)}
-                            className="bg-white text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors"
-                        >
-                            Trip Details
-                        </button>
-                    </div>
-                </div>
-            )}
-
+                                            <div className="mb-8">
+                                                {/* Active Trip Header */}
+                                                <div className="bg-gradient-to-r from-green-500 to-blue-500 rounded-xl p-6 text-white mb-6">
+                                                    <div className="flex items-center justify-between">
+                                                        <div>
+                                                            <div className="flex items-center space-x-2 mb-2">
+                                                                <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
+                                                                    <span className="text-xs">✓</span>
+                                                                </div>
+                                                                <h3 className="text-xl font-bold">Active Trip: {currentTrip.title}</h3>
+                                                            </div>
+                                                            <p className="text-white/90">{currentTrip.destination}</p>
+                                                            
+                                                            {currentTrip.reminders && JSON.parse(currentTrip.reminders).length > 0 && (
+                                                                <div className="mt-3 flex items-center space-x-2 text-sm">
+                                                                    <span>🔔</span>
+                                                                    <span>{JSON.parse(currentTrip.reminders).length} reminder(s) active</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <button
+                                                            onClick={() => sendChatMessage(`Tell me about my active trip to ${currentTrip.destination}`)}
+                                                            className="bg-white text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors"
+                                                        >
+                                                            Trip Details
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                        
+                                                {/* Current Day Activity Cards */}
+                                                <div className="grid grid-cols-1 gap-6">
+                                                    {(() => {
+                                                        const parseItinerary = (itineraryText) => {
+                                                            if (!itineraryText) return [];
+                                                            const days = [];
+                                                            const lines = itineraryText.split('\n');
+                                                            let currentDay = null;
+                                        
+                                                            lines.forEach(line => {
+                                                                line = line.trim();
+                                                                if (!line) return;
+                                        
+                                                                const dayMatch = line.match(/\*?\*?Day\s+(\d+)[:\-\s]*(.*?)\*?\*?/i);
+                                                                if (dayMatch) {
+                                                                    if (currentDay) days.push(currentDay);
+                                                                    currentDay = {
+                                                                        number: parseInt(dayMatch[1]),
+                                                                        title: dayMatch[2].replace(/\*/g, '').trim() || 'Exploration Day',
+                                                                        activities: [],
+                                                                        totalCost: 0
+                                                                    };
+                                                                    return;
+                                                                }
+                                        
+                                                                const costMatch = line.match(/\$(\d+(?:,\d{3})*(?:\.\d{2})?)/);
+                                                                if (costMatch && currentDay) {
+                                                                    currentDay.totalCost += parseFloat(costMatch[1].replace(/,/g, ''));
+                                                                }
+                                        
+                                                                if (currentDay && line.length > 3 && !line.match(/^#+/)) {
+                                                                    const cleanLine = line
+                                                                        .replace(/^\*+\s*/, '')
+                                                                        .replace(/\*+$/, '')
+                                                                        .replace(/\*\*(.*?)\*\*/g, '$1')
+                                                                        .replace(/^-\s*/, '')
+                                                                        .replace(/^•\s*/, '')
+                                                                        .replace(/^\d+\.\s*/, '')
+                                                                        .trim();
+                                        
+                                                                    if (cleanLine && !cleanLine.match(/^(Day \d+)/i)) {
+                                                                        currentDay.activities.push(cleanLine);
+                                                                    }
+                                                                }
+                                                            });
+                                        
+                                                            if (currentDay) days.push(currentDay);
+                                                            return days;
+                                                        };
+                                        
+                                                        const formatActivityText = (text) => {
+                                                            const sectionMatch = text.match(/^(Morning Activity|Afternoon Activity|Evening Activity|Lunch|Dinner|Breakfast)(\s*\(.*?\))?:/i);
+                                                            
+                                                            if (sectionMatch) {
+                                                                return {
+                                                                    type: 'header',
+                                                                    text: sectionMatch[1],
+                                                                    time: sectionMatch[2] ? sectionMatch[2].replace(/[()]/g, '').trim() : null
+                                                                };
+                                                            }
+                                                            
+                                                            const detailMatch = text.match(/^(Activity|Venue|Address|Cost|Price Range|Note|Duration):\s*(.+)/i);
+                                                            
+                                                            if (detailMatch) {
+                                                                return {
+                                                                    type: 'detail',
+                                                                    label: detailMatch[1],
+                                                                    value: detailMatch[2].trim()
+                                                                };
+                                                            }
+                                                            
+                                                            return { type: 'text', text: text };
+                                                        };
+                                        
+                                                        const days = parseItinerary(currentTrip.itinerary?.itinerary || currentTrip.itinerary);
+                                                        const today = new Date();
+                                                        const tripStart = new Date(currentTrip.startDate);
+                                                        const daysSinceStart = Math.floor((today - tripStart) / (1000 * 60 * 60 * 24)) + 1;
+                                                        const currentDayIndex = Math.max(0, Math.min(daysSinceStart - 1, days.length - 1));
+                                                        const currentDayData = days[currentDayIndex];
+                                                        const nextDayData = days[currentDayIndex + 1];
+                                        
+                                                        return (
+                                                            <>
+                                                                {/* Today's Activities */}
+                                                                {currentDayData && (
+                                                                    <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+                                                                        <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-4">
+                                                                            <div className="flex items-center justify-between">
+                                                                                <div>
+                                                                                    <div className="flex items-center space-x-2 mb-1">
+                                                                                        <span className="text-2xl font-bold">Today - Day {currentDayData.number}</span>
+                                                                                    </div>
+                                                                                    <h3 className="text-lg font-semibold">{currentDayData.title}</h3>
+                                                                                </div>
+                                                                                {currentDayData.totalCost > 0 && (
+                                                                                    <div className="text-right">
+                                                                                        <div className="text-xs text-blue-100">Budget</div>
+                                                                                        <div className="text-2xl font-bold">${currentDayData.totalCost.toFixed(0)}</div>
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                        
+                                                                        <div className="p-6">
+                                                                            <div className="space-y-4">
+                                                                                {currentDayData.activities.map((activity, idx) => {
+                                                                                    const formatted = formatActivityText(activity);
+                                                                                    
+                                                                                    if (formatted.type === 'header') {
+                                                                                        return (
+                                                                                            <div key={idx} className="mt-4 first:mt-0">
+                                                                                                <h4 className="font-bold text-gray-900 text-base flex items-center">
+                                                                                                    <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded mr-2 text-sm">
+                                                                                                        {formatted.text}
+                                                                                                    </span>
+                                                                                                    {formatted.time && (
+                                                                                                        <span className="text-sm text-gray-600 font-normal">
+                                                                                                            {formatted.time}
+                                                                                                        </span>
+                                                                                                    )}
+                                                                                                </h4>
+                                                                                            </div>
+                                                                                        );
+                                                                                    }
+                                                                                    
+                                                                                    if (formatted.type === 'detail') {
+                                                                                        return (
+                                                                                            <div key={idx} className="ml-4 flex items-start space-x-2">
+                                                                                                <span className="font-semibold text-gray-700 text-sm min-w-[80px]">
+                                                                                                    {formatted.label}:
+                                                                                                </span>
+                                                                                                <span className="text-gray-600 text-sm flex-1">
+                                                                                                    {formatted.value}
+                                                                                                </span>
+                                                                                            </div>
+                                                                                        );
+                                                                                    }
+                                                                                    
+                                                                                    return (
+                                                                                        <div key={idx} className="flex items-start space-x-3 text-gray-700 ml-2">
+                                                                                            <span className="text-blue-500 mt-1">•</span>
+                                                                                            <span className="flex-1 leading-relaxed text-sm">{formatted.text}</span>
+                                                                                        </div>
+                                                                                    );
+                                                                                })}
+                                                                            </div>
+                                                                        </div>
+                                        
+                                                                        <div className="border-t border-gray-100 px-6 py-3 bg-gray-50 flex items-center justify-between">
+                                                                            <button
+                                                                                onClick={() => sendChatMessage(`What should I focus on for today's activities in ${currentTrip.destination}?`)}
+                                                                                className="text-sm text-blue-600 hover:text-blue-700 flex items-center space-x-1"
+                                                                            >
+                                                                                <MessageCircle className="w-4 h-4" />
+                                                                                <span>Get AI Tips</span>
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                        
+                                                                {/* Tomorrow's Preview */}
+                                                                {nextDayData && (
+                                                                    <div className="bg-white rounded-xl shadow-lg overflow-hidden border-2 border-dashed border-gray-300">
+                                                                        <div className="bg-gradient-to-r from-gray-400 to-gray-500 text-white p-4">
+                                                                            <div className="flex items-center justify-between">
+                                                                                <div>
+                                                                                    <div className="flex items-center space-x-2 mb-1">
+                                                                                        <span className="text-lg font-bold">Tomorrow - Day {nextDayData.number}</span>
+                                                                                    </div>
+                                                                                    <h3 className="text-base font-semibold">{nextDayData.title}</h3>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                        
+                                                                        <div className="p-6">
+                                                                            <div className="space-y-2">
+                                                                                {nextDayData.activities.slice(0, 3).map((activity, idx) => {
+                                                                                    const formatted = formatActivityText(activity);
+                                                                                    
+                                                                                    if (formatted.type === 'header') {
+                                                                                        return (
+                                                                                            <div key={idx} className="font-semibold text-gray-700 text-sm">
+                                                                                                {formatted.text} {formatted.time && `(${formatted.time})`}
+                                                                                            </div>
+                                                                                        );
+                                                                                    }
+                                                                                    
+                                                                                    return (
+                                                                                        <div key={idx} className="text-sm text-gray-600 ml-2">
+                                                                                            • {formatted.type === 'detail' ? `${formatted.label}: ${formatted.value}` : formatted.text}
+                                                                                        </div>
+                                                                                    );
+                                                                                })}
+                                                                                {nextDayData.activities.length > 3 && (
+                                                                                    <div className="text-sm text-gray-500 italic ml-2">
+                                                                                        ...and {nextDayData.activities.length - 3} more activities
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </>
+                                                        );
+                                                    })()}
+                                                </div>
+                                            </div>
+                                        )}
                                         <div className="flex space-x-2">
                                             <button
                                                 onClick={() => sendChatMessage(`Tell me more about ${place.name}`)}
@@ -4820,6 +5029,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

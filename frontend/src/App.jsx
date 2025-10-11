@@ -2700,7 +2700,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                                 <Calendar className="w-4 h-4" />
                                 <span>{tripToShow.duration} days</span>
                             </span>
-                            {selectedTrip.budget && (
+                            {tripToShow.budget && (
                                 <span className="flex items-center space-x-1">
                                     <span>💰</span>
                                     <span>${tripToShow.budget} budget</span>
@@ -5142,6 +5142,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

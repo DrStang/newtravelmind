@@ -2652,7 +2652,13 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
     };
 
     // ITINERARY VIEW
-    if (view === 'itinerary' && selectedTrip) {
+    if (view === 'itinerary' && (selectedTrip || selectedTripId)) {
+        const tripToShow = selectedTrip || trips.find(t => t.id === selectedTripId);
+
+        if (!tripToShow) {
+            setView('create');
+            return nul;
+        }
         const days = parseItinerary(selectedTrip.itinerary?.itinerary || selectedTrip.itinerary);
 
         return (
@@ -2683,7 +2689,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                 <div className="flex items-center justify-between mb-8">
                     <div>
                         <h2 className="text-3xl font-bold text-gray-900 mb-2">
-                            {selectedTrip.title || `${selectedTrip.destination} Trip`}
+                            {selectedTrip.title || `${tripToShow.destination} Trip`}
                         </h2>
                         <div className="flex items-center space-x-4 text-gray-600">
                             <span className="flex items-center space-x-1">
@@ -3135,8 +3141,8 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                                 key={trip.id}
                                 className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
                                 onClick={() => {
-                                    setSelectedTrip(trip);
                                     setSelectedTripId(trip.id);
+                                    setSelectedTrip(trip);
                                     setView('itinerary');
                                 }}
                             >
@@ -5136,6 +5142,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

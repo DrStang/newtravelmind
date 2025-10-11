@@ -295,6 +295,9 @@ const App = () => {
     const [nearbyPlaces, setNearbyPlaces] = useState([]);
     const [currentTrip, setCurrentTrip] = useState(null);
     const [dashboardData, setDashboardData] = useState(null);
+    const [planningView, setPlanningView] = useState('create');
+    const [selectedTrip, setSelectedTrip] = useState(null);
+    const [selectedTripId, setSelectedTripId] = useState(null);
     const activeTrip = trips.find(t => t.status === 'active');
     const { socket, connected } = useSocket(token, setChatMessages, setNearbyPlaces);
 
@@ -5132,6 +5135,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

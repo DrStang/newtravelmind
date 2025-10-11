@@ -799,7 +799,7 @@ const Header = ({ user, logout, currentMode, setCurrentMode, connected, location
                                 className="hidden md:flex items-center space-x-2 bg-green-100 text-green-700 px-3 py-2 rounded-lg hover:bg-green-200 transition-colors text-sm"
                             >
                                 <Check className="w-4 h-4" />
-                                <span>Active: {active.Trip.destination}</span>
+                                <span>Active: {activeTrip.destination}</span>
                             </button>
                         )}
                         {/* Location & Weather */}
@@ -5136,6 +5136,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

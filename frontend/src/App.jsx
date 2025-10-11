@@ -457,7 +457,7 @@ const App = () => {
                     location: location,
                     weather: weather,
                     currentTrip: currentTrip,
-                    userPreferences: user?.preferences
+                    userPreferences: Array.isArray(user?.preferences) ? user.preferences : (user?.preferences ? [user.preferences] : [])  // ✅ ENSURE IT'S AN ARRAY
                 }
             });
             console.log('Message sent via socket');
@@ -5131,6 +5131,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

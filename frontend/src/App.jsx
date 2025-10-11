@@ -2990,7 +2990,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div>
                             <div className="text-sm text-gray-600 mb-1">Total Duration</div>
-                            <div className="text-2xl font-bold text-gray-900">{selectedTrip.duration} days</div>
+                            <div className="text-2xl font-bold text-gray-900">{tripToShow.duration} days</div>
                         </div>
                         <div>
                             <div className="text-sm text-gray-600 mb-1">Estimated Total Cost</div>
@@ -3001,7 +3001,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                         <div>
                             <div className="text-sm text-gray-600 mb-1">Budget Remaining</div>
                             <div className="text-2xl font-bold text-green-600">
-                                ${Math.max(0, (selectedTrip.budget || 0) - days.reduce((sum, day) => sum + day.totalCost, 0)).toFixed(0)}
+                                ${Math.max(0, (tripToShow.budget || 0) - days.reduce((sum, day) => sum + day.totalCost, 0)).toFixed(0)}
                             </div>
                         </div>
                     </div>
@@ -3043,14 +3043,14 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                     onClose={() => setMapModalOpen(false)}
                     dayTitle={selectedDayForMap ? `Day ${selectedDayForMap.number}: ${selectedDayForMap.title}` : ''}
                     locations={selectedDayForMap?.locations || []}
-                    destination={selectedTrip?.destination || ''}
+                    destination={tripToShow?.destination || ''}
                     token={token}
                 />
                {editingDay && (
                     <DayEditor
                         day={editingDay}
-                        tripId={selectedTrip.id}
-                        destination={selectedTrip.destination}
+                        tripId={tripToShow.id}
+                        destination={tripToShow.destination}
                         onSave={handleDaySave}
                         onCancel={() => setEditingDay(null)}
                         token={token}
@@ -5142,6 +5142,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

@@ -165,7 +165,7 @@ Current context:
 ${context.mode ? `- Mode: ${context.mode}` : ''}
 ${context.location ? `- Location: ${context.location.name || `${context.location.lat}, ${context.location.lng}`}` : ''}
 ${context.weather ? `- Weather: ${JSON.stringify(context.weather)}` : ''}
-${context.userPreferences ? `- Preferences: ${context.userPreferences.join(', ')}` : ''}
+${context.userPreferences ? `- Preferences: ${Array.isArray(context.userPreferences) ? context.userPreferences.join(', ') : context.userPreferences}` : ''}
 ${context.budget ? `- Budget: $${context.budget}` : ''}
 ${context.travelStyle ? `- Travel style: ${context.travelStyle}` : ''}
 `;
@@ -234,5 +234,6 @@ Include specific venue names, addresses, and booking recommendations where possi
 }
 
 module.exports = { OllamaService };
+
 
 

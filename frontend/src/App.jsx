@@ -3201,7 +3201,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
     }
 
     //TRIP MANAGER VIEW (when selectedTripId is set but view is still 'create')
-    if (selectedTripId && view === 'create') {
+   /* if (selectedTripId && view === 'create') {
         const tripToShow = trips.find(t => t.id === selectedTripId);
         
         return (
@@ -3224,7 +3224,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                 />
             </div>
         );
-    }
+    }*/
 
     // DEFAULT: CREATE NEW TRIP VIEW
     return (
@@ -5136,6 +5136,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

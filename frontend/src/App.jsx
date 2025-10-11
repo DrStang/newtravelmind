@@ -551,6 +551,12 @@ const App = () => {
                         sendChatMessage={sendChatMessage}
                         setChatOpen={setChatOpen}
                         location={location}
+                        view={view}
+                        setView={setView}
+                        selctedTrip={selectedTrip}
+                        setSelectedTrip={setSelectedTrip}
+                        selectedTripId={selectedTripId}
+                        setSelectedTripId={setSelectedTripId}
                     />
                 )}
 
@@ -2302,10 +2308,14 @@ const DayEditor = ({ day, tripId, destination, onSave, onCancel, token }) => {
 // ENHANCED PLANNING MODE COMPONENT
 // ===================================
 
-const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMessage, setChatOpen, location }) => {
-    const [view, setView] = useState('create'); // 'create', 'trips', 'itinerary', 'flights', 'hotels', 'activities'
-    const [selectedTrip, setSelectedTrip] = useState(null);
-    const [selectedTripId, setSelectedTripId] = useState(null);
+const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMessage, setChatOpen, location, view, setView,
+    selectedTrip,
+    setSelectedTrip,
+    selectedTripId,
+    setSelectedTripId }) => {
+    //const [view, setView] = useState('create'); // 'create', 'trips', 'itinerary', 'flights', 'hotels', 'activities'
+    //const [selectedTrip, setSelectedTrip] = useState(null);
+    //const [selectedTripId, setSelectedTripId] = useState(null);
     const [mapModalOpen, setMapModalOpen] = useState(false);
     const [selectedDayForMap, setSelectedDayForMap] = useState(null);
     const [isCreating, setIsCreating] = useState(false);
@@ -2322,6 +2332,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
     const [loading, setLoading] = useState(false);
     const [savedFlights, setSavedFlights] = useState([]);
     const [loadingFlights, setLoadingFlights] = useState(false);
+    const activeTrip = trips.find(t => t.status === 'active');
 
     const interestOptions = [
         'Adventure', 'Culture', 'Food', 'History', 'Nature', 'Nightlife',
@@ -5121,6 +5132,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

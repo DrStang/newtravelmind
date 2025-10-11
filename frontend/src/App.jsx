@@ -2719,7 +2719,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                 {/* Day Cards */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                     {days.map((day) => {
-                        const dayDate = getDayDate(selectedTrip.startDate, day.number);
+                        const dayDate = getDayDate(tripToShow.startDate, day.number);
 
                         return (
                             <div key={day.number} className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
@@ -5142,6 +5142,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

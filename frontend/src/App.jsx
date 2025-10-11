@@ -3050,8 +3050,14 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
     }
 
     // ACTIVITIES VIEW
-    if (view === 'activities' && selectedTrip) {
-        return (
+        if (view === 'activities' && (selectedTrip || selectedTripId)) {
+            const tripToShow = selectedTrip || trips.find(t => t.id === selectedTripId);
+            
+            if (!tripToShow) {
+                setView('itinerary');
+                return null;
+        }        
+            return (
             <div className="max-w-7xl mx-auto px-4 py-8">
                 <button
                     onClick={() => setView('itinerary')}
@@ -3060,19 +3066,24 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                     <span>←</span>
                     <span>Back to Itinerary</span>
                 </button>
-                <ActivitiesSearch trip={selectedTrip} token={token} location={location} sendChatMessage={sendChatMessage} />
+                <ActivitiesSearch trip={tripToShow} token={token} location={location} sendChatMessage={sendChatMessage} />
             </div>
         );
     }
 
     // FLIGHTS VIEW
-    if (view === 'flights' && selectedTrip) {
+    if (view === 'flights' && (selectedTrip || selectedTripId)) {
+        const tripToShow = selectedTrip || trips.find(t => t.id === selectedTripId);
+        if (!tripToShow) {
+            setView('itinerary');
+            return null;
+        }
         return (
             <div className="max-w-7xl mx-auto px-4 py-8">
                 <button
                     onClick={() => {
                         setView('itinerary');
-                        loadSavedFlights(selectedTrip.id);
+                        loadSavedFlights(tripToShow.id);
                     }}
                     className="flex items-center space-x-2 text-blue-600 hover:text-blue-700 mb-6"
                 >
@@ -3080,10 +3091,10 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                     <span>Back to Itinerary</span>
                 </button>
                 <FlightSearch
-                    trip={selectedTrip}
+                    trip={tripToShow}
                     token={token}
                     onFlightSelected={(flight) => {
-                        loadSavedFlights(selectedTrip.id);
+                        loadSavedFlights(tripToShow.id);
                         setView('itinerary');
                     }}
                 />
@@ -3092,8 +3103,14 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
     }
 
     // HOTELS VIEW
-    if (view === 'hotels' && selectedTrip) {
-        return (
+        if (view === 'hotels' && (selectedTrip || selectedTripId)) {
+            const tripToShow = selectedTrip || trips.find(t => t.id === selectedTripId);
+            
+            if (!tripToShow) {
+                setView('itinerary');
+                return null;
+            }        
+            return (
             <div className="max-w-7xl mx-auto px-4 py-8">
                 <button
                     onClick={() => setView('itinerary')}
@@ -3102,7 +3119,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                     <span>←</span>
                     <span>Back to Itinerary</span>
                 </button>
-                <HotelSearch trip={selectedTrip} token={token} />
+                <HotelSearch trip={tripToShow} token={token} />
             </div>
         );
     }
@@ -5131,6 +5148,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

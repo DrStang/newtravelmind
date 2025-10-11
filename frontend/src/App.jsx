@@ -2659,7 +2659,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
             setView('create');
             return nul;
         }
-        const days = parseItinerary(selectedTrip.itinerary?.itinerary || selectedTrip.itinerary);
+        const days = parseItinerary(tripToShow.itinerary?.itinerary || tripToShow.itinerary);
 
         return (
             <div className="max-w-7xl mx-auto px-4 py-8">
@@ -2689,21 +2689,21 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                 <div className="flex items-center justify-between mb-8">
                     <div>
                         <h2 className="text-3xl font-bold text-gray-900 mb-2">
-                            {selectedTrip.title || `${tripToShow.destination} Trip`}
+                            {tripToShow.title || `${tripToShow.destination} Trip`}
                         </h2>
                         <div className="flex items-center space-x-4 text-gray-600">
                             <span className="flex items-center space-x-1">
                                 <MapPin className="w-4 h-4" />
-                                <span>{selectedTrip.destination}</span>
+                                <span>{tripToShow.destination}</span>
                             </span>
                             <span className="flex items-center space-x-1">
                                 <Calendar className="w-4 h-4" />
-                                <span>{selectedTrip.duration} days</span>
+                                <span>{tripToShow.duration} days</span>
                             </span>
                             {selectedTrip.budget && (
                                 <span className="flex items-center space-x-1">
                                     <span>💰</span>
-                                    <span>${selectedTrip.budget} budget</span>
+                                    <span>${tripToShow.budget} budget</span>
                                 </span>
                             )}
                         </div>
@@ -2885,7 +2885,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                                                             <div className="flex items-center justify-center">
                                                                 <div className="flex-1 border-t-2 border-gray-300"></div>
                                                                 <Plane className="w-5 h-5 text-blue-600 mx-2" />
-                                                                <div className="flex-1 border-t-2 border-gray-300"></div>
+                                                f                <div className="flex-1 border-t-2 border-gray-300"></div>
                                                             </div>
                                                             <div className="text-center text-xs text-gray-500 mt-1">
                                                                 {outbound.segments.length === 1 ? 'Direct' : `${outbound.segments.length - 1} stop(s)`}
@@ -5142,6 +5142,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

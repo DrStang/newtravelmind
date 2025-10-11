@@ -298,6 +298,7 @@ const App = () => {
     const [planningView, setPlanningView] = useState('create');
     const [selectedTrip, setSelectedTrip] = useState(null);
     const [selectedTripId, setSelectedTripId] = useState(null);
+    const [view, setView] = useState('create');
     const activeTrip = trips.find(t => t.status === 'active');
     const { socket, connected } = useSocket(token, setChatMessages, setNearbyPlaces);
 
@@ -5135,6 +5136,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

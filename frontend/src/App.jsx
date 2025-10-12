@@ -3281,18 +3281,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                 >
                     ← Back to Create New Trip
                 </button>
-                {trip.status === 'active' && (
-                    <button
-                        onClick={() => {
-                            if (confirm('Deactivate this trip?')) {
-                                onTripDeactivate(trip.id);
-                            }
-                        }}
-                        className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
-                    >
-                        Deactivate Trip
-                    </button>
-                )}
+                
                 <TripManager
                     trip={tripToShow}
                     onUpdate={handleTripUpdate}
@@ -5213,6 +5202,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

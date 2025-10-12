@@ -131,10 +131,11 @@ const TripManager = ({ trip, onUpdate, onActivate, onDeactivate, token }) => {
       day: 'numeric'
     });
   };
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
 
   const handleActivate = async () => {
     try {
-      const response = await fetch(`http://localhost:3001/api/trips/${trip.id}/activate`, {
+      const response = await fetch(`${API_BASE_URL}/trips/${trip.id}/activate`, {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -148,7 +149,7 @@ const TripManager = ({ trip, onUpdate, onActivate, onDeactivate, token }) => {
 
   const handleSaveItinerary = async () => {
     try {
-      const response = await fetch(`http://localhost:3001/api/trips/${trip.id}/itinerary`, {
+      const response = await fetch(`${API_BASE_URL}/trips/${trip.id}/itinerary`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -207,7 +208,7 @@ const TripManager = ({ trip, onUpdate, onActivate, onDeactivate, token }) => {
     const handleSave = async () => {
       setSaving(true);
       try {
-        const response = await fetch(`http://localhost:3001/api/trips/${trip.id}/days/${day.number}`, {
+        const response = await fetch(`${API_BASE_URL}/trips/${trip.id}/days/${day.number}`, {
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -353,7 +354,7 @@ const TripManager = ({ trip, onUpdate, onActivate, onDeactivate, token }) => {
 
     const handleSubmit = async () => {
       try {
-        const response = await fetch(`http://localhost:3001/api/trips/${trip.id}/bookings`, {
+        const response = await fetch(`${API_BASE_URL}/trips/${trip.id}/bookings`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -520,7 +521,7 @@ const TripManager = ({ trip, onUpdate, onActivate, onDeactivate, token }) => {
 
     const handleSubmit = async () => {
       try {
-        const response = await fetch(`http://localhost:3001/api/trips/${trip.id}/reminders`, {
+        const response = await fetch(`${API_BASE_URL}/trips/${trip.id}/reminders`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,

@@ -2387,13 +2387,11 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
 
     const handleTripActivate = async (tripId) => {
     try {
-        const response = await fetch(`${API_BASE_URL}/trips/${tripId}/status`, {
+        const response = await fetch(`${API_BASE_URL}/trips/${tripId}/activate`, {
             method: 'PATCH',
             headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ status: 'active' })
+                'Authorization': `Bearer ${token}`
+            }
         });
 
         const data = await response.json();
@@ -2418,13 +2416,11 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
 
 const handleTripDeactivate = async (tripId) => {
     try {
-        const response = await fetch(`${API_BASE_URL}/trips/${tripId}/status`, {
+        const response = await fetch(`${API_BASE_URL}/trips/${tripId}/deactivate`, {
             method: 'PATCH',
             headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ status: 'planning' })
+                'Authorization': `Bearer ${token}`
+            }
         });
 
         const data = await response.json();
@@ -2447,7 +2443,6 @@ const handleTripDeactivate = async (tripId) => {
         console.error('Deactivate trip error:', error);
     }
 };
-
     const handleCreateTrip = async (e) => {
         e.preventDefault();
         if (!formData.destination || !formData.duration) return;
@@ -5295,6 +5290,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

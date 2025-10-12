@@ -2442,6 +2442,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                 setIsCreating(false);
 
                 sendChatMessage(`I just created a new itinerary for ${formData.destination}! Can you give me some additional tips?`);
+                setChatOpen(true);
             }
         } catch (error) {
             console.error('Trip creation error:', error);
@@ -2855,7 +2856,10 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                                 </div>
                                 <div className="border-t border-gray-100 px-6 py-3 bg-gray-50 flex items-center justify-between">
                                     <button
-                                        onClick={() => sendChatMessage(`Tell me more details about Day ${day.number}: ${day.title} in ${selectedTrip.destination}`)}
+                                        onClick={() => {
+                                            sendChatMessage(`Tell me more details about Day ${day.number}: ${day.title} in ${selectedTrip.destination}`);
+                                            setChatOpen(true);
+                                        }}
                                         className="text-sm text-blue-600 hover:text-blue-700 flex items-center space-x-1"
                                     >
                                         <MessageCircle className="w-4 h-4" />
@@ -3300,6 +3304,8 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                     onActivate={handleTripActivate}
                     onDeactivate={handleTripDeactivate}
                     token={token}
+                    sendChatMessage={sendChatMessage}
+                    setChatOpen={setChatOpen}
                 />
             </div>
         );
@@ -3867,7 +3873,10 @@ const CompanionMode = ({user, token, location, weather, nearbyPlaces, currentTri
                                 Accuracy: ±{location.accuracy?.toFixed(0) || '50'}m
                             </p>
                             <button
-                                onClick={() => sendChatMessage("What's interesting around my current location?")}
+                                onClick={() => {
+                                    sendChatMessage("What's interesting around my current location?");
+                                    setChatOpen(true);
+                                }}
                                 className="text-sm text-blue-600 hover:text-blue-700"
                             >
                                 Explore this area →
@@ -3942,7 +3951,10 @@ const CompanionMode = ({user, token, location, weather, nearbyPlaces, currentTri
                         <div className="space-y-2">
                             <p className="text-gray-500">No scheduled activity</p>
                             <button
-                                onClick={() => sendChatMessage("What should I do right now?")}
+                                onClick={() => {
+                                    sendChatMessage("What should I do right now?");
+                                    setChatOpen(true);
+                                }}
                                 className="text-sm text-blue-600 hover:text-blue-700"
                             >
                                 Get suggestions →
@@ -3966,7 +3978,10 @@ const CompanionMode = ({user, token, location, weather, nearbyPlaces, currentTri
                                 {weatherRec.suggestions.map((suggestion, index) => (
                                     <button
                                         key={index}
-                                        onClick={() => sendChatMessage(`Find ${suggestion.toLowerCase()} near me`)}
+                                        onClick={() => {
+                                            sendChatMessage(`Find ${suggestion.toLowerCase()} near me`);
+                                            setChatOpen(true);
+                                        }}
                                         className="text-xs bg-white px-2 py-1 rounded border hover:bg-gray-50"
                                     >
                                         {suggestion}
@@ -4124,7 +4139,10 @@ const CompanionMode = ({user, token, location, weather, nearbyPlaces, currentTri
                                                             )}
                                                         </div>
                                                         <button
-                                                            onClick={() => sendChatMessage(`Tell me about my active trip to ${currentTrip.destination}`)}
+                                                            onClick={() => {
+                                                                sendChatMessage(`Tell me about my active trip to ${currentTrip.destination}`);
+                                                                setChatOpen(true);
+                                                            }}
                                                             className="bg-white text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors"
                                                         >
                                                             Trip Details
@@ -4283,7 +4301,10 @@ const CompanionMode = ({user, token, location, weather, nearbyPlaces, currentTri
                                         
                                                                         <div className="border-t border-gray-100 px-6 py-3 bg-gray-50 flex items-center justify-between">
                                                                             <button
-                                                                                onClick={() => sendChatMessage(`What should I focus on for today's activities in ${currentTrip.destination}?`)}
+                                                                                onClick={() => {
+                                                                                    sendChatMessage(`What should I focus on for today's activities in ${currentTrip.destination}?`);
+                                                                                    setChatOpen(true);
+                                                                                }}
                                                                                 className="text-sm text-blue-600 hover:text-blue-700 flex items-center space-x-1"
                                                                             >
                                                                                 <MessageCircle className="w-4 h-4" />
@@ -4343,13 +4364,19 @@ const CompanionMode = ({user, token, location, weather, nearbyPlaces, currentTri
                                         )}
                                         <div className="flex space-x-2">
                                             <button
-                                                onClick={() => sendChatMessage(`Tell me more about ${place.name}`)}
+                                                onClick={() => {
+                                                    sendChatMessage(`Tell me more about ${place.name}`);
+                                                    setChatOpen(true);
+                                                }}
                                                 className="flex-1 bg-blue-100 text-blue-700 py-2 rounded text-sm hover:bg-blue-200 transition-colors"
                                             >
                                                 Ask AI
                                             </button>
                                             <button
-                                                onClick={() => sendChatMessage(`Get directions to ${place.name}`)}
+                                                onClick={() => {
+                                                    sendChatMessage(`Get directions to ${place.name}`);
+                                                    setChatOpen(true);
+                                                }}
                                                 className="flex-1 bg-gray-100 text-gray-700 py-2 rounded text-sm hover:bg-gray-200 transition-colors"
                                             >
                                                 Directions
@@ -4448,6 +4475,7 @@ const MemoryMode = ({user, token, memories, setMemories, trips, dashboardData, s
                     setMemories(prev => [data.data, ...prev]);
                     setShowCreateMemory(false);
                     sendChatMessage(`I just created a new memory: ${formData.title}. Can you help me reflect on this experience?`);
+                    setChatOpen(true);
                 }
             } catch (error) {
                 console.error('Memory creation error:', error);
@@ -4865,13 +4893,19 @@ const MemoryMode = ({user, token, memories, setMemories, trips, dashboardData, s
 
                                         <div className="mt-8 flex space-x-3">
                                             <button
-                                                onClick={() => sendChatMessage("Help me improve this travel story")}
+                                                onClick={() => {
+                                                    sendChatMessage("Help me improve this travel story");
+                                                    setChatOpen(true);
+                                                }}
                                                 className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
                                             >
                                                 Improve Story
                                             </button>
                                             <button
-                                                onClick={() => sendChatMessage("Create a shorter version of this story for social media")}
+                                                onClick={() => {
+                                                    sendChatMessage("Create a shorter version of this story for social media");
+                                                    setChatOpen(true);
+                                                }}
                                                 className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
                                             >
                                                 Social Media Version
@@ -4972,7 +5006,10 @@ const MemoryMode = ({user, token, memories, setMemories, trips, dashboardData, s
                                                 </div>
                                                 <p className="text-sm text-gray-600">{rec.reason}</p>
                                                 <button
-                                                    onClick={() => sendChatMessage(`Tell me more about traveling to ${rec.destination}`)}
+                                                    onClick={() => {
+                                                        sendChatMessage(`Tell me more about traveling to ${rec.destination}`);
+                                                        setChatOpen(true);
+                                                    }}
                                                     className="mt-2 text-sm text-blue-600 hover:text-blue-700"
                                                 >
                                                     Learn more →
@@ -5007,13 +5044,19 @@ const MemoryMode = ({user, token, memories, setMemories, trips, dashboardData, s
 
                                 <div className="mt-4 flex space-x-3">
                                     <button
-                                        onClick={() => sendChatMessage("Analyze my travel personality and give me personalized recommendations")}
+                                        onClick={() => {
+                                            sendChatMessage("Analyze my travel personality and give me personalized recommendations");
+                                            setChatOpen(true);
+                                        }}
                                         className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
                                     >
                                         Deep Dive Analysis
                                     </button>
                                     <button
-                                        onClick={() => sendChatMessage("What destinations would be perfect for my travel style?")}
+                                        onClick={() => {
+                                            sendChatMessage("What destinations would be perfect for my travel style?");
+                                            setChatOpen(true);
+                                        }}
                                         className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
                                     >
                                         Get Recommendations
@@ -5215,6 +5258,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

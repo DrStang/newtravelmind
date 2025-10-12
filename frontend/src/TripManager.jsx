@@ -5,7 +5,7 @@ import {
   Save, ChevronDown, ChevronUp, AlertCircle, MessageCircle
 } from 'lucide-react';
 
-const TripManager = ({ trip, onUpdate, onActivate, onDeactivate, token }) => {
+const TripManager = ({ trip, onUpdate, onActivate, onDeactivate, token, sendChatMessage }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedItinerary, setEditedItinerary] = useState(trip?.itinerary || '');
   const [showBookingModal, setShowBookingModal] = useState(false);
@@ -748,7 +748,6 @@ const TripManager = ({ trip, onUpdate, onActivate, onDeactivate, token }) => {
               return (
                 <div key={booking.id} className="flex items-start space-x-3 p-4 bg-blue-50 rounded-lg border border-blue-100">
                   <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                    -shrink-0">
                     <IconComponent className="w-5 h-5 text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -941,8 +940,14 @@ const TripManager = ({ trip, onUpdate, onActivate, onDeactivate, token }) => {
                       <div className="border-t border-gray-100 px-6 py-3 bg-gray-50 flex items-center justify-between">
                         <button
                           onClick={() => {
-                            // This would trigger AI chat - you can connect this to your sendChatMessage function
-                            console.log(`AI request for Day ${day.number}`);
+                              if (sendChatMessage) {
+                                  sendChatMessage(`Give me more details and suggestions for Day ${day.number}: ${day.title} in ${trip.destination}`);
+                                  if (setChatOpen) {
+                                      setChatOpen(true);
+                                  }  
+                              } else {
+                                  console.log(`AI request for Day ${day.number}`);
+                              }
                           }}
                           className="text-sm text-blue-600 hover:text-blue-700 flex items-center space-x-1"
                         >

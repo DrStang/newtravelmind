@@ -5,7 +5,7 @@ import {
   Save, ChevronDown, ChevronUp, AlertCircle, MessageCircle
 } from 'lucide-react';
 
-const TripManager = ({ trip, onUpdate, onActivate, token }) => {
+const TripManager = ({ trip, onUpdate, onActivate, onDeactivate, token }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedItinerary, setEditedItinerary] = useState(trip?.itinerary || '');
   const [showBookingModal, setShowBookingModal] = useState(false);
@@ -712,6 +712,18 @@ const TripManager = ({ trip, onUpdate, onActivate, token }) => {
               <Bell className="w-4 h-4" />
               <span>Add Reminder</span>
             </button>
+            {trip.status === 'active' && (
+                    <button
+                        onClick={() => {
+                            if (confirm('Deactivate this trip?')) {
+                                onTripDeactivate(trip.id);
+                            }
+                        }}
+                        className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                    >
+                        Deactivate Trip
+                    </button>
+                )}
           </div>
         </div>
       )}

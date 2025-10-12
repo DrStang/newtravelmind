@@ -580,12 +580,10 @@ const App = () => {
                         location={location}
                         view={view}
                         setView={setView}
-                        selctedTrip={selectedTrip}
+                        selectedTrip={selectedTrip}
                         setSelectedTrip={setSelectedTrip}
                         selectedTripId={selectedTripId}
                         setSelectedTripId={setSelectedTripId}
-                        handleTripActivate={handleTripActivate}
-                        handleTripDeactivate={handleTripDeactivate}
                     />
                 )}
 
@@ -2341,7 +2339,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
     selectedTrip,
     setSelectedTrip,
     selectedTripId,
-    setSelectedTripId
+    setSelectedTripId,
                       }) => {
     //const [view, setView] = useState('create'); // 'create', 'trips', 'itinerary', 'flights', 'hotels', 'activities'
     //const [selectedTrip, setSelectedTrip] = useState(null);
@@ -5215,6 +5213,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

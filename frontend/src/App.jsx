@@ -297,7 +297,10 @@ const App = () => {
     const [dashboardData, setDashboardData] = useState(null);
     const [planningView, setPlanningView] = useState('create');
     const [selectedTrip, setSelectedTrip] = useState(null);
-    const [selectedTripId, setSelectedTripId] = useState(null);
+    const [selectedTripId, setSelectedTripId] = useState(() => {
+        const saved = localStorage.getItem('selectedTripId');
+        return saved ? parseInt(saved) : null;
+    });
     const [view, setView] = useState('create');
     const activeTrip = trips.find(t => t.status === 'active');
     const { socket, connected } = useSocket(token, setChatMessages, setNearbyPlaces);
@@ -350,6 +353,26 @@ const App = () => {
             socket.emit('location_update', location);
         }
     }, [socket, location]);
+    useEffect(() => {
+        if (selectedTripId) {
+            localStorage.setItem('selectedTripId', selectedTripId.toString());
+        } else {
+            localStorage.removeItem('selectedTripId');
+        }
+    }, [selectedTripId]);
+
+    useEffect(() => {
+        localStorage.setItem('planningView', view);
+    }, [view]);
+
+    useEffect(() => {
+        if (trips.length > 0 && selectedTripId && !selectedTrip) {
+            const trip = trips.find(t => t.id === selectedTripId);
+            if (trip) {
+                setSelectedTrip(trip);
+            }
+        }
+    }, [trips, selectedTripId, selectedTrip]);
 
     const loadDashboardData = async () => {
         try {
@@ -561,6 +584,8 @@ const App = () => {
                         setSelectedTrip={setSelectedTrip}
                         selectedTripId={selectedTripId}
                         setSelectedTripId={setSelectedTripId}
+                        onTripActivate={handleTripActivate}
+                        onTripDeactivate={handleTripDeactivate}
                     />
                 )}
 
@@ -2373,6 +2398,19 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
             setSelectedTrip({ ...activatedTrip, status: 'active' });
         }
     };
+    const handleTripDeactivate = async (tripId) => {
+        setTrips(prev => prev.map(trip => ({
+            ...trip,
+            status: trip.id === tripId ? 'planning' : trip.status
+        })));
+        
+        if (currentTrip?.id === tripId) {
+            setCurrentTrip(null);
+        }
+        if (selectedTrip?.id === tripId) {
+            setSelectedTrip(null);
+        }
+    };
 
     const handleCreateTrip = async (e) => {
         e.preventDefault();
@@ -2522,7 +2560,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
         if (!line) return;
 
         // Check if this is a day header
-        const dayMatch = line.match(/^\*?\*?Day\s+(\d+)[:\-\s]*(.*?)\*?\*?$/i);
+        const dayMatch = line.match(/\*?\*?\s*Day\s+(\d+)[:\-\s]*(.*?)\*?\*?/i);
         if (dayMatch) {
             if (currentDay) {
                 days.push(currentDay);
@@ -2536,37 +2574,31 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
             return;
         }
 
-        // Skip lines that are just section headers without content after colon
-        if (line.match(/^(Morning Activity|Afternoon Activity|Evening Activity|Lunch|Dinner|Breakfast):?\s*$/i)) {
-            return;
-        }
-
-        // Extract costs
+    // Extract costs
         const costMatch = line.match(/\$(\d+(?:,\d{3})*(?:\.\d{2})?)/);
         if (costMatch && currentDay) {
             currentDay.totalCost += parseFloat(costMatch[1].replace(/,/g, ''));
         }
 
-        // Add activities (skip headers, day markers, and empty lines)
-        if (currentDay && line.length > 3 && !line.match(/^#+/) && !line.match(/^\*\*Day \d+/i)) {
+       // Add activities - be less strict
+        if (currentDay && line.length > 3) {
             const cleanLine = line
-                .replace(/^\*+\s*/, '')           // Remove leading asterisks
-                .replace(/\*+$/, '')              // Remove trailing asterisks
-                .replace(/\*\*(.*?)\*\*/g, '$1')  // Remove bold markdown
-                .replace(/^[-•]\s*/, '')          // Remove bullet points
-                .replace(/^\d+\.\s*/, '')         // Remove numbered list
+                .replace(/^\*+\s*/, '')
+                .replace(/\*+$/, '')
+                .replace(/\*\*(.*?)\*\*/g, '$1')
+                .replace(/^[-•]\s*/, '')
+                .replace(/^\d+\.\s*/, '')
                 .trim();
 
-            // Only add if it's substantive content and not a standalone section header
-            if (cleanLine && cleanLine.length > 10 && !cleanLine.match(/^(Total|Budget|Summary)/i)) {
+            if (cleanLine) {
                 currentDay.activities.push(cleanLine);
             }
         }
     });
-
     if (currentDay) {
         days.push(currentDay);
     }
+        
 
     // Remove duplicate days (same day number)
     const uniqueDays = [];
@@ -5170,6 +5202,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

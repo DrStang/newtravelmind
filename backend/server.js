@@ -680,54 +680,214 @@ app.patch('/api/trips/:id/itinerary', authenticateToken, async (req, res) => {
 });
 
 // Add manual booking
-app.post('/api/trips/:id/bookings', authenticateToken, async (req, res) => {
+// Add these routes after the existing trip routes (around line 550)
+
+// Bookings routes
+app.post('/api/trips/:tripId/bookings', authenticateToken, async (req, res) => {
     try {
-        const { id } = req.params;
+        const { tripId } = req.params;
         const bookingData = req.body;
-        
-        const trip = await database.getTripById(id, req.user.id);
-        const bookings = trip.booking_data ? JSON.parse(trip.booking_data) : [];
-        
-        bookings.push({
-            id: Date.now().toString(),
-            ...bookingData,
-            createdAt: new Date().toISOString()
+
+        // Verify trip belongs to user
+        const trip = await database.getTripById(tripId, req.user.id);
+        if (!trip) {
+            return res.status(404).json({
+                success: false,
+                error: 'Trip not found'
+            });
+        }
+
+        const result = await database.pool.query(`
+            INSERT INTO trip_bookings (trip_id, booking_type, details, booking_date, confirmation_number, cost, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, NOW())
+        `, [
+            tripId,
+            bookingData.type,
+            JSON.stringify(bookingData.details),
+            bookingData.date,
+            bookingData.confirmationNumber,
+            bookingData.cost
+        ]);
+
+        res.json({
+            success: true,
+            data: {
+                id: result.insertId,
+                ...bookingData
+            }
         });
-        
-        await database.updateTrip(id, req.user.id, { 
-            booking_data: JSON.stringify(bookings) 
-        });
-        
-        res.json({ success: true, data: bookings });
     } catch (error) {
         console.error('Add booking error:', error);
-        res.status(500).json({ success: false, error: 'Failed to add booking' });
+        res.status(500).json({
+            success: false,
+            error: 'Failed to add booking'
+        });
     }
 });
 
-// Add reminder
-app.post('/api/trips/:id/reminders', authenticateToken, async (req, res) => {
+app.get('/api/trips/:tripId/bookings', authenticateToken, async (req, res) => {
     try {
-        const { id } = req.params;
-        const reminderData = req.body;
-        
-        const trip = await database.getTripById(id, req.user.id);
-        const reminders = trip.reminders ? JSON.parse(trip.reminders) : [];
-        
-        reminders.push({
-            id: Date.now().toString(),
-            ...reminderData,
-            createdAt: new Date().toISOString()
+        const { tripId } = req.params;
+
+        // Verify trip belongs to user
+        const trip = await database.getTripById(tripId, req.user.id);
+        if (!trip) {
+            return res.status(404).json({
+                success: false,
+                error: 'Trip not found'
+            });
+        }
+
+        const bookings = await database.pool.query(`
+            SELECT * FROM trip_bookings 
+            WHERE trip_id = ?
+            ORDER BY booking_date ASC
+        `, [tripId]);
+
+        res.json({
+            success: true,
+            data: bookings.map(booking => ({
+                ...booking,
+                details: JSON.parse(booking.details || '{}')
+            }))
         });
-        
-        await database.updateTrip(id, req.user.id, { 
-            reminders: JSON.stringify(reminders) 
+    } catch (error) {
+        console.error('Get bookings error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to get bookings'
         });
-        
-        res.json({ success: true, data: reminders });
+    }
+});
+
+app.delete('/api/trips/:tripId/bookings/:bookingId', authenticateToken, async (req, res) => {
+    try {
+        const { tripId, bookingId } = req.params;
+
+        // Verify trip belongs to user
+        const trip = await database.getTripById(tripId, req.user.id);
+        if (!trip) {
+            return res.status(404).json({
+                success: false,
+                error: 'Trip not found'
+            });
+        }
+
+        await database.pool.query(`
+            DELETE FROM trip_bookings 
+            WHERE id = ? AND trip_id = ?
+        `, [bookingId, tripId]);
+
+        res.json({
+            success: true
+        });
+    } catch (error) {
+        console.error('Delete booking error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to delete booking'
+        });
+    }
+});
+
+// Reminders routes
+app.post('/api/trips/:tripId/reminders', authenticateToken, async (req, res) => {
+    try {
+        const { tripId } = req.params;
+        const { title, reminderDate, type, notes } = req.body;
+
+        // Verify trip belongs to user
+        const trip = await database.getTripById(tripId, req.user.id);
+        if (!trip) {
+            return res.status(404).json({
+                success: false,
+                error: 'Trip not found'
+            });
+        }
+
+        const result = await database.pool.query(`
+            INSERT INTO trip_reminders (trip_id, title, reminder_date, type, notes, created_at)
+            VALUES (?, ?, ?, ?, ?, NOW())
+        `, [tripId, title, reminderDate, type, notes]);
+
+        res.json({
+            success: true,
+            data: {
+                id: result.insertId,
+                title,
+                reminderDate,
+                type,
+                notes
+            }
+        });
     } catch (error) {
         console.error('Add reminder error:', error);
-        res.status(500).json({ success: false, error: 'Failed to add reminder' });
+        res.status(500).json({
+            success: false,
+            error: 'Failed to add reminder'
+        });
+    }
+});
+
+app.get('/api/trips/:tripId/reminders', authenticateToken, async (req, res) => {
+    try {
+        const { tripId } = req.params;
+
+        // Verify trip belongs to user
+        const trip = await database.getTripById(tripId, req.user.id);
+        if (!trip) {
+            return res.status(404).json({
+                success: false,
+                error: 'Trip not found'
+            });
+        }
+
+        const reminders = await database.pool.query(`
+            SELECT * FROM trip_reminders 
+            WHERE trip_id = ?
+            ORDER BY reminder_date ASC
+        `, [tripId]);
+
+        res.json({
+            success: true,
+            data: reminders
+        });
+    } catch (error) {
+        console.error('Get reminders error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to get reminders'
+        });
+    }
+});
+
+app.delete('/api/trips/:tripId/reminders/:reminderId', authenticateToken, async (req, res) => {
+    try {
+        const { tripId, reminderId } = req.params;
+
+        // Verify trip belongs to user
+        const trip = await database.getTripById(tripId, req.user.id);
+        if (!trip) {
+            return res.status(404).json({
+                success: false,
+                error: 'Trip not found'
+            });
+        }
+
+        await database.pool.query(`
+            DELETE FROM trip_reminders 
+            WHERE id = ? AND trip_id = ?
+        `, [reminderId, tripId]);
+
+        res.json({
+            success: true
+        });
+    } catch (error) {
+        console.error('Delete reminder error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to delete reminder'
+        });
     }
 });
 
@@ -1623,6 +1783,7 @@ process.on('SIGTERM', async () => {
 startServer();
 
 module.exports = app;
+
 
 
 

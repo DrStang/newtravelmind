@@ -2386,30 +2386,67 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
     };
 
     const handleTripActivate = async (tripId) => {
-        setTrips(prev => prev.map(trip => ({
-            ...trip,
-            status: trip.id === tripId ? 'active' : (trip.status === 'active' ? 'planning' : trip.status)
-        })));
-        
-        const activatedTrip = trips.find(t => t.id === tripId);
-        if (activatedTrip) {
-            setCurrentTrip({ ...activatedTrip, status: 'active' });
-            setSelectedTrip({ ...activatedTrip, status: 'active' });
+    try {
+        const response = await fetch(`${API_BASE_URL}/trips/${tripId}/status`, {
+            method: 'PATCH',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ status: 'active' })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            // Update local state
+            setTrips(prev => prev.map(trip => ({
+                ...trip,
+                status: trip.id === tripId ? 'active' : (trip.status === 'active' ? 'planning' : trip.status)
+            })));
+            
+            const activatedTrip = trips.find(t => t.id === tripId);
+            if (activatedTrip) {
+                setCurrentTrip({ ...activatedTrip, status: 'active' });
+                setSelectedTrip({ ...activatedTrip, status: 'active' });
+            }
         }
-    };
-    const handleTripDeactivate = async (tripId) => {
-        setTrips(prev => prev.map(trip => ({
-            ...trip,
-            status: trip.id === tripId ? 'planning' : trip.status
-        })));
-        
-        if (currentTrip?.id === tripId) {
-            setCurrentTrip(null);
+    } catch (error) {
+        console.error('Activate trip error:', error);
+    }
+};
+
+const handleTripDeactivate = async (tripId) => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/trips/${tripId}/status`, {
+            method: 'PATCH',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ status: 'planning' })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            // Update local state
+            setTrips(prev => prev.map(trip => ({
+                ...trip,
+                status: trip.id === tripId ? 'planning' : trip.status
+            })));
+            
+            if (currentTrip?.id === tripId) {
+                setCurrentTrip(null);
+            }
+            if (selectedTrip?.id === tripId) {
+                setSelectedTrip(prev => ({ ...prev, status: 'planning' }));
+            }
         }
-        if (selectedTrip?.id === tripId) {
-            setSelectedTrip(null);
-        }
-    };
+    } catch (error) {
+        console.error('Deactivate trip error:', error);
+    }
+};
 
     const handleCreateTrip = async (e) => {
         e.preventDefault();
@@ -2753,7 +2790,8 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    handleTripActivate(trip.id);
+                                                    handleTripActivate(tripToShow.id);
+                                                    setView('manage');
                                                 }}
                                                 className="text-xs text-blue-600 hover:text-blue-700"
                                             >
@@ -5257,6 +5295,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

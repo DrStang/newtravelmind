@@ -683,13 +683,13 @@ app.patch('/api/trips/:id/itinerary', authenticateToken, async (req, res) => {
 // Add these routes after the existing trip routes (around line 550)
 
 // Bookings routes
-app.post('/api/trips/:tripId/bookings', authenticateToken, async (req, res) => {
+app.post('/api/trips/:id/bookings', authenticateToken, async (req, res) => {
     try {
-        const { tripId } = req.params;
+        const { id } = req.params;
         const bookingData = req.body;
 
         // Verify trip belongs to user
-        const trip = await database.getTripById(tripId, req.user.id);
+        const trip = await database.getTripById(id, req.user.id);
         if (!trip) {
             return res.status(404).json({
                 success: false,
@@ -725,12 +725,12 @@ app.post('/api/trips/:tripId/bookings', authenticateToken, async (req, res) => {
     }
 });
 
-app.get('/api/trips/:tripId/bookings', authenticateToken, async (req, res) => {
+app.get('/api/trips/:id/bookings', authenticateToken, async (req, res) => {
     try {
-        const { tripId } = req.params;
+        const { id } = req.params;
 
         // Verify trip belongs to user
-        const trip = await database.getTripById(tripId, req.user.id);
+        const trip = await database.getTripById(id, req.user.id);
         if (!trip) {
             return res.status(404).json({
                 success: false,
@@ -760,12 +760,12 @@ app.get('/api/trips/:tripId/bookings', authenticateToken, async (req, res) => {
     }
 });
 
-app.delete('/api/trips/:tripId/bookings/:bookingId', authenticateToken, async (req, res) => {
+app.delete('/api/trips/:id/bookings/:bookingId', authenticateToken, async (req, res) => {
     try {
-        const { tripId, bookingId } = req.params;
+        const { id, bookingId } = req.params;
 
         // Verify trip belongs to user
-        const trip = await database.getTripById(tripId, req.user.id);
+        const trip = await database.getTripById(id, req.user.id);
         if (!trip) {
             return res.status(404).json({
                 success: false,
@@ -791,13 +791,13 @@ app.delete('/api/trips/:tripId/bookings/:bookingId', authenticateToken, async (r
 });
 
 // Reminders routes
-app.post('/api/trips/:tripId/reminders', authenticateToken, async (req, res) => {
+app.post('/api/trips/:id/reminders', authenticateToken, async (req, res) => {
     try {
-        const { tripId } = req.params;
+        const { id } = req.params;
         const { title, reminderDate, type, notes } = req.body;
 
         // Verify trip belongs to user
-        const trip = await database.getTripById(tripId, req.user.id);
+        const trip = await database.getTripById(id, req.user.id);
         if (!trip) {
             return res.status(404).json({
                 success: false,
@@ -829,12 +829,12 @@ app.post('/api/trips/:tripId/reminders', authenticateToken, async (req, res) => 
     }
 });
 
-app.get('/api/trips/:tripId/reminders', authenticateToken, async (req, res) => {
+app.get('/api/trips/:id/reminders', authenticateToken, async (req, res) => {
     try {
-        const { tripId } = req.params;
+        const { id } = req.params;
 
         // Verify trip belongs to user
-        const trip = await database.getTripById(tripId, req.user.id);
+        const trip = await database.getTripById(id, req.user.id);
         if (!trip) {
             return res.status(404).json({
                 success: false,
@@ -861,12 +861,12 @@ app.get('/api/trips/:tripId/reminders', authenticateToken, async (req, res) => {
     }
 });
 
-app.delete('/api/trips/:tripId/reminders/:reminderId', authenticateToken, async (req, res) => {
+app.delete('/api/trips/:id/reminders/:reminderId', authenticateToken, async (req, res) => {
     try {
-        const { tripId, reminderId } = req.params;
+        const { id, reminderId } = req.params;
 
         // Verify trip belongs to user
-        const trip = await database.getTripById(tripId, req.user.id);
+        const trip = await database.getTripById(id, req.user.id);
         if (!trip) {
             return res.status(404).json({
                 success: false,
@@ -967,13 +967,13 @@ app.get('/api/places/nearby', async (req, res) => {
     }
 });
 // Add this route in your backend
-app.put('/api/trips/:tripId/days/:dayNumber', authenticateToken, async (req, res) => {
+app.put('/api/trips/:id/days/:dayNumber', authenticateToken, async (req, res) => {
     try {
-        const { tripId, dayNumber } = req.params;
+        const { id, dayNumber } = req.params;
         const { activities, title } = req.body;
 
         // Get current trip
-        const trip = await database.getTripById(tripId, req.user.id);
+        const trip = await database.getTripById(id, req.user.id);
         
         if (!trip) {
             return res.status(404).json({ success: false, error: 'Trip not found' });
@@ -1423,9 +1423,9 @@ app.get('/api/memories', authenticateToken, async (req, res) => {
     }
 });
 
-app.get('/api/memories/story/:tripId?', authenticateToken, async (req, res) => {
+app.get('/api/memories/story/:id?', authenticateToken, async (req, res) => {
     try {
-        const { tripId } = req.params;
+        const { id } = req.params;
         const story = await MemoryService.generateTravelStory(req.user.id, tripId ? parseInt(tripId) : null);
 
         res.json({
@@ -1536,11 +1536,11 @@ app.post('/api/flights/save-selection', authenticateToken, async (req, res) => {
     }
 });
 
-app.get('/api/trips/:tripId/flights', authenticateToken, async (req, res) => {
+app.get('/api/trips/:id/flights', authenticateToken, async (req, res) => {
     try {
-        const { tripId } = req.params;
+        const { id } = req.params;
 
-        const flights = await database.getTripFlights(tripId, req.user.id);
+        const flights = await database.getTripFlights(id, req.user.id);
 
         res.json({
             success: true,
@@ -1555,9 +1555,9 @@ app.get('/api/trips/:tripId/flights', authenticateToken, async (req, res) => {
     }
 });
 
-app.delete('/api/trips/:tripId/flights/:flightId', authenticateToken, async (req, res) => {
+app.delete('/api/trips/:id/flights/:flightId', authenticateToken, async (req, res) => {
     try {
-        const { flightId } = req.params;
+        const { id, flightId } = req.params;
 
         await database.deleteTripFlight(flightId, req.user.id);
 
@@ -1783,6 +1783,7 @@ process.on('SIGTERM', async () => {
 startServer();
 
 module.exports = app;
+
 
 
 

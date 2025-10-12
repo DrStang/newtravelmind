@@ -434,7 +434,7 @@ const App = () => {
             setCurrentMode('planning');
             setSelectedTrip(activeTrip);
             setSelectedTripId(activeTrip.id);
-            setView('itinerary');
+            setView('manage');
         }
     };
     const sendChatMessage = (message) => {
@@ -3213,7 +3213,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
     }
 
     //TRIP MANAGER VIEW (when selectedTripId is set but view is still 'create')
-   /* if (selectedTripId && view === 'create') {
+   if (selectedTripId && view === 'manage') {
         const tripToShow = trips.find(t => t.id === selectedTripId);
         
         return (
@@ -3236,7 +3236,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                 />
             </div>
         );
-    }*/
+    }
 
     // DEFAULT: CREATE NEW TRIP VIEW
     return (
@@ -3303,11 +3303,11 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                         onClick={() => {
                             setSelectedTrip(activeTrip);
                             setSelectedTripId(activeTrip.id);
-                            setView('itinerary');
+                            setView('manage');
                         }}
                         className="bg-white text-green-600 px-6 py-3 rounded-lg hover:bg-green-50 transition-colors font-semibold"
                     >
-                        View Itinerary →
+                        Manage Trip →
                     </button>
                 </div>
             </div>
@@ -5148,6 +5148,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

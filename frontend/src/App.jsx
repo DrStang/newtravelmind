@@ -2752,6 +2752,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
+                                                    setView('manage');
                                                     setSelectedTrip(activeTrip);
                                                     setSelectedTripId(activeTrip.id);                                                }}
                                                 className="text-xs text-blue-600 hover:text-blue-700"
@@ -3320,7 +3321,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                             onClick={() => {
                                 setSelectedTrip(activeTrip);
                                 setSelectedTripId(activeTrip.id);
-                                setView('itinerary');
+                                setView('manage');
                             }}
                             className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition-colors flex items-center space-x-2 shadow-lg"
                         >
@@ -5214,6 +5215,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

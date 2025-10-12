@@ -2400,7 +2400,9 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                 setTrips(prev => [newTrip, ...prev]);
                 setCurrentTrip(newTrip);
                 setSelectedTrip(newTrip);
+                setSelectedTripId(newTrip.id);
                 setView('itinerary');
+                setIsCreating(false);
 
                 sendChatMessage(`I just created a new itinerary for ${formData.destination}! Can you give me some additional tips?`);
             }
@@ -2509,77 +2511,97 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
     };
 
     const parseItinerary = (itineraryText) => {
-        if (!itineraryText) return [];
+    if (!itineraryText) return [];
 
-        const days = [];
-        const lines = itineraryText.split('\n');
-        let currentDay = null;
+    const days = [];
+    const lines = itineraryText.split('\n');
+    let currentDay = null;
 
-        lines.forEach(line => {
-            line = line.trim();
-            if (!line) return;
+    lines.forEach(line => {
+        line = line.trim();
+        if (!line) return;
 
-            const dayMatch = line.match(/\*?\*?Day\s+(\d+)[:\-\s]*(.*?)\*?\*?/i);
-            if (dayMatch) {
-                if (currentDay) {
-                    days.push(currentDay);
-                }
-                currentDay = {
-                    number: parseInt(dayMatch[1]),
-                    title: dayMatch[2].replace(/\*/g, '').trim() || 'Exploration Day',
-                    activities: [],
-                    totalCost: 0
-                };
-                return;
+        // Check if this is a day header
+        const dayMatch = line.match(/^\*?\*?Day\s+(\d+)[:\-\s]*(.*?)\*?\*?$/i);
+        if (dayMatch) {
+            if (currentDay) {
+                days.push(currentDay);
             }
-
-            const costMatch = line.match(/\$(\d+(?:,\d{3})*(?:\.\d{2})?)/);
-            if (costMatch && currentDay) {
-                currentDay.totalCost += parseFloat(costMatch[1].replace(/,/g, ''));
-            }
-
-            if (currentDay && line.length > 3 && !line.match(/^#+/)) {
-                const cleanLine = line
-                    .replace(/^\*+\s*/, '')           // Remove leading asterisks
-                    .replace(/\*+$/, '')              // Remove trailing asterisks
-                    .replace(/\*\*(.*?)\*\*/g, '$1')  // Remove bold markdown
-                    .replace(/^-\s*/, '')             // Remove leading dash
-                    .replace(/^•\s*/, '')             // Remove bullet
-                    .replace(/^\d+\.\s*/, '')         // Remove numbered list
-                    .trim();
-    
-                if (cleanLine && !cleanLine.match(/^(Day \d+)/i)) {
-                    currentDay.activities.push(cleanLine);
-                }
-            }
-        });
-
-        if (currentDay) {
-            days.push(currentDay);
+            currentDay = {
+                number: parseInt(dayMatch[1]),
+                title: dayMatch[2].replace(/\*/g, '').trim() || 'Exploration Day',
+                activities: [],
+                totalCost: 0
+            };
+            return;
         }
+
+        // Skip lines that are just section headers without content after colon
+        if (line.match(/^(Morning Activity|Afternoon Activity|Evening Activity|Lunch|Dinner|Breakfast):?\s*$/i)) {
+            return;
+        }
+
+        // Extract costs
+        const costMatch = line.match(/\$(\d+(?:,\d{3})*(?:\.\d{2})?)/);
+        if (costMatch && currentDay) {
+            currentDay.totalCost += parseFloat(costMatch[1].replace(/,/g, ''));
+        }
+
+        // Add activities (skip headers, day markers, and empty lines)
+        if (currentDay && line.length > 3 && !line.match(/^#+/) && !line.match(/^\*\*Day \d+/i)) {
+            const cleanLine = line
+                .replace(/^\*+\s*/, '')           // Remove leading asterisks
+                .replace(/\*+$/, '')              // Remove trailing asterisks
+                .replace(/\*\*(.*?)\*\*/g, '$1')  // Remove bold markdown
+                .replace(/^[-•]\s*/, '')          // Remove bullet points
+                .replace(/^\d+\.\s*/, '')         // Remove numbered list
+                .trim();
+
+            // Only add if it's substantive content and not a standalone section header
+            if (cleanLine && cleanLine.length > 10 && !cleanLine.match(/^(Total|Budget|Summary)/i)) {
+                currentDay.activities.push(cleanLine);
+            }
+        }
+    });
+
+    if (currentDay) {
+        days.push(currentDay);
+    }
+
+    // Remove duplicate days (same day number)
+    const uniqueDays = [];
+    const seenDayNumbers = new Set();
+    
+    days.forEach(day => {
+        if (!seenDayNumbers.has(day.number)) {
+            seenDayNumbers.add(day.number);
+            uniqueDays.push(day);
+        }
+    });
 
     // Fallback if no structured days found
-        if (days.length === 0 && itineraryText.length > 0) {
-            const activities = lines
-                .filter(line => line.trim().length > 3)
-                .map(line => line
-                    .replace(/^\*+\s*/, '')
-                    .replace(/\*+$/, '')
-                    .replace(/\*\*(.*?)\*\*/g, '$1')
-                    .trim()
-                )
-                .filter(line => line && !line.match(/^(Day \d+)/i));
+    if (uniqueDays.length === 0 && itineraryText.length > 0) {
+        const activities = lines
+            .filter(line => line.trim().length > 10)
+            .filter(line => !line.match(/^(Day \d+|Morning Activity|Afternoon Activity|Evening Activity|Lunch|Dinner|Breakfast):?\s*$/i))
+            .map(line => line
+                .replace(/^\*+\s*/, '')
+                .replace(/\*+$/, '')
+                .replace(/\*\*(.*?)\*\*/g, '$1')
+                .trim()
+            )
+            .filter(line => line && line.length > 10);
 
-            days.push({
-                number: 1,
-                title: 'Full Itinerary',
-                activities: activities,
-                totalCost: 0
-            });
-        }
+        uniqueDays.push({
+            number: 1,
+            title: 'Full Itinerary',
+            activities: activities,
+            totalCost: 0
+        });
+    }
 
-        return days;
-    };
+    return uniqueDays;
+};
     // Add a function to format activities for display
     const formatActivityText = (text) => {
         // Check if it's a section header (Morning Activity, Lunch, etc.)
@@ -5148,6 +5170,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

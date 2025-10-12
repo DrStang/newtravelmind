@@ -663,6 +663,19 @@ app.patch('/api/trips/:id/activate', authenticateToken, async (req, res) => {
         res.status(500).json({ success: false, error: 'Failed to activate trip' });
     }
 });
+app.patch('/api/trips/:id/deactivate', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        // Deactivate this trip
+        await database.updateTrip(id, req.user.id, { status: 'planning' });
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Deactivate trip error:', error);
+        res.status(500).json({ success: false, error: 'Failed to deactivate trip' });
+    }
+});
 
 // Update itinerary (for editing)
 app.patch('/api/trips/:id/itinerary', authenticateToken, async (req, res) => {
@@ -1783,6 +1796,7 @@ process.on('SIGTERM', async () => {
 startServer();
 
 module.exports = app;
+
 
 
 

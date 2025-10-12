@@ -2748,6 +2748,17 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                                     <span>${tripToShow.budget} budget</span>
                                 </span>
                             )}
+                                  {trip.status !== 'active' && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleTripActivate(trip.id);
+                                                }}
+                                                className="text-xs text-blue-600 hover:text-blue-700"
+                                            >
+                                                Make Active
+                                            </button>
+                                        )}
                         </div>
                     </div>
                     <button
@@ -5203,6 +5214,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

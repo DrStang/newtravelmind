@@ -584,7 +584,6 @@ const App = () => {
                         setSelectedTrip={setSelectedTrip}
                         selectedTripId={selectedTripId}
                         setSelectedTripId={setSelectedTripId}
-                        onTripActivate={handleTripActivate}
                         onTripDeactivate={handleTripDeactivate}
                     />
                 )}
@@ -5214,6 +5213,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

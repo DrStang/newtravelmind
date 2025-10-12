@@ -3286,6 +3286,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                     trip={tripToShow}
                     onUpdate={handleTripUpdate}
                     onActivate={handleTripActivate}
+                    onDeactivate={handleTripDeactivate}
                     token={token}
                 />
             </div>
@@ -5202,6 +5203,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

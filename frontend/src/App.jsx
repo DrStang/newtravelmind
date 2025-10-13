@@ -4654,6 +4654,7 @@ const EnhancedCompanionMode = () => {
             </div>
           </div>
         </div>
+        )}
   );
 };
 

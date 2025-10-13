@@ -4654,18 +4654,10 @@ const EnhancedCompanionMode = () => {
             </div>
           </div>
         </div>
-      )}
-
-      {/* Floating AI Assistant Button */}
-      <button className="fixed bottom-6 right-6 bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 z-40 group">
-        <MessageCircle className="w-6 h-6 group-hover:scale-110 transition-transform" />
-        <div className="absolute -top-2 -right-2 w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
-      </button>
-    </div>
   );
 };
 
-export default EnhancedCompanionMode
+export default EnhancedCompanionMode;
 // ===================================
 // MEMORY MODE COMPONENT - FIXED
 // ===================================

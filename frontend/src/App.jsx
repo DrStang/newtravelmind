@@ -3718,14 +3718,6 @@ const CompanionMode = ({user, token, location, weather, nearbyPlaces, currentTri
         {value: 'gas_station', label: 'Gas Stations', icon: '⛽'}
     ];
 
-   import React, { useState, useEffect, useRef } from 'react';
-import {
-  MapPin, Cloud, Calendar, Camera, Navigation, Phone, AlertTriangle,
-  Globe, Clock, Bell, ChevronRight, Star, DollarSign, Utensils,
-  Hotel, Plane, CheckCircle, Search, ScanLine, Languages, Map,
-  Shield, Info, X, Menu, RefreshCw, Edit, Plus, Zap
-} from 'lucide-react';
-
 // Mock data - replace with actual API calls
 const mockCurrentTrip = {
   id: 1,

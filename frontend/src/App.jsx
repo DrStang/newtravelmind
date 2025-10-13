@@ -3708,6 +3708,16 @@ const CompanionMode = ({user, token, location, weather, nearbyPlaces, currentTri
     const [loading, setLoading] = useState(false);
     const [places, setPlaces] = useState(nearbyPlaces || []);
     const [currentActivity, setCurrentActivity] = useState(null);
+     
+      const [todaySchedule, setTodaySchedule] = useState(mockTodaySchedule);
+      const [nearbyPlaces, setNearbyPlaces] = useState(mockNearbyPlaces);
+      const [showQuickToolModal, setShowQuickToolModal] = useState(null);
+      const [showScheduleEdit, setShowScheduleEdit] = useState(false);
+      const [notifications, setNotifications] = useState([
+        { id: 1, type: "weather", message: "Rain expected at 3 PM. Suggest indoor alternatives?", priority: "high" },
+        { id: 2, type: "booking", message: "Flight check-in opens in 18 hours", priority: "medium" },
+        { id: 3, type: "reminder", message: "Hotel checkout tomorrow at 11 AM", priority: "low" }
+      ]);
 
     const placeTypes = [
         {value: 'restaurant', label: 'Restaurants', icon: '🍽️'},
@@ -3848,16 +3858,7 @@ const EnhancedCompanionMode = () => {
     ]
   });
 
-  const [selectedPlaceType, setSelectedPlaceType] = useState('all');
-  const [todaySchedule, setTodaySchedule] = useState(mockTodaySchedule);
-  const [nearbyPlaces, setNearbyPlaces] = useState(mockNearbyPlaces);
-  const [showQuickToolModal, setShowQuickToolModal] = useState(null);
-  const [showScheduleEdit, setShowScheduleEdit] = useState(false);
-  const [notifications, setNotifications] = useState([
-    { id: 1, type: "weather", message: "Rain expected at 3 PM. Suggest indoor alternatives?", priority: "high" },
-    { id: 2, type: "booking", message: "Flight check-in opens in 18 hours", priority: "medium" },
-    { id: 3, type: "reminder", message: "Hotel checkout tomorrow at 11 AM", priority: "low" }
-  ]);
+
 
   const placeCategories = [
     { value: 'all', label: 'All Places', icon: '🌟' },
@@ -4656,12 +4657,6 @@ const EnhancedCompanionMode = () => {
           </div>
         </div>
       )}
-
-      {/* Floating AI Assistant Button */}
-      <button className="fixed bottom-6 right-6 bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 z-40 group">
-        <MessageCircle className="w-6 h-6 group-hover:scale-110 transition-transform" />
-        <div className="absolute -top-2 -right-2 w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
-      </button>
     </div>
   );
 };

@@ -2341,6 +2341,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
     selectedTripId,
     setSelectedTripId,
                       }) => {
+    console.log('PlanningMode setChatOpen:', typeof setChatOpen);
     //const [view, setView] = useState('create'); // 'create', 'trips', 'itinerary', 'flights', 'hotels', 'activities'
     //const [selectedTrip, setSelectedTrip] = useState(null);
     //const [selectedTripId, setSelectedTripId] = useState(null);
@@ -5290,6 +5291,7 @@ const FloatingChatButton = ({onClick}) => {
 };
 
 export default App;
+
 
 
 

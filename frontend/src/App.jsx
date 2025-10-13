@@ -3710,7 +3710,6 @@ const CompanionMode = ({user, token, location, weather, nearbyPlaces, currentTri
     const [currentActivity, setCurrentActivity] = useState(null);
      
       const [todaySchedule, setTodaySchedule] = useState(mockTodaySchedule);
-      const [nearbyPlaces, setNearbyPlaces] = useState(mockNearbyPlaces);
       const [showQuickToolModal, setShowQuickToolModal] = useState(null);
       const [showScheduleEdit, setShowScheduleEdit] = useState(false);
       const [notifications, setNotifications] = useState([

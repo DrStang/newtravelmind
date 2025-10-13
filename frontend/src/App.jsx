@@ -3703,8 +3703,7 @@ const handleTripDeactivate = async (tripId) => {
 // COMPANION MODE COMPONENT
 // ===================================
 
-const EnhancedCompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTrip, sendChatMessage }) => {
-  const API_BASE_URL = 'http://localhost:3001/api';
+const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTrip, sendChatMessage }) => {
 
   // Mock current trip data
   const mockCurrentTrip = currentTrip || {

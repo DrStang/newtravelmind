@@ -4665,9 +4665,6 @@ const EnhancedCompanionMode = () => {
   );
 };
 
-// Import MessageCircle icon
-import { MessageCircle } from 'lucide-react';
-
 export default EnhancedCompanionMode
 // ===================================
 // MEMORY MODE COMPONENT - FIXED

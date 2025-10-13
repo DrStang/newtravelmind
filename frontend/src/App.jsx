@@ -3702,14 +3702,6 @@ const handleTripDeactivate = async (tripId) => {
 // ===================================
 // COMPANION MODE COMPONENT
 // ===================================
-import { useState, useEffect } from 'react';
-import {
-  MapPin, Cloud, Calendar, Camera, Navigation, Phone, AlertTriangle,
-  Globe, Clock, Bell, ChevronRight, Star, DollarSign, Utensils,
-  Hotel, Plane, CheckCircle, Search, ScanLine, Languages, Map,
-  Shield, Info, X, Menu, RefreshCw, Edit, Plus, Zap, MessageCircle,
-  Sun, CloudRain, Droplets, Wind, TrendingUp
-} from 'lucide-react';
 
 const EnhancedCompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTrip, sendChatMessage }) => {
   const API_BASE_URL = 'http://localhost:3001/api';
@@ -4797,7 +4789,6 @@ const EnhancedCompanionMode = ({ user, token, location, weather, nearbyPlaces, c
   );
 };
 
-export default EnhancedCompanionMode;
 
 // ===================================
 // MEMORY MODE COMPONENT - FIXED

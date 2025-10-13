@@ -3702,9 +3702,6 @@ const handleTripDeactivate = async (tripId) => {
 // ===================================
 // COMPANION MODE COMPONENT
 // ===================================
-// ===================================
-// COMPANION MODE COMPONENT
-// ===================================
 const CompanionMode = ({user, token, location, weather, nearbyPlaces, currentTrip, sendChatMessage}) => {
     const [selectedPlaceType, setSelectedPlaceType] = useState('restaurant');
     const [searchRadius, setSearchRadius] = useState(1000);
@@ -3720,289 +3717,958 @@ const CompanionMode = ({user, token, location, weather, nearbyPlaces, currentTri
         {value: 'gas_station', label: 'Gas Stations', icon: '⛽'}
     ];
 
-    const searchNearbyPlaces = async (type = selectedPlaceType) => {
-        if (!location) return;
+// Mock data - replace with actual API calls
+const mockCurrentTrip = {
+  id: 1,
+  title: "Tokyo Adventure",
+  destination: "Tokyo, Japan",
+  status: "active",
+  startDate: "2025-10-15",
+  endDate: "2025-10-22",
+  currentDay: 2
+};
 
-        setLoading(true);
-        try {
-            const response = await fetch(
-                `${API_BASE_URL}/places/nearby?lat=${location.lat}&lng=${location.lng}&type=${type}&radius=${searchRadius}&opennow=true`
-            );
-            const data = await response.json();
+const mockTodaySchedule = [
+  {
+    id: 1,
+    time: "09:00 AM",
+    title: "Visit Senso-ji Temple",
+    type: "activity",
+    location: "Asakusa, Tokyo",
+    status: "upcoming",
+    duration: "2 hours",
+    cost: "$15",
+    bookingConfirmation: "TMG-123456"
+  },
+  {
+    id: 2,
+    time: "12:00 PM",
+    title: "Lunch at Ichiran Ramen",
+    type: "dining",
+    location: "Shibuya",
+    status: "upcoming",
+    duration: "1 hour",
+    cost: "$20"
+  },
+  {
+    id: 3,
+    time: "02:00 PM",
+    title: "Shopping in Harajuku",
+    type: "activity",
+    location: "Harajuku District",
+    status: "upcoming",
+    duration: "3 hours"
+  },
+  {
+    id: 4,
+    time: "07:00 PM",
+    title: "Hotel Check-in",
+    type: "accommodation",
+    location: "Shinjuku Prince Hotel",
+    status: "upcoming",
+    bookingConfirmation: "BK-789012",
+    cost: "$180"
+  }
+];
 
-            if (data.success) {
-                setPlaces(data.data);
-            }
-        } catch (error) {
-            console.error('Places search error:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
+const mockNearbyPlaces = [
+  {
+    id: 1,
+    name: "Tokyo Tower",
+    category: "tourist_attraction",
+    distance: "0.5 km",
+    rating: 4.6,
+    reviews: 12453,
+    openNow: true,
+    priceLevel: 2,
+    image: "https://picsum.photos/seed/tower/400/300"
+  },
+  {
+    id: 2,
+    name: "Tsukiji Outer Market",
+    category: "restaurant",
+    distance: "1.2 km",
+    rating: 4.5,
+    reviews: 8901,
+    openNow: true,
+    priceLevel: 2,
+    image: "https://picsum.photos/seed/market/400/300"
+  },
+  {
+    id: 3,
+    name: "Imperial Palace",
+    category: "tourist_attraction",
+    distance: "2.1 km",
+    rating: 4.7,
+    reviews: 15234,
+    openNow: true,
+    priceLevel: 1,
+    image: "https://picsum.photos/seed/palace/400/300"
+  }
+];
 
-    useEffect(() => {
-        setPlaces(nearbyPlaces);
-    }, [nearbyPlaces]);
+const mockUpcomingBookings = [
+  {
+    id: 1,
+    type: "flight",
+    title: "Return Flight to NYC",
+    time: "Tomorrow, 6:30 PM",
+    confirmation: "JAL456",
+    status: "confirmed",
+    alert: "Check-in opens in 18 hours"
+  },
+  {
+    id: 2,
+    type: "hotel",
+    title: "Hotel Checkout",
+    time: "Oct 22, 11:00 AM",
+    confirmation: "BK-789012",
+    status: "confirmed"
+  }
+];
 
-    useEffect(() => {
-        if (location) {
-            searchNearbyPlaces();
-        }
-    }, [selectedPlaceType, searchRadius, location]);
+const EnhancedCompanionMode = () => {
+  const [currentLocation, setCurrentLocation] = useState({
+    lat: 35.6762,
+    lng: 139.6503,
+    name: "Shibuya, Tokyo"
+  });
+  
+  const [weather, setWeather] = useState({
+    temp: 24,
+    condition: "Partly Cloudy",
+    humidity: 65,
+    windSpeed: 12,
+    forecast: [
+      { time: "12 PM", temp: 25, condition: "sunny" },
+      { time: "3 PM", temp: 24, condition: "rain", alert: true },
+      { time: "6 PM", temp: 22, condition: "cloudy" },
+      { time: "9 PM", temp: 20, condition: "clear" }
+    ]
+  });
 
-    const getWeatherRecommendation = () => {
-        if (!weather) return null;
+  const [selectedPlaceType, setSelectedPlaceType] = useState('all');
+  const [todaySchedule, setTodaySchedule] = useState(mockTodaySchedule);
+  const [nearbyPlaces, setNearbyPlaces] = useState(mockNearbyPlaces);
+  const [showQuickToolModal, setShowQuickToolModal] = useState(null);
+  const [showScheduleEdit, setShowScheduleEdit] = useState(false);
+  const [notifications, setNotifications] = useState([
+    { id: 1, type: "weather", message: "Rain expected at 3 PM. Suggest indoor alternatives?", priority: "high" },
+    { id: 2, type: "booking", message: "Flight check-in opens in 18 hours", priority: "medium" },
+    { id: 3, type: "reminder", message: "Hotel checkout tomorrow at 11 AM", priority: "low" }
+  ]);
 
-        if (weather.condition?.toLowerCase().includes('rain')) {
-            return {
-                type: 'warning',
-                message: 'Rain expected - consider indoor activities',
-                suggestions: ['Museums', 'Shopping centers', 'Cafes']
-            };
-        }
+  const placeCategories = [
+    { value: 'all', label: 'All Places', icon: '🌟' },
+    { value: 'restaurant', label: 'Restaurants', icon: '🍽️' },
+    { value: 'tourist_attraction', label: 'Attractions', icon: '🏛️' },
+    { value: 'shopping_mall', label: 'Shopping', icon: '🛍️' },
+    { value: 'cafe', label: 'Cafes', icon: '☕' },
+    { value: 'museum', label: 'Museums', icon: '🎨' },
+    { value: 'park', label: 'Parks', icon: '🌳' }
+  ];
 
-        if (weather.temperature > 30) {
-            return {
-                type: 'info',
-                message: 'Hot weather - stay hydrated and seek shade',
-                suggestions: ['Parks with shade', 'Air-conditioned venues', 'Swimming']
-            };
-        }
-
-        return {
-            type: 'success',
-            message: 'Perfect weather for exploring!',
-            suggestions: ['Outdoor activities', 'Walking tours', 'Street food']
-        };
-    };
-
-    const weatherRec = getWeatherRecommendation();
+  // Current Activity Component
+  const CurrentActivity = () => {
+    const currentActivity = todaySchedule.find(item => item.status === 'current') || todaySchedule[0];
+    const nextActivity = todaySchedule[todaySchedule.findIndex(item => item.id === currentActivity.id) + 1];
 
     return (
-        <div className="max-w-7xl mx-auto px-4 py-8">
-            <div className="mb-8">
-                <h2 className="text-3xl font-bold text-gray-900 mb-2">Travel Companion</h2>
-                <p className="text-gray-600">Real-time assistance for your current location</p>
+      <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl p-6 text-white mb-6">
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex-1">
+            <div className="flex items-center space-x-2 mb-2">
+              <Clock className="w-5 h-5" />
+              <span className="text-sm font-medium opacity-90">Current Activity</span>
             </div>
-
-            {/* Current Status */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                {/* Location Card */}
-                <div className="bg-white rounded-xl shadow-lg p-6">
-                    <div className="flex items-center space-x-3 mb-4">
-                        <MapPin className="w-6 h-6 text-blue-600" />
-                        <h3 className="text-lg font-semibold">Current Location</h3>
-                    </div>
-                    {location ? (
-                        <div className="space-y-2">
-                            <p className="text-gray-600">
-                                {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
-                            </p>
-                            <p className="text-sm text-gray-500">
-                                Accuracy: ±{location.accuracy?.toFixed(0)}m
-                            </p>
-                        </div>
-                    ) : (
-                        <p className="text-gray-500">Location access needed</p>
-                    )}
-                </div>
-
-                {/* Weather Card */}
-                <div className="bg-white rounded-xl shadow-lg p-6">
-                    <div className="flex items-center space-x-3 mb-4">
-                        <Cloud className="w-6 h-6 text-blue-600" />
-                        <h3 className="text-lg font-semibold">Weather</h3>
-                    </div>
-                    {weather ? (
-                        <div className="space-y-2">
-                            <p className="text-2xl font-bold">{Math.round(weather.temperature)}°C</p>
-                            <p className="text-gray-600 capitalize">{weather.description}</p>
-                            <p className="text-sm text-gray-500">
-                                Humidity: {weather.humidity}% | Wind: {weather.windSpeed} m/s
-                            </p>
-                        </div>
-                    ) : (
-                        <p className="text-gray-500">Weather data unavailable</p>
-                    )}
-                </div>
-
-                {/* Current Trip */}
-                <div className="bg-white rounded-xl shadow-lg p-6">
-                    <div className="flex items-center space-x-3 mb-4">
-                        <Calendar className="w-6 h-6 text-blue-600" />
-                        <h3 className="text-lg font-semibold">Current Trip</h3>
-                    </div>
-                    {currentTrip ? (
-                        <div className="space-y-2">
-                            <p className="font-medium">{currentTrip.destination}</p>
-                            <p className="text-gray-600">{currentTrip.duration} days</p>
-                            <span className={`inline-block px-2 py-1 rounded-full text-xs ${
-                                currentTrip.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
-                            }`}>
-                                {currentTrip.status}
-                            </span>
-                        </div>
-                    ) : (
-                        <p className="text-gray-500">No active trip</p>
-                    )}
-                </div>
+            <h3 className="text-2xl font-bold mb-1">{currentActivity.title}</h3>
+            <div className="flex items-center space-x-4 text-sm opacity-90">
+              <span className="flex items-center space-x-1">
+                <MapPin className="w-4 h-4" />
+                <span>{currentActivity.location}</span>
+              </span>
+              <span>{currentActivity.time}</span>
+              {currentActivity.duration && <span>• {currentActivity.duration}</span>}
             </div>
-
-            {/* Weather Recommendation */}
-            {weatherRec && (
-                <div className={`mb-8 p-4 rounded-lg border-l-4 ${
-                    weatherRec.type === 'warning' ? 'bg-yellow-50 border-yellow-400' :
-                        weatherRec.type === 'info' ? 'bg-blue-50 border-blue-400' :
-                            'bg-green-50 border-green-400'
-                }`}>
-                    <div className="flex items-start space-x-3">
-                        <div className="flex-1">
-                            <p className="font-medium text-gray-900">{weatherRec.message}</p>
-                            <div className="mt-2 flex flex-wrap gap-2">
-                                {weatherRec.suggestions.map((suggestion, index) => (
-                                    <button
-                                        key={index}
-                                        onClick={() => sendChatMessage(`Find ${suggestion.toLowerCase()} near me`)}
-                                        className="text-xs bg-white px-2 py-1 rounded border hover:bg-gray-50"
-                                    >
-                                        {suggestion}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-                {/* Place Type Selector */}
-                <div className="lg:col-span-1">
-                    <div className="bg-white rounded-xl shadow-lg p-6 sticky top-24">
-                        <h3 className="text-lg font-semibold mb-4">Find Nearby</h3>
-
-                        <div className="space-y-2 mb-6">
-                            {placeTypes.map(type => (
-                                <button
-                                    key={type.value}
-                                    onClick={() => setSelectedPlaceType(type.value)}
-                                    className={`w-full text-left px-3 py-2 rounded-lg transition-colors flex items-center space-x-3 ${
-                                        selectedPlaceType === type.value
-                                            ? 'bg-blue-100 text-blue-700 border border-blue-200'
-                                            : 'hover:bg-gray-50'
-                                    }`}
-                                >
-                                    <span className="text-xl">{type.icon}</span>
-                                    <span>{type.label}</span>
-                                </button>
-                            ))}
-                        </div>
-
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Search Radius
-                            </label>
-                            <select
-                                value={searchRadius}
-                                onChange={(e) => setSearchRadius(parseInt(e.target.value))}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                            >
-                                <option value={500}>500m</option>
-                                <option value={1000}>1km</option>
-                                <option value={2000}>2km</option>
-                                <option value={5000}>5km</option>
-                            </select>
-                        </div>
-
-                        <button
-                            onClick={() => searchNearbyPlaces()}
-                            disabled={!location || loading}
-                            className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {loading ? 'Searching...' : 'Refresh'}
-                        </button>
-                    </div>
-                </div>
-
-                {/* Places List */}
-                <div className="lg:col-span-3">
-                    <div className="bg-white rounded-xl shadow-lg p-6">
-                        <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-lg font-semibold">
-                                Nearby {placeTypes.find(t => t.value === selectedPlaceType)?.label}
-                            </h3>
-                            <span className="text-sm text-gray-500">
-                                {places.length} results within {searchRadius}m
-                            </span>
-                        </div>
-
-                        {loading ? (
-                            <div className="flex items-center justify-center py-8">
-                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                                <span className="ml-3 text-gray-600">Finding places...</span>
-                            </div>
-                        ) : places.length > 0 ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {places.map((place, index) => (
-                                    <div key={place.id || index} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                                        <div className="flex items-start justify-between mb-3">
-                                            <div className="flex-1">
-                                                <h4 className="font-semibold text-gray-800 mb-1">{place.name}</h4>
-                                                <p className="text-sm text-gray-600 mb-2">{place.address}</p>
-
-                                                <div className="flex items-center space-x-3">
-                                                    {place.rating && (
-                                                        <div className="flex items-center space-x-1">
-                                                            <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                                                            <span className="text-sm text-gray-700">{place.rating}</span>
-                                                            {place.userRatingsTotal && (
-                                                                <span className="text-xs text-gray-500">({place.userRatingsTotal})</span>
-                                                            )}
-                                                        </div>
-                                                    )}
-
-                                                    {place.priceLevel && (
-                                                        <span className="text-sm text-gray-600">
-                                                            {'$'.repeat(place.priceLevel)}
-                                                        </span>
-                                                    )}
-
-                                                    {place.openNow && (
-                                                        <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
-                                                            Open Now
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex space-x-2">
-                                            <button
-                                                onClick={() => sendChatMessage(`Tell me more about ${place.name}`)}
-                                                className="flex-1 bg-blue-100 text-blue-700 px-3 py-2 rounded-lg hover:bg-blue-200 transition-colors text-sm"
-                                            >
-                                                Details
-                                            </button>
-                                            <button
-                                                className="bg-green-100 text-green-700 px-3 py-2 rounded-lg hover:bg-green-200 transition-colors"
-                                            >
-                                                <Navigation className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="text-center py-12 text-gray-500">
-                                <MapPin className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                                <p>No places found. Try adjusting your search.</p>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
+          </div>
+          <button className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors">
+            <Navigation className="w-5 h-5" />
+          </button>
         </div>
+
+        {nextActivity && (
+          <div className="bg-white/10 rounded-lg p-3 backdrop-blur-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <ChevronRight className="w-4 h-4" />
+                <div>
+                  <p className="text-sm opacity-75">Up Next</p>
+                  <p className="font-medium">{nextActivity.title}</p>
+                </div>
+              </div>
+              <span className="text-sm opacity-75">{nextActivity.time}</span>
+            </div>
+          </div>
+        )}
+      </div>
     );
+  };
+
+  // Weather Alert Component
+  const WeatherAlert = () => {
+    const rainAlert = weather.forecast.find(f => f.alert);
+    if (!rainAlert) return null;
+
+    return (
+      <div className="bg-yellow-50 border-l-4 border-yellow-400 rounded-lg p-4 mb-6">
+        <div className="flex items-start space-x-3">
+          <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h4 className="font-semibold text-yellow-900 mb-1">Weather Alert</h4>
+            <p className="text-yellow-800 text-sm mb-2">
+              Rain expected at {rainAlert.time}. Would you like indoor activity suggestions?
+            </p>
+            <div className="flex space-x-2">
+              <button className="text-xs bg-yellow-600 text-white px-3 py-1 rounded hover:bg-yellow-700">
+                Show Alternatives
+              </button>
+              <button className="text-xs bg-white text-yellow-600 border border-yellow-200 px-3 py-1 rounded hover:bg-yellow-50">
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Today's Schedule Component
+  const TodaySchedulePanel = () => {
+    const getActivityIcon = (type) => {
+      switch (type) {
+        case 'dining': return <Utensils className="w-4 h-4" />;
+        case 'accommodation': return <Hotel className="w-4 h-4" />;
+        case 'transport': return <Plane className="w-4 h-4" />;
+        default: return <Calendar className="w-4 h-4" />;
+      }
+    };
+
+    return (
+      <div className="bg-white rounded-xl shadow-lg p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold flex items-center space-x-2">
+            <Calendar className="w-5 h-5 text-blue-600" />
+            <span>Today's Schedule</span>
+          </h3>
+          <div className="flex space-x-2">
+            <button 
+              onClick={() => setShowScheduleEdit(true)}
+              className="text-blue-600 hover:text-blue-700 text-sm flex items-center space-x-1"
+            >
+              <Edit className="w-4 h-4" />
+              <span>Modify</span>
+            </button>
+            <button className="text-gray-400 hover:text-gray-600">
+              <RefreshCw className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {todaySchedule.map((item, index) => (
+            <div 
+              key={item.id}
+              className={`border rounded-lg p-3 transition-all ${
+                item.status === 'current' 
+                  ? 'border-blue-500 bg-blue-50' 
+                  : item.status === 'completed'
+                  ? 'border-gray-200 bg-gray-50 opacity-60'
+                  : 'border-gray-200 hover:border-blue-300'
+              }`}
+            >
+              <div className="flex items-start space-x-3">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                  item.status === 'current' ? 'bg-blue-600 text-white' :
+                  item.status === 'completed' ? 'bg-green-600 text-white' :
+                  'bg-gray-200 text-gray-600'
+                }`}>
+                  {item.status === 'completed' ? <CheckCircle className="w-4 h-4" /> : getActivityIcon(item.type)}
+                </div>
+                
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-900">{item.title}</p>
+                      <div className="flex items-center space-x-2 mt-1 text-sm text-gray-600">
+                        <span>{item.time}</span>
+                        {item.duration && <span>• {item.duration}</span>}
+                        {item.cost && <span>• {item.cost}</span>}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1 flex items-center space-x-1">
+                        <MapPin className="w-3 h-3" />
+                        <span>{item.location}</span>
+                      </p>
+                      {item.bookingConfirmation && (
+                        <p className="text-xs text-blue-600 mt-1">
+                          Booking: {item.bookingConfirmation}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <button className="text-gray-400 hover:text-gray-600">
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <button className="w-full mt-4 border-2 border-dashed border-gray-300 rounded-lg py-3 text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors flex items-center justify-center space-x-2">
+          <Plus className="w-4 h-4" />
+          <span>Add Activity</span>
+        </button>
+      </div>
+    );
+  };
+
+  // Quick Tools Component
+  const QuickTools = () => {
+    const tools = [
+      {
+        id: 'landmark',
+        icon: <ScanLine className="w-6 h-6" />,
+        title: 'Photo ID',
+        description: 'Identify landmarks',
+        color: 'from-purple-500 to-purple-600'
+      },
+      {
+        id: 'translate',
+        icon: <Languages className="w-6 h-6" />,
+        title: 'Live Translate',
+        description: 'Real-time translation',
+        color: 'from-blue-500 to-blue-600'
+      },
+      {
+        id: 'navigation',
+        icon: <Map className="w-6 h-6" />,
+        title: 'Navigation',
+        description: 'Get directions',
+        color: 'from-green-500 to-green-600'
+      },
+      {
+        id: 'emergency',
+        icon: <Shield className="w-6 h-6" />,
+        title: 'Emergency',
+        description: 'Local contacts',
+        color: 'from-red-500 to-red-600'
+      }
+    ];
+
+    return (
+      <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+        <h3 className="text-lg font-semibold mb-4 flex items-center space-x-2">
+          <Zap className="w-5 h-5 text-yellow-500" />
+          <span>Quick Tools</span>
+        </h3>
+        
+        <div className="grid grid-cols-2 gap-3">
+          {tools.map(tool => (
+            <button
+              key={tool.id}
+              onClick={() => setShowQuickToolModal(tool.id)}
+              className={`bg-gradient-to-r ${tool.color} text-white rounded-lg p-4 hover:shadow-lg transition-all group`}
+            >
+              <div className="flex flex-col items-center text-center space-y-2">
+                <div className="group-hover:scale-110 transition-transform">
+                  {tool.icon}
+                </div>
+                <div>
+                  <p className="font-semibold text-sm">{tool.title}</p>
+                  <p className="text-xs opacity-90">{tool.description}</p>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  // Find Nearby Component
+  const FindNearby = () => {
+    return (
+      <div className="bg-white rounded-xl shadow-lg p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold flex items-center space-x-2">
+            <MapPin className="w-5 h-5 text-blue-600" />
+            <span>Find Nearby</span>
+          </h3>
+          <select className="text-sm border border-gray-300 rounded-lg px-2 py-1">
+            <option>500m</option>
+            <option>1km</option>
+            <option>2km</option>
+            <option>5km</option>
+          </select>
+        </div>
+
+        {/* Category Pills */}
+        <div className="flex overflow-x-auto space-x-2 mb-4 pb-2">
+          {placeCategories.map(cat => (
+            <button
+              key={cat.value}
+              onClick={() => setSelectedPlaceType(cat.value)}
+              className={`flex-shrink-0 px-3 py-2 rounded-full text-sm transition-colors ${
+                selectedPlaceType === cat.value
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <span className="mr-1">{cat.icon}</span>
+              {cat.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Places List */}
+        <div className="space-y-3 max-h-96 overflow-y-auto">
+          {nearbyPlaces.map(place => (
+            <div key={place.id} className="border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow">
+              <div className="flex space-x-3">
+                <img 
+                  src={place.image} 
+                  alt={place.name}
+                  className="w-20 h-20 rounded-lg object-cover"
+                />
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-semibold text-gray-900 truncate">{place.name}</h4>
+                  <div className="flex items-center space-x-2 mt-1">
+                    <div className="flex items-center space-x-1">
+                      <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                      <span className="text-sm text-gray-700">{place.rating}</span>
+                      <span className="text-xs text-gray-500">({place.reviews})</span>
+                    </div>
+                    <span className="text-xs text-gray-400">•</span>
+                    <span className="text-sm text-gray-600">{place.distance}</span>
+                  </div>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-xs text-gray-500">
+                      {'$'.repeat(place.priceLevel)}
+                    </span>
+                    {place.openNow && (
+                      <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
+                        Open Now
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <button className="text-blue-600 hover:text-blue-700">
+                  <Navigation className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  // Upcoming Bookings Component
+  const UpcomingBookings = () => {
+    const getBookingIcon = (type) => {
+      switch (type) {
+        case 'flight': return <Plane className="w-5 h-5" />;
+        case 'hotel': return <Hotel className="w-5 h-5" />;
+        default: return <Calendar className="w-5 h-5" />;
+      }
+    };
+
+    return (
+      <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+        <h3 className="text-lg font-semibold mb-4 flex items-center space-x-2">
+          <Bell className="w-5 h-5 text-orange-500" />
+          <span>Upcoming Bookings</span>
+        </h3>
+
+        <div className="space-y-3">
+          {mockUpcomingBookings.map(booking => (
+            <div key={booking.id} className="border border-gray-200 rounded-lg p-3">
+              <div className="flex items-start space-x-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600">
+                  {getBookingIcon(booking.type)}
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-medium text-gray-900">{booking.title}</h4>
+                  <p className="text-sm text-gray-600">{booking.time}</p>
+                  <p className="text-xs text-gray-500 mt-1">Confirmation: {booking.confirmation}</p>
+                  {booking.alert && (
+                    <p className="text-xs text-orange-600 mt-2 flex items-center space-x-1">
+                      <Info className="w-3 h-3" />
+                      <span>{booking.alert}</span>
+                    </p>
+                  )}
+                </div>
+                <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
+                  {booking.status}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  // Smart Insights Component
+  const SmartInsights = () => {
+    return (
+      <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl p-6 mb-6">
+        <h3 className="text-lg font-semibold mb-4 flex items-center space-x-2">
+          <Zap className="w-5 h-5 text-purple-600" />
+          <span>Smart Insights</span>
+        </h3>
+
+        <div className="space-y-3">
+          <div className="bg-white rounded-lg p-3">
+            <p className="text-sm text-gray-700 mb-2">
+              💡 <strong>Local Tip:</strong> Senso-ji Temple is less crowded before 9 AM. Consider arriving early.
+            </p>
+          </div>
+          <div className="bg-white rounded-lg p-3">
+            <p className="text-sm text-gray-700 mb-2">
+              🍜 <strong>Food Recommendation:</strong> Try the seasonal ramen special at Ichiran - only available this month!
+            </p>
+          </div>
+          <div className="bg-white rounded-lg p-3">
+            <p className="text-sm text-gray-700 mb-2">
+              ⚡ <strong>Budget Alert:</strong> You're 15% under budget. Consider upgrading tonight's dinner reservation.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Quick Tool Modal
+  const QuickToolModal = () => {
+    if (!showQuickToolModal) return null;
+
+    const modalContent = {
+      landmark: {
+        title: 'Photo ID - Identify Landmarks',
+        content: (
+          <div className="text-center">
+            <Camera className="w-16 h-16 text-purple-600 mx-auto mb-4" />
+            <p className="text-gray-600 mb-4">Take or upload a photo to identify landmarks and get detailed information</p>
+            <button className="w-full bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 mb-2">
+              Take Photo
+            </button>
+            <button className="w-full bg-gray-100 text-gray-700 py-3 rounded-lg hover:bg-gray-200">
+              Upload Photo
+            </button>
+          </div>
+        )
+      },
+      translate: {
+        title: 'Live Translate',
+        content: (
+          <div>
+            <textarea 
+              className="w-full border border-gray-300 rounded-lg p-3 mb-3"
+              rows="4"
+              placeholder="Enter text to translate..."
+            />
+            <div className="flex space-x-2 mb-4">
+              <select className="flex-1 border border-gray-300 rounded-lg px-3 py-2">
+                <option>English</option>
+                <option>Japanese</option>
+                <option>Chinese</option>
+                <option>Spanish</option>
+              </select>
+              <button className="px-4 py-2 bg-gray-200 rounded-lg">⇄</button>
+              <select className="flex-1 border border-gray-300 rounded-lg px-3 py-2">
+                <option>Japanese</option>
+                <option>English</option>
+                <option>Chinese</option>
+                <option>Spanish</option>
+              </select>
+            </div>
+            <button className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700">
+              Translate
+            </button>
+          </div>
+        )
+      },
+      navigation: {
+        title: 'Navigation',
+        content: (
+          <div>
+            <div className="bg-blue-50 rounded-lg p-4 mb-4">
+              <p className="text-sm text-gray-700 mb-2">Current Location:</p>
+              <p className="font-medium">{currentLocation.name}</p>
+            </div>
+            <input 
+              type="text" 
+              placeholder="Where do you want to go?"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 mb-3"
+            />
+            <button className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 mb-2">
+              Get Directions
+            </button>
+            <button className="w-full bg-gray-100 text-gray-700 py-3 rounded-lg hover:bg-gray-200">
+              Navigate to Next Activity
+            </button>
+          </div>
+        )
+      },
+      emergency: {
+        title: 'Emergency & Local Contacts',
+        content: (
+          <div className="space-y-3">
+            <div className="bg-red-50 border-l-4 border-red-500 rounded p-3">
+              <p className="font-semibold text-red-900 mb-2">Emergency Services</p>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between items-center">
+                  <span>Police</span>
+                  <button className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700">Call 110</button>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span>Ambulance/Fire</span>
+                  <button className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700">Call 119</button>
+                </div>
+              </div>
+            </div>
+            
+            <div className="border border-gray-200 rounded-lg p-3">
+              <p className="font-semibold text-gray-900 mb-2">Local Contacts</p>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between items-center">
+                  <span>US Embassy Tokyo</span>
+                  <button className="text-blue-600 hover:text-blue-700">+81-3-3224-5000</button>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span>Hotel Concierge</span>
+                  <button className="text-blue-600 hover:text-blue-700">+81-3-1234-5678</button>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span>Travel Insurance</span>
+                  <button className="text-blue-600 hover:text-blue-700">1-800-123-4567</button>
+                </div>
+              </div>
+            </div>
+
+            <button className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
+              Share My Location
+            </button>
+          </div>
+        )
+      }
+    };
+
+    const modal = modalContent[showQuickToolModal];
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-semibold">{modal.title}</h3>
+              <button
+                onClick={() => setShowQuickToolModal(null)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            {modal.content}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header with Location and Weather */}
+      <div className="bg-white shadow-sm border-b sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2 text-gray-700">
+                <MapPin className="w-5 h-5 text-blue-600" />
+                <span className="font-medium">{currentLocation.name}</span>
+              </div>
+              <div className="hidden md:flex items-center space-x-2 text-gray-700">
+                <Cloud className="w-5 h-5 text-blue-600" />
+                <span>{weather.temp}°C</span>
+                <span className="text-gray-500">•</span>
+                <span className="text-gray-600">{weather.condition}</span>
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-3">
+              <div className="hidden md:block text-sm text-gray-600">
+                Day {mockCurrentTrip.currentDay} of {mockCurrentTrip.title}
+              </div>
+              <button className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg">
+                <Bell className="w-5 h-5" />
+                {notifications.length > 0 && (
+                  <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        {/* Notifications Bar */}
+        {notifications.filter(n => n.priority === 'high').length > 0 && (
+          <div className="mb-6 space-y-2">
+            {notifications.filter(n => n.priority === 'high').map(notif => (
+              <div key={notif.id} className="bg-yellow-50 border-l-4 border-yellow-400 rounded-lg p-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start space-x-3">
+                    <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-yellow-800">{notif.message}</p>
+                  </div>
+                  <button className="text-yellow-600 hover:text-yellow-800">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Current Activity Section */}
+        <CurrentActivity />
+
+        {/* Weather Alert */}
+        <WeatherAlert />
+
+        {/* Main Grid Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column - Schedule and Bookings */}
+          <div className="lg:col-span-1 space-y-6">
+            <TodaySchedulePanel />
+            <UpcomingBookings />
+            <SmartInsights />
+          </div>
+
+          {/* Middle Column - Nearby Places */}
+          <div className="lg:col-span-1">
+            <FindNearby />
+          </div>
+
+          {/* Right Column - Quick Tools and Info */}
+          <div className="lg:col-span-1 space-y-6">
+            <QuickTools />
+            
+            {/* Trip Progress */}
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <h3 className="text-lg font-semibold mb-4">Trip Progress</h3>
+              <div className="space-y-4">
+                <div>
+                  <div className="flex justify-between text-sm mb-2">
+                    <span className="text-gray-600">Days Completed</span>
+                    <span className="font-medium">2 of 7</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="bg-blue-600 h-2 rounded-full" style={{width: '28%'}}></div>
+                  </div>
+                </div>
+                
+                <div>
+                  <div className="flex justify-between text-sm mb-2">
+                    <span className="text-gray-600">Budget Used</span>
+                    <span className="font-medium">$850 of $2000</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="bg-green-600 h-2 rounded-full" style={{width: '42.5%'}}></div>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Activities Completed</span>
+                    <span className="text-2xl font-bold text-blue-600">12</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Local Information */}
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <h3 className="text-lg font-semibold mb-4">Local Information</h3>
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Local Time</span>
+                  <span className="font-medium">{new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Currency</span>
+                  <span className="font-medium">¥1 = $0.0067</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Language</span>
+                  <span className="font-medium">Japanese</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Emergency</span>
+                  <span className="font-medium text-red-600">110 (Police), 119 (Fire)</span>
+                </div>
+              </div>
+              
+              <button className="w-full mt-4 bg-blue-50 text-blue-600 py-2 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium">
+                View Full Guide
+              </button>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
+              <div className="space-y-2">
+                <button className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3">
+                  <Camera className="w-5 h-5 text-gray-600" />
+                  <span className="text-sm">Add Memory</span>
+                </button>
+                <button className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3">
+                  <DollarSign className="w-5 h-5 text-gray-600" />
+                  <span className="text-sm">Log Expense</span>
+                </button>
+                <button className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3">
+                  <Star className="w-5 h-5 text-gray-600" />
+                  <span className="text-sm">Rate Activity</span>
+                </button>
+                <button className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3">
+                  <MessageCircle className="w-5 h-5 text-gray-600" />
+                  <span className="text-sm">Ask AI Assistant</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Weather Forecast Strip */}
+        <div className="mt-6 bg-white rounded-xl shadow-lg p-6">
+          <h3 className="text-lg font-semibold mb-4">Today's Forecast</h3>
+          <div className="grid grid-cols-4 gap-4">
+            {weather.forecast.map((item, index) => (
+              <div 
+                key={index}
+                className={`text-center p-4 rounded-lg ${item.alert ? 'bg-yellow-50 border-2 border-yellow-400' : 'bg-gray-50'}`}
+              >
+                <p className="text-sm text-gray-600 mb-2">{item.time}</p>
+                <div className="text-3xl mb-2">
+                  {item.condition === 'sunny' ? '☀️' : 
+                   item.condition === 'rain' ? '🌧️' : 
+                   item.condition === 'cloudy' ? '☁️' : '🌙'}
+                </div>
+                <p className="text-lg font-semibold">{item.temp}°C</p>
+                {item.alert && (
+                  <p className="text-xs text-yellow-700 mt-2 font-medium">⚠️ Rain Alert</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Tool Modal */}
+      <QuickToolModal />
+
+      {/* Schedule Edit Modal */}
+      {showScheduleEdit && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-semibold">Modify Today's Schedule</h3>
+                <button
+                  onClick={() => setShowScheduleEdit(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="space-y-4 mb-6">
+                {todaySchedule.map((item, index) => (
+                  <div key={item.id} className="border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <input
+                        type="text"
+                        defaultValue={item.title}
+                        className="flex-1 font-medium border-b border-gray-300 focus:border-blue-500 outline-none"
+                      />
+                      <button className="text-red-500 hover:text-red-700 ml-4">
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      <input
+                        type="time"
+                        defaultValue={item.time}
+                        className="text-sm border border-gray-300 rounded px-2 py-1"
+                      />
+                      <input
+                        type="text"
+                        defaultValue={item.duration}
+                        placeholder="Duration"
+                        className="text-sm border border-gray-300 rounded px-2 py-1"
+                      />
+                      <input
+                        type="text"
+                        defaultValue={item.location}
+                        placeholder="Location"
+                        className="text-sm border border-gray-300 rounded px-2 py-1 col-span-2"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <button className="w-full border-2 border-dashed border-gray-300 rounded-lg py-3 text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors flex items-center justify-center space-x-2 mb-4">
+                <Plus className="w-5 h-5" />
+                <span>Add New Activity</span>
+              </button>
+
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setShowScheduleEdit(false)}
+                  className="flex-1 border border-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => setShowScheduleEdit(false)}
+                  className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating AI Assistant Button */}
+      <button className="fixed bottom-6 right-6 bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 z-40 group">
+        <MessageCircle className="w-6 h-6 group-hover:scale-110 transition-transform" />
+        <div className="absolute -top-2 -right-2 w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+      </button>
+    </div>
+  );
 };
+
+// Import MessageCircle icon
+import { MessageCircle } from 'lucide-react';
+
+export default EnhancedCompanionMode
 // ===================================
 // MEMORY MODE COMPONENT - FIXED
 // ===================================

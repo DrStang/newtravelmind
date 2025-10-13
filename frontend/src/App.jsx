@@ -3702,160 +3702,85 @@ const handleTripDeactivate = async (tripId) => {
 // ===================================
 // COMPANION MODE COMPONENT
 // ===================================
-const CompanionMode = ({user, token, location, weather, nearbyPlaces, currentTrip, sendChatMessage}) => {
-    const [selectedPlaceType, setSelectedPlaceType] = useState('restaurant');
-    const [searchRadius, setSearchRadius] = useState(1000);
-    const [loading, setLoading] = useState(false);
-    const [places, setPlaces] = useState(nearbyPlaces || []);
+import { useState, useEffect } from 'react';
+import {
+  MapPin, Cloud, Calendar, Camera, Navigation, Phone, AlertTriangle,
+  Globe, Clock, Bell, ChevronRight, Star, DollarSign, Utensils,
+  Hotel, Plane, CheckCircle, Search, ScanLine, Languages, Map,
+  Shield, Info, X, Menu, RefreshCw, Edit, Plus, Zap, MessageCircle,
+  Sun, CloudRain, Droplets, Wind, TrendingUp
+} from 'lucide-react';
 
-    const placeTypes = [
-        {value: 'restaurant', label: 'Restaurants', icon: '🍽️'},
-        {value: 'tourist_attraction', label: 'Attractions', icon: '🏛️'},
-        {value: 'lodging', label: 'Hotels', icon: '🏨'},
-        {value: 'shopping_mall', label: 'Shopping', icon: '🛍️'},
-        {value: 'hospital', label: 'Healthcare', icon: '🏥'},
-        {value: 'gas_station', label: 'Gas Stations', icon: '⛽'}
-    ];
+const EnhancedCompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTrip, sendChatMessage }) => {
+  const API_BASE_URL = 'http://localhost:3001/api';
 
-// Mock data - replace with actual API calls
-const mockCurrentTrip = {
-  id: 1,
-  title: "Tokyo Adventure",
-  destination: "Tokyo, Japan",
-  status: "active",
-  startDate: "2025-10-15",
-  endDate: "2025-10-22",
-  currentDay: 2
-};
-
-const mockTodaySchedule = [
-  {
+  // Mock current trip data
+  const mockCurrentTrip = currentTrip || {
     id: 1,
-    time: "09:00 AM",
-    title: "Visit Senso-ji Temple",
-    type: "activity",
-    location: "Asakusa, Tokyo",
-    status: "upcoming",
-    duration: "2 hours",
-    cost: "$15",
-    bookingConfirmation: "TMG-123456"
-  },
-  {
-    id: 2,
-    time: "12:00 PM",
-    title: "Lunch at Ichiran Ramen",
-    type: "dining",
-    location: "Shibuya",
-    status: "upcoming",
-    duration: "1 hour",
-    cost: "$20"
-  },
-  {
-    id: 3,
-    time: "02:00 PM",
-    title: "Shopping in Harajuku",
-    type: "activity",
-    location: "Harajuku District",
-    status: "upcoming",
-    duration: "3 hours"
-  },
-  {
-    id: 4,
-    time: "07:00 PM",
-    title: "Hotel Check-in",
-    type: "accommodation",
-    location: "Shinjuku Prince Hotel",
-    status: "upcoming",
-    bookingConfirmation: "BK-789012",
-    cost: "$180"
-  }
-];
+    title: "Current Adventure",
+    destination: location ? "Current Location" : "Unknown",
+    status: "active",
+    startDate: new Date().toISOString(),
+    endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    currentDay: 2,
+    duration: 7
+  };
 
-const mockNearbyPlaces = [
-  {
-    id: 1,
-    name: "Tokyo Tower",
-    category: "tourist_attraction",
-    distance: "0.5 km",
-    rating: 4.6,
-    reviews: 12453,
-    openNow: true,
-    priceLevel: 2,
-    image: "https://picsum.photos/seed/tower/400/300"
-  },
-  {
-    id: 2,
-    name: "Tsukiji Outer Market",
-    category: "restaurant",
-    distance: "1.2 km",
-    rating: 4.5,
-    reviews: 8901,
-    openNow: true,
-    priceLevel: 2,
-    image: "https://picsum.photos/seed/market/400/300"
-  },
-  {
-    id: 3,
-    name: "Imperial Palace",
-    category: "tourist_attraction",
-    distance: "2.1 km",
-    rating: 4.7,
-    reviews: 15234,
-    openNow: true,
-    priceLevel: 1,
-    image: "https://picsum.photos/seed/palace/400/300"
-  }
-];
-
-const mockUpcomingBookings = [
-  {
-    id: 1,
-    type: "flight",
-    title: "Return Flight to NYC",
-    time: "Tomorrow, 6:30 PM",
-    confirmation: "JAL456",
-    status: "confirmed",
-    alert: "Check-in opens in 18 hours"
-  },
-  {
-    id: 2,
-    type: "hotel",
-    title: "Hotel Checkout",
-    time: "Oct 22, 11:00 AM",
-    confirmation: "BK-789012",
-    status: "confirmed"
-  }
-];
-
-const EnhancedCompanionMode = () => {
-  const [currentLocation, setCurrentLocation] = useState({
-    lat: 35.6762,
-    lng: 139.6503,
-    name: "Shibuya, Tokyo"
-  });
-  
-  const [weather, setWeather] = useState({
-    temp: 24,
-    condition: "Partly Cloudy",
-    humidity: 65,
-    windSpeed: 12,
-    forecast: [
-      { time: "12 PM", temp: 25, condition: "sunny" },
-      { time: "3 PM", temp: 24, condition: "rain", alert: true },
-      { time: "6 PM", temp: 22, condition: "cloudy" },
-      { time: "9 PM", temp: 20, condition: "clear" }
-    ]
-  });
-
+  // State Management
   const [selectedPlaceType, setSelectedPlaceType] = useState('all');
-  const [todaySchedule, setTodaySchedule] = useState(mockTodaySchedule);
-  const [nearbyPlaces, setNearbyPlaces] = useState(mockNearbyPlaces);
+  const [searchRadius, setSearchRadius] = useState(1000);
+  const [loading, setLoading] = useState(false);
+  const [places, setPlaces] = useState(nearbyPlaces || []);
   const [showQuickToolModal, setShowQuickToolModal] = useState(null);
   const [showScheduleEdit, setShowScheduleEdit] = useState(false);
+  const [todaySchedule, setTodaySchedule] = useState([
+    {
+      id: 1,
+      time: "09:00 AM",
+      title: "Visit Local Attraction",
+      type: "activity",
+      location: "City Center",
+      status: "current",
+      duration: "2 hours",
+      cost: "$15",
+      bookingConfirmation: null
+    },
+    {
+      id: 2,
+      time: "12:00 PM",
+      title: "Lunch at Local Restaurant",
+      type: "dining",
+      location: "Downtown",
+      status: "upcoming",
+      duration: "1 hour",
+      cost: "$20"
+    },
+    {
+      id: 3,
+      time: "02:00 PM",
+      title: "Shopping & Exploration",
+      type: "activity",
+      location: "Shopping District",
+      status: "upcoming",
+      duration: "3 hours"
+    }
+  ]);
+
+  const [upcomingBookings] = useState([
+    {
+      id: 1,
+      type: "flight",
+      title: "Return Flight",
+      time: "In 5 days, 6:30 PM",
+      confirmation: "ABC123",
+      status: "confirmed",
+      alert: "Check-in opens in 4 days"
+    }
+  ]);
+
   const [notifications, setNotifications] = useState([
-    { id: 1, type: "weather", message: "Rain expected at 3 PM. Suggest indoor alternatives?", priority: "high" },
-    { id: 2, type: "booking", message: "Flight check-in opens in 18 hours", priority: "medium" },
-    { id: 3, type: "reminder", message: "Hotel checkout tomorrow at 11 AM", priority: "low" }
+    { id: 1, type: "weather", message: "Weather looking good today!", priority: "medium" },
+    { id: 2, type: "reminder", message: "Don't forget to stay hydrated", priority: "low" }
   ]);
 
   const placeCategories = [
@@ -3867,6 +3792,79 @@ const EnhancedCompanionMode = () => {
     { value: 'museum', label: 'Museums', icon: '🎨' },
     { value: 'park', label: 'Parks', icon: '🌳' }
   ];
+
+  // Mock weather forecast
+  const weatherForecast = [
+    { time: "12 PM", temp: weather?.temperature + 2 || 25, condition: "sunny", alert: false },
+    { time: "3 PM", temp: weather?.temperature + 3 || 26, condition: "cloudy", alert: false },
+    { time: "6 PM", temp: weather?.temperature || 24, condition: "clear", alert: false },
+    { time: "9 PM", temp: weather?.temperature - 2 || 22, condition: "clear", alert: false }
+  ];
+
+  // Search nearby places
+  const searchNearbyPlaces = async (type = selectedPlaceType) => {
+    if (!location) return;
+
+    setLoading(true);
+    try {
+      const searchType = type === 'all' ? 'tourist_attraction' : type;
+      const response = await fetch(
+        `${API_BASE_URL}/places/nearby?lat=${location.lat}&lng=${location.lng}&type=${searchType}&radius=${searchRadius}`
+      );
+      const data = await response.json();
+
+      if (data.success) {
+        setPlaces(data.data);
+      }
+    } catch (error) {
+      console.error('Places search error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    setPlaces(nearbyPlaces || []);
+  }, [nearbyPlaces]);
+
+  useEffect(() => {
+    if (location && selectedPlaceType) {
+      searchNearbyPlaces();
+    }
+  }, [selectedPlaceType, searchRadius]);
+
+  // Helper functions
+  const getWeatherIcon = (condition) => {
+    switch (condition?.toLowerCase()) {
+      case 'sunny':
+      case 'clear':
+        return '☀️';
+      case 'rain':
+      case 'rainy':
+        return '🌧️';
+      case 'cloudy':
+        return '☁️';
+      default:
+        return '🌙';
+    }
+  };
+
+  const getActivityIcon = (type) => {
+    switch (type) {
+      case 'dining': return <Utensils className="w-4 h-4" />;
+      case 'accommodation': return <Hotel className="w-4 h-4" />;
+      case 'transport': return <Plane className="w-4 h-4" />;
+      default: return <Calendar className="w-4 h-4" />;
+    }
+  };
+
+  const getBookingIcon = (type) => {
+    switch (type) {
+      case 'flight': return <Plane className="w-5 h-5" />;
+      case 'hotel': return <Hotel className="w-5 h-5" />;
+      default: return <Calendar className="w-5 h-5" />;
+    }
+  };
 
   // Current Activity Component
   const CurrentActivity = () => {
@@ -3882,7 +3880,7 @@ const EnhancedCompanionMode = () => {
               <span className="text-sm font-medium opacity-90">Current Activity</span>
             </div>
             <h3 className="text-2xl font-bold mb-1">{currentActivity.title}</h3>
-            <div className="flex items-center space-x-4 text-sm opacity-90">
+            <div className="flex items-center space-x-4 text-sm opacity-90 flex-wrap gap-2">
               <span className="flex items-center space-x-1">
                 <MapPin className="w-4 h-4" />
                 <span>{currentActivity.location}</span>
@@ -3891,7 +3889,10 @@ const EnhancedCompanionMode = () => {
               {currentActivity.duration && <span>• {currentActivity.duration}</span>}
             </div>
           </div>
-          <button className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors">
+          <button 
+            onClick={() => sendChatMessage(`Get directions to ${currentActivity.location}`)}
+            className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors"
+          >
             <Navigation className="w-5 h-5" />
           </button>
         </div>
@@ -3916,8 +3917,8 @@ const EnhancedCompanionMode = () => {
 
   // Weather Alert Component
   const WeatherAlert = () => {
-    const rainAlert = weather.forecast.find(f => f.alert);
-    if (!rainAlert) return null;
+    const hasAlert = weatherForecast.some(f => f.alert);
+    if (!hasAlert) return null;
 
     return (
       <div className="bg-yellow-50 border-l-4 border-yellow-400 rounded-lg p-4 mb-6">
@@ -3926,13 +3927,19 @@ const EnhancedCompanionMode = () => {
           <div className="flex-1">
             <h4 className="font-semibold text-yellow-900 mb-1">Weather Alert</h4>
             <p className="text-yellow-800 text-sm mb-2">
-              Rain expected at {rainAlert.time}. Would you like indoor activity suggestions?
+              Weather changes expected. Consider indoor alternatives?
             </p>
             <div className="flex space-x-2">
-              <button className="text-xs bg-yellow-600 text-white px-3 py-1 rounded hover:bg-yellow-700">
+              <button 
+                onClick={() => sendChatMessage("Show me indoor activities near me")}
+                className="text-xs bg-yellow-600 text-white px-3 py-1 rounded hover:bg-yellow-700"
+              >
                 Show Alternatives
               </button>
-              <button className="text-xs bg-white text-yellow-600 border border-yellow-200 px-3 py-1 rounded hover:bg-yellow-50">
+              <button 
+                onClick={() => setNotifications(notifications.filter(n => n.type !== 'weather'))}
+                className="text-xs bg-white text-yellow-600 border border-yellow-200 px-3 py-1 rounded hover:bg-yellow-50"
+              >
                 Dismiss
               </button>
             </div>
@@ -3942,96 +3949,94 @@ const EnhancedCompanionMode = () => {
     );
   };
 
-  // Today's Schedule Component
-  const TodaySchedulePanel = () => {
-    const getActivityIcon = (type) => {
-      switch (type) {
-        case 'dining': return <Utensils className="w-4 h-4" />;
-        case 'accommodation': return <Hotel className="w-4 h-4" />;
-        case 'transport': return <Plane className="w-4 h-4" />;
-        default: return <Calendar className="w-4 h-4" />;
-      }
-    };
-
-    return (
-      <div className="bg-white rounded-xl shadow-lg p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold flex items-center space-x-2">
-            <Calendar className="w-5 h-5 text-blue-600" />
-            <span>Today's Schedule</span>
-          </h3>
-          <div className="flex space-x-2">
-            <button 
-              onClick={() => setShowScheduleEdit(true)}
-              className="text-blue-600 hover:text-blue-700 text-sm flex items-center space-x-1"
-            >
-              <Edit className="w-4 h-4" />
-              <span>Modify</span>
-            </button>
-            <button className="text-gray-400 hover:text-gray-600">
-              <RefreshCw className="w-4 h-4" />
-            </button>
-          </div>
+  // Today's Schedule Panel
+  const TodaySchedulePanel = () => (
+    <div className="bg-white rounded-xl shadow-lg p-6">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold flex items-center space-x-2">
+          <Calendar className="w-5 h-5 text-blue-600" />
+          <span>Today's Schedule</span>
+        </h3>
+        <div className="flex space-x-2">
+          <button 
+            onClick={() => setShowScheduleEdit(true)}
+            className="text-blue-600 hover:text-blue-700 text-sm flex items-center space-x-1"
+          >
+            <Edit className="w-4 h-4" />
+            <span>Modify</span>
+          </button>
+          <button 
+            onClick={() => searchNearbyPlaces()}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
         </div>
+      </div>
 
-        <div className="space-y-3">
-          {todaySchedule.map((item, index) => (
-            <div 
-              key={item.id}
-              className={`border rounded-lg p-3 transition-all ${
-                item.status === 'current' 
-                  ? 'border-blue-500 bg-blue-50' 
-                  : item.status === 'completed'
-                  ? 'border-gray-200 bg-gray-50 opacity-60'
-                  : 'border-gray-200 hover:border-blue-300'
-              }`}
-            >
-              <div className="flex items-start space-x-3">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                  item.status === 'current' ? 'bg-blue-600 text-white' :
-                  item.status === 'completed' ? 'bg-green-600 text-white' :
-                  'bg-gray-200 text-gray-600'
-                }`}>
-                  {item.status === 'completed' ? <CheckCircle className="w-4 h-4" /> : getActivityIcon(item.type)}
-                </div>
-                
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-900">{item.title}</p>
-                      <div className="flex items-center space-x-2 mt-1 text-sm text-gray-600">
-                        <span>{item.time}</span>
-                        {item.duration && <span>• {item.duration}</span>}
-                        {item.cost && <span>• {item.cost}</span>}
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1 flex items-center space-x-1">
-                        <MapPin className="w-3 h-3" />
-                        <span>{item.location}</span>
-                      </p>
-                      {item.bookingConfirmation && (
-                        <p className="text-xs text-blue-600 mt-1">
-                          Booking: {item.bookingConfirmation}
-                        </p>
-                      )}
+      <div className="space-y-3">
+        {todaySchedule.map((item) => (
+          <div 
+            key={item.id}
+            className={`border rounded-lg p-3 transition-all ${
+              item.status === 'current' 
+                ? 'border-blue-500 bg-blue-50' 
+                : item.status === 'completed'
+                ? 'border-gray-200 bg-gray-50 opacity-60'
+                : 'border-gray-200 hover:border-blue-300'
+            }`}
+          >
+            <div className="flex items-start space-x-3">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                item.status === 'current' ? 'bg-blue-600 text-white' :
+                item.status === 'completed' ? 'bg-green-600 text-white' :
+                'bg-gray-200 text-gray-600'
+              }`}>
+                {item.status === 'completed' ? <CheckCircle className="w-4 h-4" /> : getActivityIcon(item.type)}
+              </div>
+              
+              <div className="flex-1 min-w-0">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900">{item.title}</p>
+                    <div className="flex items-center space-x-2 mt-1 text-sm text-gray-600">
+                      <span>{item.time}</span>
+                      {item.duration && <span>• {item.duration}</span>}
+                      {item.cost && <span>• {item.cost}</span>}
                     </div>
+                    <p className="text-xs text-gray-500 mt-1 flex items-center space-x-1">
+                      <MapPin className="w-3 h-3" />
+                      <span>{item.location}</span>
+                    </p>
+                    {item.bookingConfirmation && (
+                      <p className="text-xs text-blue-600 mt-1">
+                        Booking: {item.bookingConfirmation}
+                      </p>
+                    )}
                   </div>
                 </div>
-
-                <button className="text-gray-400 hover:text-gray-600">
-                  <ChevronRight className="w-5 h-5" />
-                </button>
               </div>
-            </div>
-          ))}
-        </div>
 
-        <button className="w-full mt-4 border-2 border-dashed border-gray-300 rounded-lg py-3 text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors flex items-center justify-center space-x-2">
-          <Plus className="w-4 h-4" />
-          <span>Add Activity</span>
-        </button>
+              <button 
+                onClick={() => sendChatMessage(`Tell me more about ${item.title}`)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        ))}
       </div>
-    );
-  };
+
+      <button 
+        onClick={() => sendChatMessage("Help me add a new activity to my schedule")}
+        className="w-full mt-4 border-2 border-dashed border-gray-300 rounded-lg py-3 text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors flex items-center justify-center space-x-2"
+      >
+        <Plus className="w-4 h-4" />
+        <span>Add Activity</span>
+      </button>
+    </div>
+  );
 
   // Quick Tools Component
   const QuickTools = () => {
@@ -4041,28 +4046,32 @@ const EnhancedCompanionMode = () => {
         icon: <ScanLine className="w-6 h-6" />,
         title: 'Photo ID',
         description: 'Identify landmarks',
-        color: 'from-purple-500 to-purple-600'
+        color: 'from-purple-500 to-purple-600',
+        action: () => setShowQuickToolModal('landmark')
       },
       {
         id: 'translate',
         icon: <Languages className="w-6 h-6" />,
         title: 'Live Translate',
         description: 'Real-time translation',
-        color: 'from-blue-500 to-blue-600'
+        color: 'from-blue-500 to-blue-600',
+        action: () => setShowQuickToolModal('translate')
       },
       {
         id: 'navigation',
         icon: <Map className="w-6 h-6" />,
         title: 'Navigation',
         description: 'Get directions',
-        color: 'from-green-500 to-green-600'
+        color: 'from-green-500 to-green-600',
+        action: () => setShowQuickToolModal('navigation')
       },
       {
         id: 'emergency',
         icon: <Shield className="w-6 h-6" />,
         title: 'Emergency',
         description: 'Local contacts',
-        color: 'from-red-500 to-red-600'
+        color: 'from-red-500 to-red-600',
+        action: () => setShowQuickToolModal('emergency')
       }
     ];
 
@@ -4077,7 +4086,7 @@ const EnhancedCompanionMode = () => {
           {tools.map(tool => (
             <button
               key={tool.id}
-              onClick={() => setShowQuickToolModal(tool.id)}
+              onClick={tool.action}
               className={`bg-gradient-to-r ${tool.color} text-white rounded-lg p-4 hover:shadow-lg transition-all group`}
             >
               <div className="flex flex-col items-center text-center space-y-2">
@@ -4097,65 +4106,82 @@ const EnhancedCompanionMode = () => {
   };
 
   // Find Nearby Component
-  const FindNearby = () => {
-    return (
-      <div className="bg-white rounded-xl shadow-lg p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold flex items-center space-x-2">
-            <MapPin className="w-5 h-5 text-blue-600" />
-            <span>Find Nearby</span>
-          </h3>
-          <select className="text-sm border border-gray-300 rounded-lg px-2 py-1">
-            <option>500m</option>
-            <option>1km</option>
-            <option>2km</option>
-            <option>5km</option>
-          </select>
-        </div>
+  const FindNearby = () => (
+    <div className="bg-white rounded-xl shadow-lg p-6">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold flex items-center space-x-2">
+          <MapPin className="w-5 h-5 text-blue-600" />
+          <span>Find Nearby</span>
+        </h3>
+        <select 
+          value={searchRadius}
+          onChange={(e) => setSearchRadius(parseInt(e.target.value))}
+          className="text-sm border border-gray-300 rounded-lg px-2 py-1"
+        >
+          <option value={500}>500m</option>
+          <option value={1000}>1km</option>
+          <option value={2000}>2km</option>
+          <option value={5000}>5km</option>
+        </select>
+      </div>
 
-        {/* Category Pills */}
-        <div className="flex overflow-x-auto space-x-2 mb-4 pb-2">
-          {placeCategories.map(cat => (
-            <button
-              key={cat.value}
-              onClick={() => setSelectedPlaceType(cat.value)}
-              className={`flex-shrink-0 px-3 py-2 rounded-full text-sm transition-colors ${
-                selectedPlaceType === cat.value
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              <span className="mr-1">{cat.icon}</span>
-              {cat.label}
-            </button>
-          ))}
-        </div>
+      {/* Category Pills */}
+      <div className="flex overflow-x-auto space-x-2 mb-4 pb-2 scrollbar-hide">
+        {placeCategories.map(cat => (
+          <button
+            key={cat.value}
+            onClick={() => setSelectedPlaceType(cat.value)}
+            className={`flex-shrink-0 px-3 py-2 rounded-full text-sm transition-colors ${
+              selectedPlaceType === cat.value
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            <span className="mr-1">{cat.icon}</span>
+            {cat.label}
+          </button>
+        ))}
+      </div>
 
-        {/* Places List */}
-        <div className="space-y-3 max-h-96 overflow-y-auto">
-          {nearbyPlaces.map(place => (
-            <div key={place.id} className="border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow">
+      {/* Places List */}
+      <div className="space-y-3 max-h-96 overflow-y-auto">
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <span className="ml-3 text-gray-600">Finding places...</span>
+          </div>
+        ) : places.length > 0 ? (
+          places.map((place, idx) => (
+            <div key={place.id || idx} className="border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow">
               <div className="flex space-x-3">
-                <img 
-                  src={place.image} 
-                  alt={place.name}
-                  className="w-20 h-20 rounded-lg object-cover"
-                />
+                {place.photos && place.photos.length > 0 && (
+                  <img 
+                    src={place.photos[0]}
+                    alt={place.name}
+                    className="w-20 h-20 rounded-lg object-cover"
+                  />
+                )}
                 <div className="flex-1 min-w-0">
                   <h4 className="font-semibold text-gray-900 truncate">{place.name}</h4>
                   <div className="flex items-center space-x-2 mt-1">
-                    <div className="flex items-center space-x-1">
-                      <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                      <span className="text-sm text-gray-700">{place.rating}</span>
-                      <span className="text-xs text-gray-500">({place.reviews})</span>
-                    </div>
+                    {place.rating && (
+                      <div className="flex items-center space-x-1">
+                        <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                        <span className="text-sm text-gray-700">{place.rating}</span>
+                        {place.userRatingsTotal && (
+                          <span className="text-xs text-gray-500">({place.userRatingsTotal})</span>
+                        )}
+                      </div>
+                    )}
                     <span className="text-xs text-gray-400">•</span>
-                    <span className="text-sm text-gray-600">{place.distance}</span>
+                    <span className="text-sm text-gray-600">{place.address}</span>
                   </div>
                   <div className="flex items-center justify-between mt-2">
-                    <span className="text-xs text-gray-500">
-                      {'$'.repeat(place.priceLevel)}
-                    </span>
+                    {place.priceLevel && (
+                      <span className="text-xs text-gray-500">
+                        {'$'.repeat(place.priceLevel)}
+                      </span>
+                    )}
                     {place.openNow && (
                       <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
                         Open Now
@@ -4163,94 +4189,215 @@ const EnhancedCompanionMode = () => {
                     )}
                   </div>
                 </div>
-                <button className="text-blue-600 hover:text-blue-700">
+                <button 
+                  onClick={() => sendChatMessage(`Get directions to ${place.name}`)}
+                  className="text-blue-600 hover:text-blue-700"
+                >
                   <Navigation className="w-5 h-5" />
                 </button>
               </div>
             </div>
-          ))}
-        </div>
+          ))
+        ) : (
+          <div className="text-center py-8">
+            <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+            <p className="text-gray-500 text-sm">No places found nearby</p>
+          </div>
+        )}
       </div>
-    );
-  };
+    </div>
+  );
 
   // Upcoming Bookings Component
-  const UpcomingBookings = () => {
-    const getBookingIcon = (type) => {
-      switch (type) {
-        case 'flight': return <Plane className="w-5 h-5" />;
-        case 'hotel': return <Hotel className="w-5 h-5" />;
-        default: return <Calendar className="w-5 h-5" />;
-      }
-    };
+  const UpcomingBookings = () => (
+    <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+      <h3 className="text-lg font-semibold mb-4 flex items-center space-x-2">
+        <Bell className="w-5 h-5 text-orange-500" />
+        <span>Upcoming Bookings</span>
+      </h3>
 
-    return (
-      <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-        <h3 className="text-lg font-semibold mb-4 flex items-center space-x-2">
-          <Bell className="w-5 h-5 text-orange-500" />
-          <span>Upcoming Bookings</span>
-        </h3>
-
-        <div className="space-y-3">
-          {mockUpcomingBookings.map(booking => (
-            <div key={booking.id} className="border border-gray-200 rounded-lg p-3">
-              <div className="flex items-start space-x-3">
-                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600">
-                  {getBookingIcon(booking.type)}
-                </div>
-                <div className="flex-1">
-                  <h4 className="font-medium text-gray-900">{booking.title}</h4>
-                  <p className="text-sm text-gray-600">{booking.time}</p>
-                  <p className="text-xs text-gray-500 mt-1">Confirmation: {booking.confirmation}</p>
-                  {booking.alert && (
-                    <p className="text-xs text-orange-600 mt-2 flex items-center space-x-1">
-                      <Info className="w-3 h-3" />
-                      <span>{booking.alert}</span>
-                    </p>
-                  )}
-                </div>
-                <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
-                  {booking.status}
-                </span>
+      <div className="space-y-3">
+        {upcomingBookings.map(booking => (
+          <div key={booking.id} className="border border-gray-200 rounded-lg p-3">
+            <div className="flex items-start space-x-3">
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600">
+                {getBookingIcon(booking.type)}
               </div>
+              <div className="flex-1">
+                <h4 className="font-medium text-gray-900">{booking.title}</h4>
+                <p className="text-sm text-gray-600">{booking.time}</p>
+                <p className="text-xs text-gray-500 mt-1">Confirmation: {booking.confirmation}</p>
+                {booking.alert && (
+                  <p className="text-xs text-orange-600 mt-2 flex items-center space-x-1">
+                    <Info className="w-3 h-3" />
+                    <span>{booking.alert}</span>
+                  </p>
+                )}
+              </div>
+              <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
+                {booking.status}
+              </span>
             </div>
-          ))}
-        </div>
+          </div>
+        ))}
       </div>
-    );
-  };
+    </div>
+  );
 
   // Smart Insights Component
-  const SmartInsights = () => {
-    return (
-      <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl p-6 mb-6">
-        <h3 className="text-lg font-semibold mb-4 flex items-center space-x-2">
-          <Zap className="w-5 h-5 text-purple-600" />
-          <span>Smart Insights</span>
-        </h3>
+  const SmartInsights = () => (
+    <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl p-6 mb-6">
+      <h3 className="text-lg font-semibold mb-4 flex items-center space-x-2">
+        <Zap className="w-5 h-5 text-purple-600" />
+        <span>Smart Insights</span>
+      </h3>
 
-        <div className="space-y-3">
+      <div className="space-y-3">
+        <div className="bg-white rounded-lg p-3">
+          <p className="text-sm text-gray-700 mb-2">
+            💡 <strong>Local Tip:</strong> Popular attractions are less crowded before 9 AM.
+          </p>
+        </div>
+        <div className="bg-white rounded-lg p-3">
+          <p className="text-sm text-gray-700 mb-2">
+            🍜 <strong>Food Recommendation:</strong> Try local specialties at nearby restaurants!
+          </p>
+        </div>
+        {currentTrip && (
           <div className="bg-white rounded-lg p-3">
             <p className="text-sm text-gray-700 mb-2">
-              💡 <strong>Local Tip:</strong> Senso-ji Temple is less crowded before 9 AM. Consider arriving early.
+              ⚡ <strong>Budget Alert:</strong> You're on track with your trip budget.
             </p>
           </div>
-          <div className="bg-white rounded-lg p-3">
-            <p className="text-sm text-gray-700 mb-2">
-              🍜 <strong>Food Recommendation:</strong> Try the seasonal ramen special at Ichiran - only available this month!
-            </p>
+        )}
+      </div>
+    </div>
+  );
+
+  // Trip Progress Component
+  const TripProgress = () => (
+    <div className="bg-white rounded-xl shadow-lg p-6">
+      <h3 className="text-lg font-semibold mb-4">Trip Progress</h3>
+      <div className="space-y-4">
+        <div>
+          <div className="flex justify-between text-sm mb-2">
+            <span className="text-gray-600">Days Completed</span>
+            <span className="font-medium">{mockCurrentTrip.currentDay} of {mockCurrentTrip.duration}</span>
           </div>
-          <div className="bg-white rounded-lg p-3">
-            <p className="text-sm text-gray-700 mb-2">
-              ⚡ <strong>Budget Alert:</strong> You're 15% under budget. Consider upgrading tonight's dinner reservation.
-            </p>
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div 
+              className="bg-blue-600 h-2 rounded-full" 
+              style={{width: `${(mockCurrentTrip.currentDay / mockCurrentTrip.duration) * 100}%`}}
+            ></div>
+          </div>
+        </div>
+
+        <div className="pt-3 border-t">
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-600">Activities Completed</span>
+            <span className="text-2xl font-bold text-blue-600">
+              {todaySchedule.filter(s => s.status === 'completed').length}
+            </span>
           </div>
         </div>
       </div>
-    );
-  };
+    </div>
+  );
 
-  // Quick Tool Modal
+  // Local Information Component
+  const LocalInformation = () => (
+    <div className="bg-white rounded-xl shadow-lg p-6">
+      <h3 className="text-lg font-semibold mb-4">Local Information</h3>
+      <div className="space-y-3 text-sm">
+        <div className="flex justify-between">
+          <span className="text-gray-600">Local Time</span>
+          <span className="font-medium">{new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-600">Currency</span>
+          <span className="font-medium">Local Currency</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-600">Language</span>
+          <span className="font-medium">Local Language</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-600">Emergency</span>
+          <span className="font-medium text-red-600">911</span>
+        </div>
+      </div>
+      
+      <button 
+        onClick={() => sendChatMessage("Tell me more about local information and customs")}
+        className="w-full mt-4 bg-blue-50 text-blue-600 py-2 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium"
+      >
+        View Full Guide
+      </button>
+    </div>
+  );
+
+  // Quick Actions Component
+  const QuickActions = () => (
+    <div className="bg-white rounded-xl shadow-lg p-6">
+      <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
+      <div className="space-y-2">
+        <button 
+          onClick={() => sendChatMessage("Help me create a new travel memory")}
+          className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3"
+        >
+          <Camera className="w-5 h-5 text-gray-600" />
+          <span className="text-sm">Add Memory</span>
+        </button>
+        <button 
+          onClick={() => sendChatMessage("Help me log a new expense")}
+          className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3"
+        >
+          <DollarSign className="w-5 h-5 text-gray-600" />
+          <span className="text-sm">Log Expense</span>
+        </button>
+        <button 
+          onClick={() => sendChatMessage("Help me rate my recent activity")}
+          className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3"
+        >
+          <Star className="w-5 h-5 text-gray-600" />
+          <span className="text-sm">Rate Activity</span>
+        </button>
+        <button 
+          onClick={() => sendChatMessage("I need help with something")}
+          className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3"
+        >
+          <MessageCircle className="w-5 h-5 text-gray-600" />
+          <span className="text-sm">Ask AI Assistant</span>
+        </button>
+      </div>
+    </div>
+  );
+
+  // Weather Forecast Strip
+  const WeatherForecast = () => (
+    <div className="bg-white rounded-xl shadow-lg p-6">
+      <h3 className="text-lg font-semibold mb-4">Today's Forecast</h3>
+      <div className="grid grid-cols-4 gap-4">
+        {weatherForecast.map((item, index) => (
+          <div 
+            key={index}
+            className={`text-center p-4 rounded-lg ${item.alert ? 'bg-yellow-50 border-2 border-yellow-400' : 'bg-gray-50'}`}
+          >
+            <p className="text-sm text-gray-600 mb-2">{item.time}</p>
+            <div className="text-3xl mb-2">
+              {getWeatherIcon(item.condition)}
+            </div>
+            <p className="text-lg font-semibold">{item.temp}°C</p>
+            {item.alert && (
+              <p className="text-xs text-yellow-700 mt-2 font-medium">⚠️ Alert</p>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  // Quick Tool Modals
   const QuickToolModal = () => {
     if (!showQuickToolModal) return null;
 
@@ -4261,10 +4408,16 @@ const EnhancedCompanionMode = () => {
           <div className="text-center">
             <Camera className="w-16 h-16 text-purple-600 mx-auto mb-4" />
             <p className="text-gray-600 mb-4">Take or upload a photo to identify landmarks and get detailed information</p>
-            <button className="w-full bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 mb-2">
+            <button 
+              onClick={() => sendChatMessage("Help me identify a landmark from a photo")}
+              className="w-full bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 mb-2"
+            >
               Take Photo
             </button>
-            <button className="w-full bg-gray-100 text-gray-700 py-3 rounded-lg hover:bg-gray-200">
+            <button 
+              onClick={() => sendChatMessage("I want to upload a photo to identify a landmark")}
+              className="w-full bg-gray-100 text-gray-700 py-3 rounded-lg hover:bg-gray-200"
+            >
               Upload Photo
             </button>
           </div>
@@ -4282,19 +4435,29 @@ const EnhancedCompanionMode = () => {
             <div className="flex space-x-2 mb-4">
               <select className="flex-1 border border-gray-300 rounded-lg px-3 py-2">
                 <option>English</option>
-                <option>Japanese</option>
-                <option>Chinese</option>
                 <option>Spanish</option>
+                <option>French</option>
+                <option>German</option>
+                <option>Chinese</option>
+                <option>Japanese</option>
               </select>
               <button className="px-4 py-2 bg-gray-200 rounded-lg">⇄</button>
               <select className="flex-1 border border-gray-300 rounded-lg px-3 py-2">
-                <option>Japanese</option>
-                <option>English</option>
-                <option>Chinese</option>
                 <option>Spanish</option>
+                <option>English</option>
+                <option>French</option>
+                <option>German</option>
+                <option>Chinese</option>
+                <option>Japanese</option>
               </select>
             </div>
-            <button className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700">
+            <button 
+              onClick={() => {
+                sendChatMessage("Help me translate text");
+                setShowQuickToolModal(null);
+              }}
+              className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700"
+            >
               Translate
             </button>
           </div>
@@ -4306,17 +4469,34 @@ const EnhancedCompanionMode = () => {
           <div>
             <div className="bg-blue-50 rounded-lg p-4 mb-4">
               <p className="text-sm text-gray-700 mb-2">Current Location:</p>
-              <p className="font-medium">{currentLocation.name}</p>
+              <p className="font-medium">
+                {location ? `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` : 'Unknown'}
+              </p>
             </div>
             <input 
               type="text" 
               placeholder="Where do you want to go?"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 mb-3"
             />
-            <button className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 mb-2">
+            <button 
+              onClick={() => {
+                sendChatMessage("Help me navigate to my destination");
+                setShowQuickToolModal(null);
+              }}
+              className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 mb-2"
+            >
               Get Directions
             </button>
-            <button className="w-full bg-gray-100 text-gray-700 py-3 rounded-lg hover:bg-gray-200">
+            <button 
+              onClick={() => {
+                const nextActivity = todaySchedule.find(s => s.status === 'upcoming');
+                if (nextActivity) {
+                  sendChatMessage(`Get directions to ${nextActivity.location}`);
+                }
+                setShowQuickToolModal(null);
+              }}
+              className="w-full bg-gray-100 text-gray-700 py-3 rounded-lg hover:bg-gray-200"
+            >
               Navigate to Next Activity
             </button>
           </div>
@@ -4331,11 +4511,15 @@ const EnhancedCompanionMode = () => {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between items-center">
                   <span>Police</span>
-                  <button className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700">Call 110</button>
+                  <button className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700">
+                    Call 911
+                  </button>
                 </div>
                 <div className="flex justify-between items-center">
                   <span>Ambulance/Fire</span>
-                  <button className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700">Call 119</button>
+                  <button className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700">
+                    Call 911
+                  </button>
                 </div>
               </div>
             </div>
@@ -4344,21 +4528,42 @@ const EnhancedCompanionMode = () => {
               <p className="font-semibold text-gray-900 mb-2">Local Contacts</p>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between items-center">
-                  <span>US Embassy Tokyo</span>
-                  <button className="text-blue-600 hover:text-blue-700">+81-3-3224-5000</button>
+                  <span>US Embassy</span>
+                  <button 
+                    onClick={() => sendChatMessage("Show me embassy contact information")}
+                    className="text-blue-600 hover:text-blue-700"
+                  >
+                    Contact
+                  </button>
                 </div>
                 <div className="flex justify-between items-center">
                   <span>Hotel Concierge</span>
-                  <button className="text-blue-600 hover:text-blue-700">+81-3-1234-5678</button>
+                  <button 
+                    onClick={() => sendChatMessage("Connect me with hotel concierge")}
+                    className="text-blue-600 hover:text-blue-700"
+                  >
+                    Contact
+                  </button>
                 </div>
                 <div className="flex justify-between items-center">
                   <span>Travel Insurance</span>
-                  <button className="text-blue-600 hover:text-blue-700">1-800-123-4567</button>
+                  <button 
+                    onClick={() => sendChatMessage("Show me my travel insurance details")}
+                    className="text-blue-600 hover:text-blue-700"
+                  >
+                    Contact
+                  </button>
                 </div>
               </div>
             </div>
 
-            <button className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">
+            <button 
+              onClick={() => {
+                sendChatMessage("Share my current location for emergency assistance");
+                setShowQuickToolModal(null);
+              }}
+              className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
+            >
               Share My Location
             </button>
           </div>
@@ -4367,6 +4572,7 @@ const EnhancedCompanionMode = () => {
     };
 
     const modal = modalContent[showQuickToolModal];
+    if (!modal) return null;
 
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -4388,6 +4594,95 @@ const EnhancedCompanionMode = () => {
     );
   };
 
+  // Schedule Edit Modal
+  const ScheduleEditModal = () => {
+    if (!showScheduleEdit) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-semibold">Modify Today's Schedule</h3>
+              <button
+                onClick={() => setShowScheduleEdit(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="space-y-4 mb-6">
+              {todaySchedule.map((item, index) => (
+                <div key={item.id} className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <input
+                      type="text"
+                      defaultValue={item.title}
+                      className="flex-1 font-medium border-b border-gray-300 focus:border-blue-500 outline-none"
+                    />
+                    <button 
+                      onClick={() => {
+                        const newSchedule = todaySchedule.filter((_, i) => i !== index);
+                        setTodaySchedule(newSchedule);
+                      }}
+                      className="text-red-500 hover:text-red-700 ml-4"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      type="time"
+                      defaultValue={item.time}
+                      className="text-sm border border-gray-300 rounded px-2 py-1"
+                    />
+                    <input
+                      type="text"
+                      defaultValue={item.duration}
+                      placeholder="Duration"
+                      className="text-sm border border-gray-300 rounded px-2 py-1"
+                    />
+                    <input
+                      type="text"
+                      defaultValue={item.location}
+                      placeholder="Location"
+                      className="text-sm border border-gray-300 rounded px-2 py-1 col-span-2"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <button 
+              onClick={() => sendChatMessage("Help me add a new activity to my schedule")}
+              className="w-full border-2 border-dashed border-gray-300 rounded-lg py-3 text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors flex items-center justify-center space-x-2 mb-4"
+            >
+              <Plus className="w-5 h-5" />
+              <span>Add New Activity</span>
+            </button>
+
+            <div className="flex space-x-3">
+              <button
+                onClick={() => setShowScheduleEdit(false)}
+                className="flex-1 border border-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => setShowScheduleEdit(false)}
+                className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header with Location and Weather */}
@@ -4397,16 +4692,20 @@ const EnhancedCompanionMode = () => {
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2 text-gray-700">
                 <MapPin className="w-5 h-5 text-blue-600" />
-                <span className="font-medium">{currentLocation.name}</span>
+                <span className="font-medium">
+                  {location ? `${location.lat.toFixed(2)}, ${location.lng.toFixed(2)}` : 'Location unavailable'}
+                </span>
               </div>
-              <div className="hidden md:flex items-center space-x-2 text-gray-700">
-                <Cloud className="w-5 h-5 text-blue-600" />
-                <span>{weather.temp}°C</span>
-                <span className="text-gray-500">•</span>
-                <span className="text-gray-600">{weather.condition}</span>
-              </div>
+              {weather && (
+                <div className="hidden md:flex items-center space-x-2 text-gray-700">
+                  <Cloud className="w-5 h-5 text-blue-600" />
+                  <span>{Math.round(weather.temperature)}°C</span>
+                  <span className="text-gray-500">•</span>
+                  <span className="text-gray-600 capitalize">{weather.description}</span>
+                </div>
+              )}
             </div>
-            
+
             <div className="flex items-center space-x-3">
               <div className="hidden md:block text-sm text-gray-600">
                 Day {mockCurrentTrip.currentDay} of {mockCurrentTrip.title}
@@ -4434,7 +4733,10 @@ const EnhancedCompanionMode = () => {
                     <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
                     <p className="text-sm text-yellow-800">{notif.message}</p>
                   </div>
-                  <button className="text-yellow-600 hover:text-yellow-800">
+                  <button 
+                    onClick={() => setNotifications(notifications.filter(n => n.id !== notif.id))}
+                    className="text-yellow-600 hover:text-yellow-800"
+                  >
                     <X className="w-4 h-4" />
                   </button>
                 </div>
@@ -4466,199 +4768,37 @@ const EnhancedCompanionMode = () => {
           {/* Right Column - Quick Tools and Info */}
           <div className="lg:col-span-1 space-y-6">
             <QuickTools />
-            
-            {/* Trip Progress */}
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <h3 className="text-lg font-semibold mb-4">Trip Progress</h3>
-              <div className="space-y-4">
-                <div>
-                  <div className="flex justify-between text-sm mb-2">
-                    <span className="text-gray-600">Days Completed</span>
-                    <span className="font-medium">2 of 7</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div className="bg-blue-600 h-2 rounded-full" style={{width: '28%'}}></div>
-                  </div>
-                </div>
-                
-                <div>
-                  <div className="flex justify-between text-sm mb-2">
-                    <span className="text-gray-600">Budget Used</span>
-                    <span className="font-medium">$850 of $2000</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div className="bg-green-600 h-2 rounded-full" style={{width: '42.5%'}}></div>
-                  </div>
-                </div>
-
-                <div className="pt-3 border-t">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Activities Completed</span>
-                    <span className="text-2xl font-bold text-blue-600">12</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Local Information */}
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <h3 className="text-lg font-semibold mb-4">Local Information</h3>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Local Time</span>
-                  <span className="font-medium">{new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Currency</span>
-                  <span className="font-medium">¥1 = $0.0067</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Language</span>
-                  <span className="font-medium">Japanese</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Emergency</span>
-                  <span className="font-medium text-red-600">110 (Police), 119 (Fire)</span>
-                </div>
-              </div>
-              
-              <button className="w-full mt-4 bg-blue-50 text-blue-600 py-2 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium">
-                View Full Guide
-              </button>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
-              <div className="space-y-2">
-                <button className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3">
-                  <Camera className="w-5 h-5 text-gray-600" />
-                  <span className="text-sm">Add Memory</span>
-                </button>
-                <button className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3">
-                  <DollarSign className="w-5 h-5 text-gray-600" />
-                  <span className="text-sm">Log Expense</span>
-                </button>
-                <button className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3">
-                  <Star className="w-5 h-5 text-gray-600" />
-                  <span className="text-sm">Rate Activity</span>
-                </button>
-                <button className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3">
-                  <MessageCircle className="w-5 h-5 text-gray-600" />
-                  <span className="text-sm">Ask AI Assistant</span>
-                </button>
-              </div>
-            </div>
+            <TripProgress />
+            <LocalInformation />
+            <QuickActions />
           </div>
         </div>
 
         {/* Weather Forecast Strip */}
-        <div className="mt-6 bg-white rounded-xl shadow-lg p-6">
-          <h3 className="text-lg font-semibold mb-4">Today's Forecast</h3>
-          <div className="grid grid-cols-4 gap-4">
-            {weather.forecast.map((item, index) => (
-              <div 
-                key={index}
-                className={`text-center p-4 rounded-lg ${item.alert ? 'bg-yellow-50 border-2 border-yellow-400' : 'bg-gray-50'}`}
-              >
-                <p className="text-sm text-gray-600 mb-2">{item.time}</p>
-                <div className="text-3xl mb-2">
-                  {item.condition === 'sunny' ? '☀️' : 
-                   item.condition === 'rain' ? '🌧️' : 
-                   item.condition === 'cloudy' ? '☁️' : '🌙'}
-                </div>
-                <p className="text-lg font-semibold">{item.temp}°C</p>
-                {item.alert && (
-                  <p className="text-xs text-yellow-700 mt-2 font-medium">⚠️ Rain Alert</p>
-                )}
-              </div>
-            ))}
-          </div>
+        <div className="mt-6">
+          <WeatherForecast />
         </div>
       </div>
 
-      {/* Quick Tool Modal */}
+      {/* Modals */}
       <QuickToolModal />
+      <ScheduleEditModal />
 
-      {/* Schedule Edit Modal */}
-      {showScheduleEdit && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-semibold">Modify Today's Schedule</h3>
-                <button
-                  onClick={() => setShowScheduleEdit(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-
-              <div className="space-y-4 mb-6">
-                {todaySchedule.map((item, index) => (
-                  <div key={item.id} className="border border-gray-200 rounded-lg p-4">
-                    <div className="flex items-start justify-between mb-3">
-                      <input
-                        type="text"
-                        defaultValue={item.title}
-                        className="flex-1 font-medium border-b border-gray-300 focus:border-blue-500 outline-none"
-                      />
-                      <button className="text-red-500 hover:text-red-700 ml-4">
-                        <X className="w-5 h-5" />
-                      </button>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-3">
-                      <input
-                        type="time"
-                        defaultValue={item.time}
-                        className="text-sm border border-gray-300 rounded px-2 py-1"
-                      />
-                      <input
-                        type="text"
-                        defaultValue={item.duration}
-                        placeholder="Duration"
-                        className="text-sm border border-gray-300 rounded px-2 py-1"
-                      />
-                      <input
-                        type="text"
-                        defaultValue={item.location}
-                        placeholder="Location"
-                        className="text-sm border border-gray-300 rounded px-2 py-1 col-span-2"
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <button className="w-full border-2 border-dashed border-gray-300 rounded-lg py-3 text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors flex items-center justify-center space-x-2 mb-4">
-                <Plus className="w-5 h-5" />
-                <span>Add New Activity</span>
-              </button>
-
-              <div className="flex space-x-3">
-                <button
-                  onClick={() => setShowScheduleEdit(false)}
-                  className="flex-1 border border-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => setShowScheduleEdit(false)}
-                  className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700"
-                >
-                  Save Changes
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-        )}
+      {/* Floating AI Assistant Button */}
+      <button 
+        onClick={() => sendChatMessage("Hi, I need help with something")}
+        className="fixed bottom-6 right-6 bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 z-40 group"
+        aria-label="Open AI Chat"
+      >
+        <MessageCircle className="w-6 h-6 group-hover:scale-110 transition-transform" />
+        <div className="absolute -top-2 -right-2 w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+      </button>
+    </div>
   );
 };
 
 export default EnhancedCompanionMode;
+
 // ===================================
 // MEMORY MODE COMPONENT - FIXED
 // ===================================

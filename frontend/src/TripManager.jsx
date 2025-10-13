@@ -5,7 +5,7 @@ import {
   Save, ChevronDown, ChevronUp, AlertCircle, MessageCircle
 } from 'lucide-react';
 
-const TripManager = ({ trip, onUpdate, onActivate, onDeactivate, token, sendChatMessage }) => {
+const TripManager = ({ trip, onUpdate, onActivate, onDeactivate, token, sendChatMessage, setChatOpen }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedItinerary, setEditedItinerary] = useState(trip?.itinerary || '');
   const [showBookingModal, setShowBookingModal] = useState(false);

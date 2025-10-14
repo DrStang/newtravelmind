@@ -107,7 +107,7 @@ app.use(cors({
 // Handle preflight requests explicitly
 app.options('*', (req, res) => {
     res.header('Access-Control-Allow-Origin', req.headers.origin);
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
     res.header('Access-Control-Allow-Credentials', 'true');
     res.sendStatus(200);
@@ -900,6 +900,260 @@ app.delete('/api/trips/:id/reminders/:reminderId', authenticateToken, async (req
         res.status(500).json({
             success: false,
             error: 'Failed to delete reminder'
+        });
+    }
+});
+// Add these endpoints to backend/server.js after the existing routes
+
+// ===================================
+// COMPANION MODE SPECIFIC ROUTES
+// ===================================
+
+// Get active trip with today's schedule
+app.get('/api/trips/active', authenticateToken, async (req, res) => {
+    try {
+        const trips = await database.getUserTrips(req.user.id, 'active', 1);
+        const activeTrip = trips[0] || null;
+
+        if (activeTrip) {
+            // Calculate current day
+            const startDate = new Date(activeTrip.start_date);
+            const today = new Date();
+            const diffTime = Math.abs(today - startDate);
+            const currentDay = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            activeTrip.currentDay = currentDay;
+        }
+
+        res.json({
+            success: true,
+            data: activeTrip
+        });
+    } catch (error) {
+        console.error('Get active trip error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to get active trip'
+        });
+    }
+});
+
+// Get today's schedule for active trip
+app.get('/api/trips/active/schedule', authenticateToken, async (req, res) => {
+    try {
+        const trips = await database.getUserTrips(req.user.id, 'active', 1);
+        const activeTrip = trips[0];
+
+        if (!activeTrip) {
+            return res.json({
+                success: true,
+                data: []
+            });
+        }
+
+        // Extract today's activities from itinerary
+        const itinerary = activeTrip.itinerary;
+        const startDate = new Date(activeTrip.start_date);
+        const today = new Date();
+        const currentDay = Math.ceil((today - startDate) / (1000 * 60 * 60 * 24));
+
+        // Parse itinerary to get today's schedule
+        const todaySchedule = itinerary[`day_${currentDay}`] || [];
+
+        res.json({
+            success: true,
+            data: todaySchedule
+        });
+    } catch (error) {
+        console.error('Get schedule error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to get schedule'
+        });
+    }
+});
+
+// Update schedule item status
+app.patch('/api/trips/active/schedule/:itemId', authenticateToken, async (req, res) => {
+    try {
+        const { itemId } = req.params;
+        const { status } = req.body;
+
+        const trips = await database.getUserTrips(req.user.id, 'active', 1);
+        const activeTrip = trips[0];
+
+        if (!activeTrip) {
+            return res.status(404).json({
+                success: false,
+                error: 'No active trip found'
+            });
+        }
+
+        // Update the schedule item in itinerary
+        const itinerary = activeTrip.itinerary;
+        const startDate = new Date(activeTrip.start_date);
+        const today = new Date();
+        const currentDay = Math.ceil((today - startDate) / (1000 * 60 * 60 * 24));
+        const dayKey = `day_${currentDay}`;
+
+        if (itinerary[dayKey]) {
+            itinerary[dayKey] = itinerary[dayKey].map(item => 
+                item.id === parseInt(itemId) ? { ...item, status } : item
+            );
+        }
+        
+        await database.updateTrip(activeTrip.id, req.user.id, { itinerary });
+
+        res.json({
+            success: true,
+            data: { itemId, status }
+        });
+    } catch (error) {
+        console.error('Update schedule error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to update schedule'
+        });
+    }
+});
+
+// Get upcoming bookings (uses existing trip_bookings table)
+app.get('/api/bookings/upcoming', authenticateToken, async (req, res) => {
+    try {
+        // Get all active trips for the user
+        const trips = await database.getUserTrips(req.user.id, 'active');
+        const tripIds = trips.map(t => t.id);
+
+        if (tripIds.length === 0) {
+            return res.json({
+                success: true,
+                data: []
+            });
+        }
+
+        // Get bookings for these trips
+        const placeholders = tripIds.map(() => '?').join(',');
+        const bookings = await database.pool.query(`
+            SELECT tb.*, t.title as trip_title, t.destination
+            FROM trip_bookings tb
+            JOIN trips t ON tb.trip_id = t.id
+            WHERE tb.trip_id IN (${placeholders})
+            AND tb.booking_date >= CURDATE()
+            ORDER BY tb.booking_date ASC, tb.created_at ASC
+            LIMIT 10
+        `, tripIds);
+
+        // Parse details JSON and format response
+        const formattedBookings = bookings.map(booking => {
+            const details = typeof booking.details === 'string' 
+                ? JSON.parse(booking.details) 
+                : booking.details;
+
+            return {
+                id: booking.id,
+                type: booking.booking_type,
+                title: details.title || `${booking.booking_type} booking`,
+                time: booking.booking_date,
+                confirmation: booking.confirmation_number,
+                status: 'confirmed',
+                alert: details.alert || null,
+                tripId: booking.trip_id,
+                tripTitle: booking.trip_title,
+                cost: booking.cost,
+                ...details
+            };
+        });
+
+        res.json({
+            success: true,
+            data: formattedBookings
+        });
+    } catch (error) {
+        console.error('Get bookings error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to get bookings'
+        });
+    }
+});
+
+// Save/update custom schedule
+app.post('/api/trips/:id/schedule', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { schedule, day } = req.body;
+
+        const trip = await database.getTripById(id, req.user.id);
+        
+        if (!trip) {
+            return res.status(404).json({
+                success: false,
+                error: 'Trip not found'
+            });
+        }
+
+        const itinerary = trip.itinerary;
+        itinerary[`day_${day}`] = schedule;
+
+        await database.updateTrip(id, req.user.id, { itinerary });
+
+        res.json({
+            success: true,
+            data: { schedule, day }
+        });
+    } catch (error) {
+        console.error('Save schedule error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to save schedule'
+        });
+    }
+});
+
+// Get notifications
+app.get('/api/notifications', authenticateToken, async (req, res) => {
+    try {
+        // Query notifications from database
+        const notifications = await database.pool.query(`
+            SELECT * FROM notifications 
+            WHERE user_id = ? 
+            AND dismissed = FALSE 
+            ORDER BY priority DESC, created_at DESC 
+            LIMIT 10
+        `, [req.user.id]);
+
+        res.json({
+            success: true,
+            data: notifications
+        });
+    } catch (error) {
+        console.error('Get notifications error:', error);
+        // If table doesn't exist yet, return empty array
+        res.json({
+            success: true,
+            data: []
+        });
+    }
+});
+
+// Dismiss notification
+app.patch('/api/notifications/:id/dismiss', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        await database.pool.query(
+            'UPDATE notifications SET dismissed = TRUE WHERE id = ? AND user_id = ?',
+            [id, req.user.id]
+        );
+
+        res.json({
+            success: true
+        });
+    } catch (error) {
+        console.error('Dismiss notification error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to dismiss notification'
         });
     }
 });
@@ -1796,6 +2050,7 @@ process.on('SIGTERM', async () => {
 startServer();
 
 module.exports = app;
+
 
 
 

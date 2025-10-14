@@ -4810,13 +4810,14 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
                   <span>{Math.round(weather.temperature)}°C</span>
                   <span className="text-gray-500">•</span>
                   <span className="text-gray-600 capitalize">{weather.description}</span>
+                  <span className="text-gray-600">{formattedTime}•{formattedDate}</span>  
                 </div>
               )}
             </div>
 
             <div className="flex items-center space-x-3">
               <div className="hidden md:block text-sm text-gray-600">
-                Day {mockCurrentTrip.currentDay} of {mockCurrentTrip.title}
+                Day {currentTrip.currentDay} of {currentTrip.title}
               </div>
               <button className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg">
                 <Bell className="w-5 h-5" />

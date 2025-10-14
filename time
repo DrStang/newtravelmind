@@ -1,0 +1,27 @@
+import React, { useState, useEffect } from 'react';
+
+function LocalClock() {
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timerId = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000); // Update every second
+
+    // Cleanup function to clear the interval when the component unmounts
+    return () => clearInterval(timerId);
+  }, []); // Empty dependency array ensures this effect runs only once on mount
+
+  const formattedTime = currentTime.toLocaleTimeString();
+  const formattedDate = currentTime.toLocaleDateString();
+
+  return (
+    <div>
+      <h1>Local Time and Date</h1>
+      <p>Current Time: {formattedTime}</p>
+      <p>Current Date: {formattedDate}</p>
+    </div>
+  );
+}
+
+export default LocalClock;

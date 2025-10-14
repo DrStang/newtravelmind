@@ -4021,37 +4021,6 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
         )}
       </div>
     );
-  };4" />
-                <span>{currentActivity.location}</span>
-              </span>
-              <span>{currentActivity.time}</span>
-              {currentActivity.duration && <span>• {currentActivity.duration}</span>}
-            </div>
-          </div>
-          <button 
-            onClick={() => sendChatMessage(`Get directions to ${currentActivity.location}`)}
-            className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors"
-          >
-            <Navigation className="w-5 h-5" />
-          </button>
-        </div>
-
-        {nextActivity && (
-          <div className="bg-white/10 rounded-lg p-3 backdrop-blur-sm">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <ChevronRight className="w-4 h-4" />
-                <div>
-                  <p className="text-sm opacity-75">Up Next</p>
-                  <p className="font-medium">{nextActivity.title}</p>
-                </div>
-              </div>
-              <span className="text-sm opacity-75">{nextActivity.time}</span>
-            </div>
-          </div>
-        )}
-      </div>
-    );
   };
 
   // Weather Alert Component

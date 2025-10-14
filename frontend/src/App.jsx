@@ -595,6 +595,7 @@ const App = () => {
                         token={token}
                         location={location}
                         weather={weather}
+                        setChatOpen={setChatOpen}
                         nearbyPlaces={nearbyPlaces}
                         currentTrip={currentTrip}
                         sendChatMessage={sendChatMessage}
@@ -3703,76 +3704,152 @@ const handleTripDeactivate = async (tripId) => {
 // COMPANION MODE COMPONENT
 // ===================================
 
-const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTrip, sendChatMessage }) => {
-
-  // Mock current trip data
-  const mockCurrentTrip = currentTrip || {
-    id: 1,
-    title: "Current Adventure",
-    destination: location ? "Current Location" : "Unknown",
-    status: "active",
-    startDate: new Date().toISOString(),
-    endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    currentDay: 2,
-    duration: 7
-  };
-
+const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTrip, sendChatMessage, setChatOpen }) => {
   // State Management
   const [selectedPlaceType, setSelectedPlaceType] = useState('all');
   const [searchRadius, setSearchRadius] = useState(1000);
   const [loading, setLoading] = useState(false);
-  const [places, setPlaces] = useState(nearbyPlaces || []);
+  const [places, setPlaces] = useState([]);
   const [showQuickToolModal, setShowQuickToolModal] = useState(null);
   const [showScheduleEdit, setShowScheduleEdit] = useState(false);
-  const [todaySchedule, setTodaySchedule] = useState([
-    {
-      id: 1,
-      time: "09:00 AM",
-      title: "Visit Local Attraction",
-      type: "activity",
-      location: "City Center",
-      status: "current",
-      duration: "2 hours",
-      cost: "$15",
-      bookingConfirmation: null
-    },
-    {
-      id: 2,
-      time: "12:00 PM",
-      title: "Lunch at Local Restaurant",
-      type: "dining",
-      location: "Downtown",
-      status: "upcoming",
-      duration: "1 hour",
-      cost: "$20"
-    },
-    {
-      id: 3,
-      time: "02:00 PM",
-      title: "Shopping & Exploration",
-      type: "activity",
-      location: "Shopping District",
-      status: "upcoming",
-      duration: "3 hours"
-    }
-  ]);
+  const [todaySchedule, setTodaySchedule] = useState([]);
+  const [upcomingBookings, setUpcomingBookings] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [activeTrip, setActiveTrip] = useState(null);
+  const [scheduleLoading, setScheduleLoading] = useState(true);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  
 
-  const [upcomingBookings] = useState([
-    {
-      id: 1,
-      type: "flight",
-      title: "Return Flight",
-      time: "In 5 days, 6:30 PM",
-      confirmation: "ABC123",
-      status: "confirmed",
-      alert: "Check-in opens in 4 days"
-    }
-  ]);
+  // Load active trip on mount
+  useEffect(() => {
+    loadActiveTrip();
+    loadNotifications();
+    loadUpcomingBookings();
+  }, [token]);
 
-  const [notifications, setNotifications] = useState([
-    { id: 1, type: "weather", message: "Weather looking good today!", priority: "medium" },
-    { id: 2, type: "reminder", message: "Don't forget to stay hydrated", priority: "low" }
-  ]);
+  // Load today's schedule when active trip changes
+  useEffect(() => {
+    if (activeTrip) {
+      loadTodaySchedule();
+    }
+  }, [activeTrip]);
+
+  // Load places when location or filters change
+  useEffect(() => {
+    if (location) {
+      searchNearbyPlaces();
+    }
+  }, [location, selectedPlaceType, searchRadius]);
+
+   useEffect(() => {
+    const timerId = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000); // Update every second
+
+    // Cleanup function to clear the interval when the component unmounts
+    return () => clearInterval(timerId);
+  }, []);  
+
+  const formattedTime = currentTime.toLocaleTimeString();
+  const formattedDate = currentTime.toLocaleDateString();
+
+  // API Functions
+  const loadActiveTrip = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/trips/active`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setActiveTrip(data.data || currentTrip);
+      }
+    } catch (error) {
+      console.error('Load active trip error:', error);
+      setActiveTrip(currentTrip);
+    }
+  };
+
+  const loadTodaySchedule = async () => {
+    if (!activeTrip) return;
+    
+    setScheduleLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/trips/active/schedule`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setTodaySchedule(data.data || []);
+      }
+    } catch (error) {
+      console.error('Load schedule error:', error);
+    } finally {
+      setScheduleLoading(false);
+    }
+  };
+    
+
+  const loadNotifications = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/notifications`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setNotifications(data.data || []);
+      }
+    } catch (error) {
+      console.error('Load notifications error:', error);
+    }
+  };
+
+  const loadUpcomingBookings = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/bookings/upcoming`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setUpcomingBookings(data.data || []);
+      }
+    } catch (error) {
+      console.error('Load bookings error:', error);
+    }
+  };
+
+  const updateScheduleItemStatus = async (itemId, status) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/trips/active/schedule/${itemId}`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status })
+      });
+      const data = await response.json();
+      if (data.success) {
+        // Update local state
+        setTodaySchedule(prev =>
+          prev.map(item => item.id === itemId ? { ...item, status } : item)
+        );
+      }
+    } catch (error) {
+      console.error('Update schedule status error:', error);
+    }
+  };
+
+  const dismissNotification = async (notificationId) => {
+    try {
+      await fetch(`${API_BASE_URL}/notifications/${notificationId}/dismiss`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+    } catch (error) {
+      console.error('Dismiss notification error:', error);
+    }
+  };
 
   const placeCategories = [
     { value: 'all', label: 'All Places', icon: '🌟' },
@@ -3784,13 +3861,20 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
     { value: 'park', label: 'Parks', icon: '🌳' }
   ];
 
-  // Mock weather forecast
-  const weatherForecast = [
-    { time: "12 PM", temp: weather?.temperature + 2 || 25, condition: "sunny", alert: false },
-    { time: "3 PM", temp: weather?.temperature + 3 || 26, condition: "cloudy", alert: false },
-    { time: "6 PM", temp: weather?.temperature || 24, condition: "clear", alert: false },
-    { time: "9 PM", temp: weather?.temperature - 2 || 22, condition: "clear", alert: false }
-  ];
+  // Generate weather forecast from current weather
+  const generateWeatherForecast = () => {
+    if (!weather) return [];
+    
+    const baseTemp = weather.temperature || 24;
+    return [
+      { time: "12 PM", temp: baseTemp + 2, condition: weather.condition || "sunny", alert: false },
+      { time: "3 PM", temp: baseTemp + 3, condition: "cloudy", alert: false },
+      { time: "6 PM", temp: baseTemp, condition: "clear", alert: false },
+      { time: "9 PM", temp: baseTemp - 2, condition: "clear", alert: false }
+    ];
+  };
+
+  const weatherForecast = generateWeatherForecast();
 
   // Search nearby places
   const searchNearbyPlaces = async (type = selectedPlaceType) => {
@@ -3814,15 +3898,19 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
     }
   };
 
-  useEffect(() => {
-    setPlaces(nearbyPlaces || []);
-  }, [nearbyPlaces]);
+  // Helper to get current trip with fallback
+  const getCurrentTrip = () => {
+    return activeTrip || currentTrip || {
+      id: null,
+      title: "No Active Trip",
+      destination: "Unknown",
+      status: "planning",
+      currentDay: 1,
+      duration: 7
+    };
+  };
 
-  useEffect(() => {
-    if (location && selectedPlaceType) {
-      searchNearbyPlaces();
-    }
-  }, [selectedPlaceType, searchRadius]);
+  const tripData = getCurrentTrip();
 
   // Helper functions
   const getWeatherIcon = (condition) => {
@@ -3859,6 +3947,35 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
 
   // Current Activity Component
   const CurrentActivity = () => {
+    if (scheduleLoading) {
+      return (
+        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl p-6 text-white mb-6">
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+            <span className="ml-3">Loading schedule...</span>
+          </div>
+        </div>
+      );
+    }
+
+    if (todaySchedule.length === 0) {
+      return (
+        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl p-6 text-white mb-6">
+          <div className="text-center py-8">
+            <Calendar className="w-12 h-12 mx-auto mb-4 opacity-75" />
+            <h3 className="text-xl font-bold mb-2">No Activities Scheduled</h3>
+            <p className="opacity-90 mb-4">Start planning your day!</p>
+            <button 
+              onClick={() => sendChatMessage("Help me plan activities for today")}
+              className="bg-white/20 hover:bg-white/30 px-6 py-2 rounded-lg transition-colors"
+            >
+              Plan Activities
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     const currentActivity = todaySchedule.find(item => item.status === 'current') || todaySchedule[0];
     const nextActivity = todaySchedule[todaySchedule.findIndex(item => item.id === currentActivity.id) + 1];
 
@@ -3874,6 +3991,37 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
             <div className="flex items-center space-x-4 text-sm opacity-90 flex-wrap gap-2">
               <span className="flex items-center space-x-1">
                 <MapPin className="w-4 h-4" />
+                <span>{currentActivity.location}</span>
+              </span>
+              <span>{currentActivity.time}</span>
+              {currentActivity.duration && <span>• {currentActivity.duration}</span>}
+            </div>
+          </div>
+          <button 
+            onClick={() => sendChatMessage(`Get directions to ${currentActivity.location}`)}
+            className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors"
+          >
+            <Navigation className="w-5 h-5" />
+          </button>
+        </div>
+
+        {nextActivity && (
+          <div className="bg-white/10 rounded-lg p-3 backdrop-blur-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <ChevronRight className="w-4 h-4" />
+                <div>
+                  <p className="text-sm opacity-75">Up Next</p>
+                  <p className="font-medium">{nextActivity.title}</p>
+                </div>
+              </div>
+              <span className="text-sm opacity-75">{nextActivity.time}</span>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };4" />
                 <span>{currentActivity.location}</span>
               </span>
               <span>{currentActivity.time}</span>
@@ -4273,12 +4421,12 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
         <div>
           <div className="flex justify-between text-sm mb-2">
             <span className="text-gray-600">Days Completed</span>
-            <span className="font-medium">{mockCurrentTrip.currentDay} of {mockCurrentTrip.duration}</span>
+            <span className="font-medium">{tripData.currentDay} of {tripData.duration}</span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2">
             <div 
-              className="bg-blue-600 h-2 rounded-full" 
-              style={{width: `${(mockCurrentTrip.currentDay / mockCurrentTrip.duration) * 100}%`}}
+              className="bg-blue-600 h-2 rounded-full transition-all duration-500" 
+              style={{width: `${(tripData.currentDay / tripData.duration) * 100}%`}}
             ></div>
           </div>
         </div>
@@ -4787,7 +4935,6 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
     </div>
   );
 };
-
 
 // ===================================
 // MEMORY MODE COMPONENT - FIXED

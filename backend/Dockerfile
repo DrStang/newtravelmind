@@ -22,9 +22,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# ...everything above unchanged...
+
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/tailscale /usr/local/bin/tailscaled
 
 ENV PORT=3001
 EXPOSE 3001
-ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"
+
+# IMPORTANT: use ENTRYPOINT so nothing can skip the script
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

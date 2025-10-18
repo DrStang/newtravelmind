@@ -2,7 +2,7 @@
 FROM node:20-slim AS deps
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN npm i --omit=dev
 
 # --- runtime + tailscale ---
 FROM node:20-slim AS runner

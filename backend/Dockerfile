@@ -10,7 +10,7 @@ WORKDIR /app
 
 # Fetch Tailscale static binaries (choose a current version)
 ARG TS_VER=1.88.4
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl \
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl socat \
  && ARCH="$(dpkg --print-architecture)" \
  && curl -fsSL "https://pkgs.tailscale.com/stable/tailscale_${TS_VER}_${ARCH}.tgz" \
     | tar -xz -C /usr/local/bin --strip-components=1 \

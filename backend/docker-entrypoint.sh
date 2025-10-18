@@ -1,43 +1,50 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Resolve binaries regardless of how you installed (apt vs static tgz)
-TSD_BIN="$(command -v tailscaled || true)"
-TS_BIN="$(command -v tailscale || true)"
+TSD_BIN="$(command -v tailscaled)"; TS_BIN="$(command -v tailscale)"
+STATE_PATH="${TS_STATE_PATH:-/data/tailscaled.state}"   # <- volume-backed
 
-if [[ -z "${TSD_BIN}" || -z "${TS_BIN}" ]]; then
-  echo "ERROR: tailscale binaries not found on PATH."
-  echo "Paths: tailscaled='${TSD_BIN:-<none>}', tailscale='${TS_BIN:-<none>}'"
-  ls -l /usr/local/bin || true
-  ls -l /usr/sbin || true
-  exit 1
-fi
-
-# 1) Start tailscaled in userspace (no NET_ADMIN needed on Railway)
+# 1) start tailscaled with persistent state
 "${TSD_BIN}" \
-  --state=mem: \
+  --state="${STATE_PATH}" \
   --tun=userspace-networking \
   --socks5-server=localhost:1055 \
   --outbound-http-proxy-listen=localhost:1056 &
-TSD_PID=$!
-
-# tiny wait to avoid "doesn't appear to be running" races
 sleep 0.7
 
-# 2) Bring the node onto your tailnet
-"${TS_BIN}" up \
-  --authkey="${TS_AUTHKEY:?Missing TS_AUTHKEY}" \
-  --hostname="${RAILWAY_SERVICE_NAME:-railway}-$(hostname)" \
-  --accept-routes=true \
-  --accept-dns=false \
-  --reset
+# 2) bring node up (only authenticate if first boot)
+if [ ! -s "${STATE_PATH}" ]; then
+  echo "First boot: authenticating to Tailscale..."
+  "${TS_BIN}" up \
+    --authkey="${TS_AUTHKEY:?Missing TS_AUTHKEY}" \
+    --hostname="${TS_HOSTNAME:-newtravelmind}" \
+    --accept-routes=true \
+    --accept-dns=false
+else
+  echo "Reusing existing Tailscale state..."
+  # No authkey needed; just ensure settings are applied
+  "${TS_BIN}" up \
+    --hostname="${TS_HOSTNAME:-newtravelmind}" \
+    --accept-routes=true \
+    --accept-dns=false
+fi
 
-# Show IP for debugging
-"${TS_BIN}" ip || true
-"${TS_BIN}" status || true
+echo "TS IPv4: $(${TS_BIN} ip -4 || true)"
 
-# Optional: quick connectivity probe (comment out after first success)
-# nc -vz "${DB_HOST}" "${DB_PORT:-3306}" || true
+DB_HOST_CLEAN="$(printf "%s" "${DB_HOST?Missing DB_HOST}" | tr -d '[:space:]')"
+DB_PORT_CLEAN="${DB_PORT:-3306}"
 
-# 3) Start your app
-exec node server.js   # or: exec npm start
+echo "Pinging DB host over tailnet..."
+${TS_BIN} ping -c 3 "${DB_HOST_CLEAN}" || true
+
+echo "TCP probe to ${DB_HOST_CLEAN}:${DB_PORT_CLEAN}..."
+for i in {1..8}; do
+  (echo >"/dev/tcp/${DB_HOST_CLEAN}/${DB_PORT_CLEAN}") >/dev/null 2>&1 && {
+    echo "DB reachable."; break
+  }
+  echo "Waiting for DB... ($i/8)"
+  sleep 2
+done
+
+# finally start your app
+exec node server.js   # or npm start

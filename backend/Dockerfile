@@ -27,4 +27,4 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 ENV PORT=3001
 EXPOSE 3001
-CMD ["/usr/local/bin/docker-entrypoint.sh"]
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"

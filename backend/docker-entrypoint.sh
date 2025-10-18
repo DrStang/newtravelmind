@@ -48,33 +48,42 @@ for i in {1..30}; do
   sleep 0.5
 done
 
-# 4) Start local forward 127.0.0.1:13306 -> (SOCKS5) -> 100.x:3306
-DB_HOST_CLEAN="$(printf "%s" "${DB_HOST?Missing DB_HOST}" | tr -d '[:space:]')"   # your VPS TS IP (e.g., 100.66.175.61)
-DB_PORT_CLEAN="${DB_PORT:-3306}"
+# --- after 'SOCKS ready' ---
 
-# kill stale listeners on redeploy
+DB_HOST_CLEAN="$(printf "%s" "${DB_HOST?Missing DB_HOST}" | tr -d '[:space:]')"  # VPS’s TS IP (e.g. 100.66.175.61)
+DB_PORT_CLEAN="${DB_PORT:-3306}"
+LOCAL_FWD_PORT="${TS_LOCAL_FORWARD_PORT:-13306}"
+SOCKS_HOST=127.0.0.1
+SOCKS_PORT=1055
+NCAT_BIN="$(command -v ncat)"
+
+# kill any stale listener (if redeploying)
 pkill -f "ncat .* -l .* -p ${LOCAL_FWD_PORT}" 2>/dev/null || true
 
-# -l (listen), -k (keep-open), -p (port), -s (bind src addr 127.0.0.1)
-${NCAT_BIN} -l -k -p "${LOCAL_FWD_PORT}" -s 127.0.0.1 \
-  --sh-exec "${NCAT_BIN} --proxy ${SOCKS_HOST}:${SOCKS_PORT} --proxy-type socks5 ${DB_HOST_CLEAN} ${DB_PORT_CLEAN}" \
+# START LISTENER: 127.0.0.1:13306 -> (SOCKS5 127.0.0.1:1055) -> 100.x:3306
+# -l (listen), -k (keep-open), -p (port), -s (bind 127.0.0.1)
+# When a client connects, ncat will connect to DB_HOST:DB_PORT *via* SOCKS5.
+"${NCAT_BIN}" -l -k -p "${LOCAL_FWD_PORT}" -s 127.0.0.1 \
+  --proxy "${SOCKS_HOST}:${SOCKS_PORT}" --proxy-type socks5 \
+  "${DB_HOST_CLEAN}" "${DB_PORT_CLEAN}" \
   >/tmp/ncat-forward.log 2>&1 &
 
-# prove local listener is up before starting Node
-for i in {1..20}; do
+# Prove the listener is actually up before starting Node
+for i in {1..30}; do
   if "${NCAT_BIN}" -z 127.0.0.1 "${LOCAL_FWD_PORT}" 2>/dev/null; then
     echo "Local forward listening on 127.0.0.1:${LOCAL_FWD_PORT}"
     break
   fi
-  echo "Waiting for local forward 127.0.0.1:${LOCAL_FWD_PORT}... ($i/20)"
+  echo "Waiting for local forward 127.0.0.1:${LOCAL_FWD_PORT}... ($i/30)"
   sleep 0.5
 done
 
-# Optional: connectivity checks
-${TS_BIN} ping -c 2 "${DB_HOST_CLEAN}" || true
+# (Optional) helpful debug if it ever fails again:
+ps aux | grep -E 'tailscaled|ncat' | grep -v grep || true
+ss -lntp || true
 tail -n +1 /tmp/ncat-forward.log || true
 
-# 5) Point app at the local forward
+# Point the app at the local forward
 export DB_HOST="127.0.0.1"
 export DB_PORT="${LOCAL_FWD_PORT}"
 

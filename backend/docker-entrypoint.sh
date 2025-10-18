@@ -48,43 +48,42 @@ for i in {1..30}; do
   sleep 0.5
 done
 
-# --- after 'SOCKS ready' ---
+# --- after "SOCKS ready on 127.0.0.1:1055" ---
 
-DB_HOST_CLEAN="$(printf "%s" "${DB_HOST?Missing DB_HOST}" | tr -d '[:space:]')"  # VPS’s TS IP (e.g. 100.66.175.61)
+DB_HOST_CLEAN="$(printf "%s" "${DB_HOST?Missing DB_HOST}" | tr -d '[:space:]')"  # VPS TS IP, e.g. 100.66.175.61
 DB_PORT_CLEAN="${DB_PORT:-3306}"
 LOCAL_FWD_PORT="${TS_LOCAL_FORWARD_PORT:-13306}"
 SOCKS_HOST=127.0.0.1
 SOCKS_PORT=1055
 NCAT_BIN="$(command -v ncat)"
 
-# kill any stale listener (if redeploying)
+# stop any stale listener (redeploys)
 pkill -f "ncat .* -l .* -p ${LOCAL_FWD_PORT}" 2>/dev/null || true
 
-# START LISTENER: 127.0.0.1:13306 -> (SOCKS5 127.0.0.1:1055) -> 100.x:3306
-# -l (listen), -k (keep-open), -p (port), -s (bind 127.0.0.1)
-# When a client connects, ncat will connect to DB_HOST:DB_PORT *via* SOCKS5.
+# LISTEN locally, and for each incoming connection, sh-exec a new ncat that dials
+# the DB through the SOCKS5 proxy. This is the valid pattern (no --proxy with -l).
 "${NCAT_BIN}" -l -k -p "${LOCAL_FWD_PORT}" -s 127.0.0.1 \
-  --proxy "${SOCKS_HOST}:${SOCKS_PORT}" --proxy-type socks5 \
-  "${DB_HOST_CLEAN}" "${DB_PORT_CLEAN}" \
+  --sh-exec "${NCAT_BIN} --proxy ${SOCKS_HOST}:${SOCKS_PORT} --proxy-type socks5 ${DB_HOST_CLEAN} ${DB_PORT_CLEAN}" \
   >/tmp/ncat-forward.log 2>&1 &
 
-# Prove the listener is actually up before starting Node
+# prove the local listener is actually up before starting Node
 for i in {1..30}; do
   if "${NCAT_BIN}" -z 127.0.0.1 "${LOCAL_FWD_PORT}" 2>/dev/null; then
     echo "Local forward listening on 127.0.0.1:${LOCAL_FWD_PORT}"
+    READY=1
     break
   fi
   echo "Waiting for local forward 127.0.0.1:${LOCAL_FWD_PORT}... ($i/30)"
   sleep 0.5
 done
 
-# (Optional) helpful debug if it ever fails again:
-ps aux | grep -E 'tailscaled|ncat' | grep -v grep || true
-ss -lntp || true
-tail -n +1 /tmp/ncat-forward.log || true
+# if it never bound, dump logs and fail fast (so you don’t start Node against a dead port)
+if [ "${READY:-0}" -ne 1 ]; then
+  echo "❌ ncat listener failed to bind. Forwarder log:"
+  tail -n +1 /tmp/ncat-forward.log || true
+  exit 1
+fi
 
 # Point the app at the local forward
 export DB_HOST="127.0.0.1"
 export DB_PORT="${LOCAL_FWD_PORT}"
-
-exec node server.js   # or npm start

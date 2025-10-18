@@ -9,7 +9,7 @@ FROM node:20-slim AS runner
 WORKDIR /app
 
 # Fetch Tailscale static binaries (choose a current version)
-ARG TS_VER=1.66.4
+ARG TS_VER=1.88.4
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl \
  && ARCH="$(dpkg --print-architecture)" \
  && curl -fsSL "https://pkgs.tailscale.com/stable/tailscale_${TS_VER}_${ARCH}.tgz" \

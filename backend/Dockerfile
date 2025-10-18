@@ -8,14 +8,16 @@ RUN npm i --omit=dev
 FROM node:20-slim AS runner
 WORKDIR /app
 
-# Install tailscale (userspace works in unprivileged containers)
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl iproute2 \
-  && curl -fsSL https://pkgs.tailscale.com/stable/debian/bookworm.noarmor.gpg \
-      | tee /usr/share/keyrings/tailscale-archive-keyring.gpg >/dev/null \
-  && curl -fsSL https://pkgs.tailscale.com/stable/debian/tailscale.list \
-      | tee /etc/apt/sources.list.d/tailscale.list \
-  && apt-get update && apt-get install -y --no-install-recommends tailscale \
-  && rm -rf /var/lib/apt/lists/*
+# Fetch Tailscale static binaries (choose a current version)
+ARG TS_VER=1.66.4
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl \
+ && ARCH="$(dpkg --print-architecture)" \
+ && curl -fsSL "https://pkgs.tailscale.com/stable/tailscale_${TS_VER}_${ARCH}.tgz" \
+    | tar -xz -C /usr/local/bin --strip-components=1 \
+        "tailscale_${TS_VER}_${ARCH}/tailscale" \
+        "tailscale_${TS_VER}_${ARCH}/tailscaled" \
+ && rm -rf /var/lib/apt/lists/*
+
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .

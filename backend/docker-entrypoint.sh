@@ -43,8 +43,47 @@ done
 # ---------- DB target ----------
 DB_HOST_CLEAN="$(printf "%s" "${DB_HOST?Set DB_HOST to your VPS 100.x.y.z}" | tr -d '[:space:]')"
 DB_PORT_CLEAN="${DB_PORT:-3306}"
+LOCAL_FWD_PORT="${TS_LOCAL_FORWARD_PORT:-13306}"
+NCAT_BIN="$(command -v ncat)"
 
-# ---------- create a tiny helper to avoid quoting hell ----------
+echo "ncat version: $(${NCAT_BIN} --version 2>&1 | head -1)"
+echo "Checking if anything already binds ${LOCAL_FWD_PORT}..."
+ss -lntp 2>/dev/null | grep -E "127\.0\.0\.1:${LOCAL_FWD_PORT}\b" || echo " - nothing on 127.0.0.1:${LOCAL_FWD_PORT}"
+
+echo "Probing SOCKS: ${SOCKS_HOST}:${SOCKS_PORT}"
+${NCAT_BIN} -z "${SOCKS_HOST}" "${SOCKS_PORT}" && echo " - SOCKS port accepts TCP" || echo " - SOCKS probe failed (may still be fine)"
+
+# ---------- try a simple bind first (no --sh-exec) ----------
+echo "Trying plain bind on 127.0.0.1:${LOCAL_FWD_PORT} (no proxy) just to test binding..."
+set -x
+${NCAT_BIN} -l 127.0.0.1 -p "${LOCAL_FWD_PORT}" -k -vv >/tmp/ncat-bind-test.log 2>&1 &
+BIND_PID=$!
+set +x
+sleep 0.5
+if ${NCAT_BIN} -z 127.0.0.1 "${LOCAL_FWD_PORT}" 2>/dev/null; then
+  echo "✅ Plain bind succeeded; freeing test listener."
+  kill "${BIND_PID}" 2>/dev/null || true
+else
+  echo "❌ Plain bind FAILED on ${LOCAL_FWD_PORT}. Dumping log and trying fallback port 31337..."
+  cat /tmp/ncat-bind-test.log || true
+  kill "${BIND_PID}" 2>/dev/null || true
+  LOCAL_FWD_PORT=31337
+  echo "Retrying plain bind on 127.0.0.1:${LOCAL_FWD_PORT}..."
+  ${NCAT_BIN} -l 127.0.0.1 -p "${LOCAL_FWD_PORT}" -k -vv >/tmp/ncat-bind-test2.log 2>&1 &
+  BIND_PID=$!
+  sleep 0.5
+  if ${NCAT_BIN} -z 127.0.0.1 "${LOCAL_FWD_PORT}" 2>/dev/null; then
+    echo "✅ Plain bind succeeded on fallback port ${LOCAL_FWD_PORT}; freeing test listener."
+    kill "${BIND_PID}" 2>/dev/null || true
+  else
+    echo "❌ Still can’t bind. Logs:"
+    cat /tmp/ncat-bind-test2.log || true
+    ss -lntp || true
+    exit 1
+  fi
+fi
+
+# ---------- start the real forwarder (listen locally, sh-exec a SOCKS5 dialer per connection) ----------
 PROXY_HELPER="/usr/local/bin/ncat-proxy.sh"
 cat > "${PROXY_HELPER}" <<'EOS'
 #!/usr/bin/env bash
@@ -53,46 +92,37 @@ SOCKS_HOST="${SOCKS_HOST:-127.0.0.1}"
 SOCKS_PORT="${SOCKS_PORT:-1055}"
 TARGET_HOST="${TARGET_HOST:?}"
 TARGET_PORT="${TARGET_PORT:?}"
-exec ncat --proxy "${SOCKS_HOST}:${SOCKS_PORT}" --proxy-type socks5 "${TARGET_HOST}" "${TARGET_PORT}"
+exec ncat -vv --proxy "${SOCKS_HOST}:${SOCKS_PORT}" --proxy-type socks5 "${TARGET_HOST}" "${TARGET_PORT}"
 EOS
 chmod +x "${PROXY_HELPER}"
 
-# export values for the helper
 export SOCKS_HOST SOCKS_PORT
 export TARGET_HOST="${DB_HOST_CLEAN}"
 export TARGET_PORT="${DB_PORT_CLEAN}"
 
-# ---------- start local forwarder 127.0.0.1:${LOCAL_FWD_PORT} -> (SOCKS5) -> DB ----------
-command -v pkill >/dev/null 2>&1 && pkill -f "ncat .* -l .* -p ${LOCAL_FWD_PORT}" 2>/dev/null || true
-
-# NOTE: bind address goes after -l; no -s in listen mode
-# --sh-exec runs the helper per-connection (no fragile quoting)
-"${NCAT_BIN}" -l 127.0.0.1 -p "${LOCAL_FWD_PORT}" -k -vv \
+echo "Starting forwarder: 127.0.0.1:${LOCAL_FWD_PORT} -> (SOCKS5 ${SOCKS_HOST}:${SOCKS_PORT}) -> ${DB_HOST_CLEAN}:${DB_PORT_CLEAN}"
+# write forwarder logs to stdout so you see them in Railway
+set -x
+${NCAT_BIN} -l 127.0.0.1 -p "${LOCAL_FWD_PORT}" -k -vv \
   --sh-exec "${PROXY_HELPER}" &
+set +x
 
-echo "ncat version:"; ncat --version || true
-echo "Checking SOCKS port:"; ${NCAT_BIN} -z 127.0.0.1 1055 || true
-echo "Trying a one-shot connect via SOCKS:"
-${NCAT_BIN} --proxy 127.0.0.1:1055 --proxy-type socks5 -z "${DB_HOST_CLEAN}" "${DB_PORT_CLEAN}" || true
-
-
-# verify listener
-READY=0
+# verify listener is up before launching the app
 for i in {1..30}; do
-  if "${NCAT_BIN}" -z 127.0.0.1 "${LOCAL_FWD_PORT}" 2>/dev/null; then
-    echo "Local forward listening on 127.0.0.1:${LOCAL_FWD_PORT}"
-    READY=1; break
+  if ${NCAT_BIN} -z 127.0.0.1 "${LOCAL_FWD_PORT}" 2>/dev/null; then
+    echo "✅ Local forward listening on 127.0.0.1:${LOCAL_FWD_PORT}"
+    break
   fi
-  echo "Waiting for local forward 127.0.0.1:${LOCAL_FWD_PORT}... ($i/30)"; sleep 0.5
+  echo "Waiting for local forward 127.0.0.1:${LOCAL_FWD_PORT}... ($i/30)"
+  sleep 0.5
 done
-
-if [[ "${READY}" -ne 1 ]]; then
-  echo "❌ ncat listener failed to bind. Forwarder log:"
-  tail -n +200 /tmp/ncat-forward.log || true
+if ! ${NCAT_BIN} -z 127.0.0.1 "${LOCAL_FWD_PORT}" 2>/dev/null; then
+  echo "❌ Forwarder still not listening; printing process list and sockets:"
+  ps aux | grep -E 'tailscaled|ncat' | grep -v grep || true
+  ss -lntp || true
   exit 1
 fi
 
-# ---------- point app at local forward and launch ----------
+# Point your app at the local forward
 export DB_HOST="127.0.0.1"
 export DB_PORT="${LOCAL_FWD_PORT}"
-exec node server.js

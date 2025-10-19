@@ -92,9 +92,21 @@ SOCKS_HOST="${SOCKS_HOST:-127.0.0.1}"
 SOCKS_PORT="${SOCKS_PORT:-1055}"
 TARGET_HOST="${TARGET_HOST:?}"
 TARGET_PORT="${TARGET_PORT:?}"
+
+echo "PROXY_HELPER: dialing ${TARGET_HOST}:${TARGET_PORT} via socks5 ${SOCKS_HOST}:${SOCKS_PORT}" >&2
+
+# One-shot connectivity probe (non-fatal). Exit code 0 on success, non-0 on fail.
+if ncat --proxy "${SOCKS_HOST}:${SOCKS_PORT}" --proxy-type socks5 -z "${TARGET_HOST}" "${TARGET_PORT}" 2>&1; then
+  echo "PROXY_HELPER: probe OK" >&2
+else
+  echo "PROXY_HELPER: probe FAILED" >&2
+fi
+
+# Now turn into the actual TCP pipe
 exec ncat -vv --proxy "${SOCKS_HOST}:${SOCKS_PORT}" --proxy-type socks5 "${TARGET_HOST}" "${TARGET_PORT}"
 EOS
 chmod +x "${PROXY_HELPER}"
+
 
 export SOCKS_HOST SOCKS_PORT
 export TARGET_HOST="${DB_HOST_CLEAN}"
@@ -126,3 +138,7 @@ fi
 # Point your app at the local forward
 export DB_HOST="127.0.0.1"
 export DB_PORT="${LOCAL_FWD_PORT}"
+
+echo "LAUNCHING APP with DB_HOST=${DB_HOST} DB_PORT=${DB_PORT}"
+exec node server.js
+

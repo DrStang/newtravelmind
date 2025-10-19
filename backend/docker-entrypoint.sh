@@ -67,9 +67,14 @@ command -v pkill >/dev/null 2>&1 && pkill -f "ncat .* -l .* -p ${LOCAL_FWD_PORT}
 
 # NOTE: bind address goes after -l; no -s in listen mode
 # --sh-exec runs the helper per-connection (no fragile quoting)
-"${NCAT_BIN}" -l 127.0.0.1 -p "${LOCAL_FWD_PORT}" -k \
-  --sh-exec "${PROXY_HELPER}" \
-  > /tmp/ncat-forward.log 2>&1 &
+"${NCAT_BIN}" -l 127.0.0.1 -p "${LOCAL_FWD_PORT}" -k -vv \
+  --sh-exec "${PROXY_HELPER}" &
+
+echo "ncat version:"; ncat --version || true
+echo "Checking SOCKS port:"; ${NCAT_BIN} -z 127.0.0.1 1055 || true
+echo "Trying a one-shot connect via SOCKS:"
+${NCAT_BIN} --proxy 127.0.0.1:1055 --proxy-type socks5 -z "${DB_HOST_CLEAN}" "${DB_PORT_CLEAN}" || true
+
 
 # verify listener
 READY=0

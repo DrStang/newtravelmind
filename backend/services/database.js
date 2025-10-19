@@ -14,7 +14,7 @@ class DatabaseService {
                 password: process.env.DB_PASSWORD,
                 database: process.env.DB_NAME || 'travelmind_db',
                 connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT) || 10,
-                ssl: { rejectUnauthorized: true, minVersion: 'TLSv1.2' },
+                //ssl: { rejectUnauthorized: true, minVersion: 'TLSv1.2' },
                 acquireTimeout: 30000,
                 timeout: 30000,
                 bigIntAsNumber: true // Convert BigInt to Number automatically
@@ -582,4 +582,5 @@ class DatabaseService {
 }
 
 module.exports = { DatabaseService };
+
 

@@ -246,78 +246,100 @@ class DatabaseService {
     }
 
     async getUserTrips(userId, status = null, limit = 20) {
-        try {
-            console.log('🔍 getUserTrips called:', { userId, status, limit });
+    let conn;
+    try {
+        console.log('🔍 getUserTrips called:', { userId, status, limit });
+        
+        // Get a dedicated connection from the pool
+        conn = await this.pool.getConnection();
+        console.log('✅ Got database connection');
+        
+        let query = 'SELECT * FROM trips WHERE user_id = ?';
+        let params = [userId];
 
-            let query = 'SELECT * FROM trips WHERE user_id = ?';
-            let params = [userId];
-
-            if (status) {
-                query += ' AND status = ?';
-                params.push(status);
-            }
-
-            query += ' ORDER BY created_at DESC LIMIT ?';
-            params.push(limit);
-
-            console.log('🔍 Executing query:', query);
-            console.log('🔍 With params:', params);
-
-
-            const trips = await this.pool.query(query, params);
-
-            console.log('✅ Query returned:', trips.length, 'trips');
-            console.log('✅ Raw trips data:', JSON.stringify(trips.slice(0, 1), null, 2)); // Log first trip
-
-            // CRITICAL: Handle the case where trips is empty
-            if (!trips || trips.length === 0) {
-                console.log('⚠️ No trips found for user:', userId);
-                return [];
-            }
-
-            return trips.map(trip => {
-                try {
-                    // Safely parse JSON fields
-                    let interests = [];
-                    let itinerary = {};
-
-                    if (trip.interests) {
-                        interests = typeof trip.interests === 'string'
-                            ? JSON.parse(trip.interests)
-                            : trip.interests;
-                    }
-
-                    if (trip.itinerary) {
-                        itinerary = typeof trip.itinerary === 'string'
-                            ? JSON.parse(trip.itinerary)
-                            : trip.itinerary;
-                    }
-
-                    return {
-                        ...trip,
-                        id: Number(trip.id),
-                        user_id: Number(trip.user_id),
-                        interests,
-                        itinerary
-                    };
-                } catch (parseError) {
-                    console.error('❌ Error parsing trip:', trip.id, parseError);
-                    // Return trip with default values if parsing fails
-                    return {
-                        ...trip,
-                        id: Number(trip.id),
-                        user_id: Number(trip.user_id),
-                        interests: [],
-                        itinerary: {}
-                    };
-                }
-            });
-        } catch (error) {
-            console.error('❌ Get user trips error:', error);
-            console.error('❌ Error stack:', error.stack);
-            throw error; // Re-throw so the endpoint can handle it
+        if (status) {
+            query += ' AND status = ?';
+            params.push(status);
         }
+
+        query += ' ORDER BY created_at DESC LIMIT ?';
+        params.push(limit);
+
+        console.log('🔍 Executing query:', query);
+        console.log('🔍 With params:', params);
+
+        // Execute with timeout
+        const trips = await Promise.race([
+            conn.query(query, params),
+            new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Query timeout after 5s')), 5000)
+            )
+        ]);
+
+        console.log('✅ Query completed! Returned:', trips.length, 'rows');
+        console.log('✅ First trip (if any):', trips[0] ? JSON.stringify(trips[0], null, 2) : 'No trips');
+
+        // Release connection back to pool
+        conn.release();
+        console.log('✅ Connection released');
+
+        if (!trips || trips.length === 0) {
+            console.log('⚠️ No trips found for user:', userId);
+            return [];
+        }
+
+        return trips.map(trip => {
+            try {
+                let interests = [];
+                let itinerary = {};
+                
+                if (trip.interests) {
+                    interests = typeof trip.interests === 'string' 
+                        ? JSON.parse(trip.interests) 
+                        : trip.interests;
+                }
+                
+                if (trip.itinerary) {
+                    itinerary = typeof trip.itinerary === 'string' 
+                        ? JSON.parse(trip.itinerary) 
+                        : trip.itinerary;
+                }
+
+                return {
+                    ...trip,
+                    id: Number(trip.id),
+                    user_id: Number(trip.user_id),
+                    interests,
+                    itinerary
+                };
+            } catch (parseError) {
+                console.error('❌ Error parsing trip:', trip.id, parseError);
+                return {
+                    ...trip,
+                    id: Number(trip.id),
+                    user_id: Number(trip.user_id),
+                    interests: [],
+                    itinerary: {}
+                };
+            }
+        });
+    } catch (error) {
+        console.error('❌ Get user trips error:', error);
+        console.error('❌ Error stack:', error.stack);
+        
+        // Make sure to release connection even on error
+        if (conn) {
+            try {
+                conn.release();
+                console.log('✅ Connection released after error');
+            } catch (releaseError) {
+                console.error('❌ Error releasing connection:', releaseError);
+            }
+        }
+        
+        throw error;
     }
+}
     async getTripById(tripId, userId) {
         try {
             const rows = await this.pool.query(
@@ -626,4 +648,5 @@ class DatabaseService {
 }
 
 module.exports = { DatabaseService };
+
 

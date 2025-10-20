@@ -87,35 +87,35 @@ const useAuth = () => {
     const [token, setToken] = useState(localStorage.getItem('token'));
     const [loading, setLoading] = useState(true);
 
-useEffect(() => {
-    if (token) {
-        // ✅ Decode the JWT to get user info
-        try {
-            const tokenParts = token.split('.');
-            if (tokenParts.length === 3) {
-                const payload = JSON.parse(atob(tokenParts[1]));
-                
-                // Set user from JWT payload
-                setUser({
-                    id: payload.id,
-                    name: payload.name,
-                    email: payload.email,
-                    preferences: payload.preferences || ['culture', 'food', 'sightseeing'],
-                    travelStyle: payload.travelStyle || 'moderate'
-                });
-            } else {
-                // Invalid token format, clear it
+    useEffect(() => {
+        if (token) {
+            // ✅ Decode the JWT to get user info
+            try {
+                const tokenParts = token.split('.');
+                if (tokenParts.length === 3) {
+                    const payload = JSON.parse(atob(tokenParts[1]));
+
+                    // Set user from JWT payload
+                    setUser({
+                        id: payload.id,
+                        name: payload.name,
+                        email: payload.email,
+                        preferences: payload.preferences || ['culture', 'food', 'sightseeing'],
+                        travelStyle: payload.travelStyle || 'moderate'
+                    });
+                } else {
+                    // Invalid token format, clear it
+                    localStorage.removeItem('token');
+                    setToken(null);
+                }
+            } catch (error) {
+                console.error('Token decode error:', error);
                 localStorage.removeItem('token');
                 setToken(null);
             }
-        } catch (error) {
-            console.error('Token decode error:', error);
-            localStorage.removeItem('token');
-            setToken(null);
         }
-    }
-    setLoading(false);
-}, [token]);
+        setLoading(false);
+    }, [token]);
 
     const login = async (email, password) => {
         try {
@@ -392,18 +392,33 @@ const App = () => {
 
     const loadTrips = async () => {
         try {
+            console.log('🔄 Loading trips...');
             const response = await fetch(`${API_BASE_URL}/trips?limit=10`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             const data = await response.json();
+            console.log('✅ Trips response:', data);
+
+
             if (data.success) {
-                setTrips(data.data);
+                // Ensure IDs are numbers, not BigInt
+                const processedTrips = data.data.map(trip => ({
+                    ...trip,
+                    id: Number(trip.id),
+                    user_id: Number(trip.user_id)
+                }));
+                console.log('📊 Processed trips:', processedTrips);
+                setTrips(processedTrips);
+
                 // Set active trip as current
-                const activeTrip = data.data.find(trip => trip.status === 'active');
-                if (activeTrip) setCurrentTrip(activeTrip);
+                const activeTrip = processedTrips.find(trip => trip.status === 'active');
+                if (activeTrip) {
+                    console.log('✅ Found active trip:', activeTrip);
+                    setCurrentTrip(activeTrip);
+                }
             }
         } catch (error) {
-            console.error('Trips load error:', error);
+            console.error('❌ Trips load error:', error);
             // Mock data for demo
             setTrips([
                 {
@@ -1990,51 +2005,51 @@ const ActivitiesSearch = ({ trip, token, location, sendChatMessage }) => {
                                                     </div>
                                                 </>
                                             )}
-                                        <a
-                                            href={activity.bookingLink || '#'}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="block w-full bg-orange-600 text-white px-6 py-3 rounded-lg hover:bg-orange-700 transition-colors text-center whitespace-nowrap mb-2"
+                                            <a
+                                                href={activity.bookingLink || '#'}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="block w-full bg-orange-600 text-white px-6 py-3 rounded-lg hover:bg-orange-700 transition-colors text-center whitespace-nowrap mb-2"
                                             >
-                                            Book Now
-                                        </a>
-                                        <button
-                                            onClick={() => getAIInsight(activity)}
-                                            disabled={aiInsightLoading && selectedActivity?.id === activity.id}
-                                            className="w-full bg-purple-100 text-purple-700 px-6 py-2 rounded-lg hover:bg-purple-200 transition-colors text-sm flex items-center justify-center space-x-2"
-                                        >
-                                            {aiInsightLoading && selectedActivity?.id === activity.id ? (
-                                                <>
-                                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-700"></div>
-                                                    <span>Getting AI Insight...</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Zap className="w-4 h-4" />
-                                                    <span>AI Insight</span>
-                                                </>
-                                            )}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* AI Insights */}
-                                {aiInsights[activity.id] && (
-                                    <div className="mt-4 bg-purple-50 border border-purple-200 rounded-lg p-4">
-                                        <div className="flex items-start space-x-2">
-                                            <Zap className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" />
-                                            <div>
-                                                <h5 className="font-semibold text-purple-900 mb-2">AI Insight</h5>
-                                                <p className="text-sm text-purple-800 leading-relaxed whitespace-pre-wrap">
-                                                    {aiInsights[activity.id]}
-                                                </p>
-                                            </div>
+                                                Book Now
+                                            </a>
+                                            <button
+                                                onClick={() => getAIInsight(activity)}
+                                                disabled={aiInsightLoading && selectedActivity?.id === activity.id}
+                                                className="w-full bg-purple-100 text-purple-700 px-6 py-2 rounded-lg hover:bg-purple-200 transition-colors text-sm flex items-center justify-center space-x-2"
+                                            >
+                                                {aiInsightLoading && selectedActivity?.id === activity.id ? (
+                                                    <>
+                                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-700"></div>
+                                                        <span>Getting AI Insight...</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Zap className="w-4 h-4" />
+                                                        <span>AI Insight</span>
+                                                    </>
+                                                )}
+                                            </button>
                                         </div>
                                     </div>
-                                )}
+
+                                    {/* AI Insights */}
+                                    {aiInsights[activity.id] && (
+                                        <div className="mt-4 bg-purple-50 border border-purple-200 rounded-lg p-4">
+                                            <div className="flex items-start space-x-2">
+                                                <Zap className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" />
+                                                <div>
+                                                    <h5 className="font-semibold text-purple-900 mb-2">AI Insight</h5>
+                                                    <p className="text-sm text-purple-800 leading-relaxed whitespace-pre-wrap">
+                                                        {aiInsights[activity.id]}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
-                      </div>
                     ))}
                 </div>
             )}
@@ -2088,16 +2103,16 @@ const MapModal = ({ isOpen, onClose, dayTitle, locations, destination, token }) 
     // Calculate center point of all coordinates
     const getCenterCoords = () => {
         if (coordinates.length === 0) return { lat: 0, lng: 0 };
-        
+
         const avgLat = coordinates.reduce((sum, loc) => sum + loc.lat, 0) / coordinates.length;
         const avgLng = coordinates.reduce((sum, loc) => sum + loc.lng, 0) / coordinates.length;
-        
+
         return { lat: avgLat, lng: avgLng };
     };
 
     const center = getCenterCoords();
     const markers = coordinates.map(loc => `markers=color:red%7Clabel:${encodeURIComponent(loc.name.charAt(0))}%7C${loc.lat},${loc.lng}`).join('&');
-    
+
     // Static Maps API URL (no API key exposure issue with proper backend setup)
     const mapUrl = coordinates.length > 0
         ? `https://maps.googleapis.com/maps/api/staticmap?center=${center.lat},${center.lng}&zoom=13&size=800x600&${markers}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 'YOUR_KEY'}`
@@ -2134,7 +2149,7 @@ const MapModal = ({ isOpen, onClose, dayTitle, locations, destination, token }) 
                                 alt="Location map"
                                 className="w-full rounded-lg shadow-lg"
                             />
-                            
+
                             <div className="mt-6 space-y-2">
                                 <h3 className="font-semibold text-gray-900 flex items-center">
                                     <MapPin className="w-5 h-5 mr-2 text-blue-600" />
@@ -2339,10 +2354,10 @@ const DayEditor = ({ day, tripId, destination, onSave, onCancel, token }) => {
 // ===================================
 
 const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMessage, setChatOpen, location, view, setView,
-    selectedTrip,
-    setSelectedTrip,
-    selectedTripId,
-    setSelectedTripId,
+                          selectedTrip,
+                          setSelectedTrip,
+                          selectedTripId,
+                          setSelectedTripId,
                       }) => {
     console.log('PlanningMode setChatOpen:', typeof setChatOpen);
     //const [view, setView] = useState('create'); // 'create', 'trips', 'itinerary', 'flights', 'hotels', 'activities'
@@ -2372,7 +2387,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
     ];
 
     const handleTripUpdate = (updatedTrip) => {
-        setTrips(prev => prev.map(trip => 
+        setTrips(prev => prev.map(trip =>
             trip.id === updatedTrip.id ? updatedTrip : trip
         ));
         if (selectedTrip?.id === updatedTrip.id) {
@@ -2380,7 +2395,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
         }
     };
     const handleDaySave = (updatedDay) => {
-    // Update the trip's itinerary
+        // Update the trip's itinerary
         const updatedItinerary = selectedTrip.itinerary?.itinerary || selectedTrip.itinerary;
         // This would need to reconstruct the itinerary text with the updated day
         // For now, we'll just refresh the trip
@@ -2390,63 +2405,63 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
     };
 
     const handleTripActivate = async (tripId) => {
-    try {
-        const response = await fetch(`${API_BASE_URL}/trips/${tripId}/activate`, {
-            method: 'PATCH',
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
+        try {
+            const response = await fetch(`${API_BASE_URL}/trips/${tripId}/activate`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
 
-        const data = await response.json();
+            const data = await response.json();
 
-        if (data.success) {
-            // Update local state
-            setTrips(prev => prev.map(trip => ({
-                ...trip,
-                status: trip.id === tripId ? 'active' : (trip.status === 'active' ? 'planning' : trip.status)
-            })));
-            
-            const activatedTrip = trips.find(t => t.id === tripId);
-            if (activatedTrip) {
-                setCurrentTrip({ ...activatedTrip, status: 'active' });
-                setSelectedTrip({ ...activatedTrip, status: 'active' });
+            if (data.success) {
+                // Update local state
+                setTrips(prev => prev.map(trip => ({
+                    ...trip,
+                    status: trip.id === tripId ? 'active' : (trip.status === 'active' ? 'planning' : trip.status)
+                })));
+
+                const activatedTrip = trips.find(t => t.id === tripId);
+                if (activatedTrip) {
+                    setCurrentTrip({ ...activatedTrip, status: 'active' });
+                    setSelectedTrip({ ...activatedTrip, status: 'active' });
+                }
             }
+        } catch (error) {
+            console.error('Activate trip error:', error);
         }
-    } catch (error) {
-        console.error('Activate trip error:', error);
-    }
-};
+    };
 
-const handleTripDeactivate = async (tripId) => {
-    try {
-        const response = await fetch(`${API_BASE_URL}/trips/${tripId}/deactivate`, {
-            method: 'PATCH',
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
+    const handleTripDeactivate = async (tripId) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/trips/${tripId}/deactivate`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
 
-        const data = await response.json();
+            const data = await response.json();
 
-        if (data.success) {
-            // Update local state
-            setTrips(prev => prev.map(trip => ({
-                ...trip,
-                status: trip.id === tripId ? 'planning' : trip.status
-            })));
-            
-            if (currentTrip?.id === tripId) {
-                setCurrentTrip(null);
+            if (data.success) {
+                // Update local state
+                setTrips(prev => prev.map(trip => ({
+                    ...trip,
+                    status: trip.id === tripId ? 'planning' : trip.status
+                })));
+
+                if (currentTrip?.id === tripId) {
+                    setCurrentTrip(null);
+                }
+                if (selectedTrip?.id === tripId) {
+                    setSelectedTrip(prev => ({ ...prev, status: 'planning' }));
+                }
             }
-            if (selectedTrip?.id === tripId) {
-                setSelectedTrip(prev => ({ ...prev, status: 'planning' }));
-            }
+        } catch (error) {
+            console.error('Deactivate trip error:', error);
         }
-    } catch (error) {
-        console.error('Deactivate trip error:', error);
-    }
-};
+    };
     const handleCreateTrip = async (e) => {
         e.preventDefault();
         if (!formData.destination || !formData.duration) return;
@@ -2530,8 +2545,8 @@ const handleTripDeactivate = async (tripId) => {
             setSelectedTripId(null);
         }
     }, []);
-    
-    useEffect(() => {    
+
+    useEffect(() => {
         if (view === 'itinerary' && selectedTrip?.id) {
             loadSavedFlights(selectedTrip.id);
         }
@@ -2585,96 +2600,96 @@ const handleTripDeactivate = async (tripId) => {
     };
 
     const parseItinerary = (itineraryText) => {
-    if (!itineraryText) return [];
+        if (!itineraryText) return [];
 
-    const days = [];
-    const lines = itineraryText.split('\n');
-    let currentDay = null;
+        const days = [];
+        const lines = itineraryText.split('\n');
+        let currentDay = null;
 
-    lines.forEach(line => {
-        line = line.trim();
-        if (!line) return;
+        lines.forEach(line => {
+            line = line.trim();
+            if (!line) return;
 
-        // Check if this is a day header
-        const dayMatch = line.match(/\*?\*?\s*Day\s+(\d+)[:\-\s]*(.*?)\*?\*?/i);
-        if (dayMatch) {
-            if (currentDay) {
-                days.push(currentDay);
+            // Check if this is a day header
+            const dayMatch = line.match(/\*?\*?\s*Day\s+(\d+)[:\-\s]*(.*?)\*?\*?/i);
+            if (dayMatch) {
+                if (currentDay) {
+                    days.push(currentDay);
+                }
+                currentDay = {
+                    number: parseInt(dayMatch[1]),
+                    title: dayMatch[2].replace(/\*/g, '').trim() || 'Exploration Day',
+                    activities: [],
+                    totalCost: 0
+                };
+                return;
             }
-            currentDay = {
-                number: parseInt(dayMatch[1]),
-                title: dayMatch[2].replace(/\*/g, '').trim() || 'Exploration Day',
-                activities: [],
-                totalCost: 0
-            };
-            return;
-        }
 
-    // Extract costs
-        const costMatch = line.match(/\$(\d+(?:,\d{3})*(?:\.\d{2})?)/);
-        if (costMatch && currentDay) {
-            currentDay.totalCost += parseFloat(costMatch[1].replace(/,/g, ''));
-        }
-
-       // Add activities - be less strict
-        if (currentDay && line.length > 3) {
-            const cleanLine = line
-                .replace(/^\*+\s*/, '')
-                .replace(/\*+$/, '')
-                .replace(/\*\*(.*?)\*\*/g, '$1')
-                .replace(/^[-•]\s*/, '')
-                .replace(/^\d+\.\s*/, '')
-                .trim();
-
-            if (cleanLine) {
-                currentDay.activities.push(cleanLine);
+            // Extract costs
+            const costMatch = line.match(/\$(\d+(?:,\d{3})*(?:\.\d{2})?)/);
+            if (costMatch && currentDay) {
+                currentDay.totalCost += parseFloat(costMatch[1].replace(/,/g, ''));
             }
-        }
-    });
-    if (currentDay) {
-        days.push(currentDay);
-    }
-        
 
-    // Remove duplicate days (same day number)
-    const uniqueDays = [];
-    const seenDayNumbers = new Set();
-    
-    days.forEach(day => {
-        if (!seenDayNumbers.has(day.number)) {
-            seenDayNumbers.add(day.number);
-            uniqueDays.push(day);
-        }
-    });
+            // Add activities - be less strict
+            if (currentDay && line.length > 3) {
+                const cleanLine = line
+                    .replace(/^\*+\s*/, '')
+                    .replace(/\*+$/, '')
+                    .replace(/\*\*(.*?)\*\*/g, '$1')
+                    .replace(/^[-•]\s*/, '')
+                    .replace(/^\d+\.\s*/, '')
+                    .trim();
 
-    // Fallback if no structured days found
-    if (uniqueDays.length === 0 && itineraryText.length > 0) {
-        const activities = lines
-            .filter(line => line.trim().length > 10)
-            .filter(line => !line.match(/^(Day \d+|Morning Activity|Afternoon Activity|Evening Activity|Lunch|Dinner|Breakfast):?\s*$/i))
-            .map(line => line
-                .replace(/^\*+\s*/, '')
-                .replace(/\*+$/, '')
-                .replace(/\*\*(.*?)\*\*/g, '$1')
-                .trim()
-            )
-            .filter(line => line && line.length > 10);
-
-        uniqueDays.push({
-            number: 1,
-            title: 'Full Itinerary',
-            activities: activities,
-            totalCost: 0
+                if (cleanLine) {
+                    currentDay.activities.push(cleanLine);
+                }
+            }
         });
-    }
+        if (currentDay) {
+            days.push(currentDay);
+        }
 
-    return uniqueDays;
-};
+
+        // Remove duplicate days (same day number)
+        const uniqueDays = [];
+        const seenDayNumbers = new Set();
+
+        days.forEach(day => {
+            if (!seenDayNumbers.has(day.number)) {
+                seenDayNumbers.add(day.number);
+                uniqueDays.push(day);
+            }
+        });
+
+        // Fallback if no structured days found
+        if (uniqueDays.length === 0 && itineraryText.length > 0) {
+            const activities = lines
+                .filter(line => line.trim().length > 10)
+                .filter(line => !line.match(/^(Day \d+|Morning Activity|Afternoon Activity|Evening Activity|Lunch|Dinner|Breakfast):?\s*$/i))
+                .map(line => line
+                    .replace(/^\*+\s*/, '')
+                    .replace(/\*+$/, '')
+                    .replace(/\*\*(.*?)\*\*/g, '$1')
+                    .trim()
+                )
+                .filter(line => line && line.length > 10);
+
+            uniqueDays.push({
+                number: 1,
+                title: 'Full Itinerary',
+                activities: activities,
+                totalCost: 0
+            });
+        }
+
+        return uniqueDays;
+    };
     // Add a function to format activities for display
     const formatActivityText = (text) => {
         // Check if it's a section header (Morning Activity, Lunch, etc.)
         const sectionMatch = text.match(/^(Morning Activity|Afternoon Activity|Evening Activity|Lunch|Dinner|Breakfast)(\s*\(.*?\))?:/i);
-        
+
         if (sectionMatch) {
             return {
                 type: 'header',
@@ -2682,10 +2697,10 @@ const handleTripDeactivate = async (tripId) => {
                 time: sectionMatch[2] ? sectionMatch[2].replace(/[()]/g, '').trim() : null
             };
         }
-        
+
         // Check if it's an activity detail (Activity:, Venue:, etc.)
         const detailMatch = text.match(/^(Activity|Venue|Address|Cost|Price Range|Note|Duration):\s*(.+)/i);
-        
+
         if (detailMatch) {
             return {
                 type: 'detail',
@@ -2693,7 +2708,7 @@ const handleTripDeactivate = async (tripId) => {
                 value: detailMatch[2].trim()
             };
         }
-        
+
         // Regular text
         return {
             type: 'text',
@@ -2721,9 +2736,9 @@ const handleTripDeactivate = async (tripId) => {
                     .replace(/\s*-.*$/g, '')
                     .replace(/\$\d+(\.\d{2})?/g, '')
                     .trim();
-                
+
                 const firstPart = cleaned.split(/[,.]|and |or /i)[0].trim();
-                
+
                 if (firstPart.length > 0 && firstPart.length < 50) {
                     return firstPart;
                 }
@@ -2755,16 +2770,16 @@ const handleTripDeactivate = async (tripId) => {
             <div className="max-w-7xl mx-auto px-4 py-8">
                 <button
                     onClick={() => {
-                    setView('create');
-                    setSelectedTrip(null);
-                    setSelectedTripId(null);
-                }}
+                        setView('create');
+                        setSelectedTrip(null);
+                        setSelectedTripId(null);
+                    }}
                     className="flex items-center space-x-2 text-blue-600 hover:text-blue-700 mb-4"
                 >
                     <span>←</span>
                     <span>Back to Trip Planning</span>
                 </button>
-            
+
                 <div className="flex items-center justify-between mb-8">
                     <div>
                         <h2 className="text-3xl font-bold text-gray-900 mb-2">
@@ -2785,18 +2800,18 @@ const handleTripDeactivate = async (tripId) => {
                                     <span>${tripToShow.budget} budget</span>
                                 </span>
                             )}
-                                  {!activeTrip && (
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleTripActivate(tripToShow.id);
-                                                    setView('manage');
-                                                }}
-                                                className="text-xs text-blue-600 hover:text-blue-700"
-                                            >
-                                                Make Active
-                                            </button>
-                                        )}
+                            {!activeTrip && (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleTripActivate(tripToShow.id);
+                                        setView('manage');
+                                    }}
+                                    className="text-xs text-blue-600 hover:text-blue-700"
+                                >
+                                    Make Active
+                                </button>
+                            )}
                         </div>
                     </div>
                     <button
@@ -2850,7 +2865,7 @@ const handleTripDeactivate = async (tripId) => {
                                     <div className="space-y-4">
                                         {day.activities.map((activity, idx) => {
                                             const formatted = formatActivityText(activity);
-                                            
+
                                             if (formatted.type === 'header') {
                                                 return (
                                                     <div key={idx} className="mt-4 first:mt-0">
@@ -2867,7 +2882,7 @@ const handleTripDeactivate = async (tripId) => {
                                                     </div>
                                                 );
                                             }
-                                            
+
                                             if (formatted.type === 'detail') {
                                                 return (
                                                     <div key={idx} className="ml-4 flex items-start space-x-2">
@@ -2880,7 +2895,7 @@ const handleTripDeactivate = async (tripId) => {
                                                     </div>
                                                 );
                                             }
-                                            
+
                                             return (
                                                 <div key={idx} className="flex items-start space-x-3 text-gray-700 ml-2">
                                                     <span className="text-blue-500 mt-1">•</span>
@@ -2979,7 +2994,7 @@ const handleTripDeactivate = async (tripId) => {
                                                             <div className="flex items-center justify-center">
                                                                 <div className="flex-1 border-t-2 border-gray-300"></div>
                                                                 <Plane className="w-5 h-5 text-blue-600 mx-2" />
-                                                f                <div className="flex-1 border-t-2 border-gray-300"></div>
+                                                                f                <div className="flex-1 border-t-2 border-gray-300"></div>
                                                             </div>
                                                             <div className="text-center text-xs text-gray-500 mt-1">
                                                                 {outbound.segments.length === 1 ? 'Direct' : `${outbound.segments.length - 1} stop(s)`}
@@ -3140,7 +3155,7 @@ const handleTripDeactivate = async (tripId) => {
                     destination={tripToShow?.destination || ''}
                     token={token}
                 />
-               {editingDay && (
+                {editingDay && (
                     <DayEditor
                         day={editingDay}
                         tripId={tripToShow.id}
@@ -3155,14 +3170,14 @@ const handleTripDeactivate = async (tripId) => {
     }
 
     // ACTIVITIES VIEW
-        if (view === 'activities' && (selectedTrip || selectedTripId)) {
-            const tripToShow = selectedTrip || trips.find(t => t.id === selectedTripId);
-            
-            if (!tripToShow) {
-                setView('itinerary');
-                return null;
-        }        
-            return (
+    if (view === 'activities' && (selectedTrip || selectedTripId)) {
+        const tripToShow = selectedTrip || trips.find(t => t.id === selectedTripId);
+
+        if (!tripToShow) {
+            setView('itinerary');
+            return null;
+        }
+        return (
             <div className="max-w-7xl mx-auto px-4 py-8">
                 <button
                     onClick={() => setView('itinerary')}
@@ -3208,14 +3223,14 @@ const handleTripDeactivate = async (tripId) => {
     }
 
     // HOTELS VIEW
-        if (view === 'hotels' && (selectedTrip || selectedTripId)) {
-            const tripToShow = selectedTrip || trips.find(t => t.id === selectedTripId);
-            
-            if (!tripToShow) {
-                setView('itinerary');
-                return null;
-            }        
-            return (
+    if (view === 'hotels' && (selectedTrip || selectedTripId)) {
+        const tripToShow = selectedTrip || trips.find(t => t.id === selectedTripId);
+
+        if (!tripToShow) {
+            setView('itinerary');
+            return null;
+        }
+        return (
             <div className="max-w-7xl mx-auto px-4 py-8">
                 <button
                     onClick={() => setView('itinerary')}
@@ -3318,9 +3333,9 @@ const handleTripDeactivate = async (tripId) => {
     }
 
     //TRIP MANAGER VIEW (when selectedTripId is set but view is still 'create')
-   if (selectedTripId && view === 'manage') {
+    if (selectedTripId && view === 'manage') {
         const tripToShow = trips.find(t => t.id === selectedTripId);
-        
+
         return (
             <div className="max-w-7xl mx-auto px-4 py-8">
                 <button
@@ -3333,7 +3348,7 @@ const handleTripDeactivate = async (tripId) => {
                 >
                     ← Back to Create New Trip
                 </button>
-                
+
                 <TripManager
                     trip={tripToShow}
                     onUpdate={handleTripUpdate}
@@ -3357,70 +3372,70 @@ const handleTripDeactivate = async (tripId) => {
                         <p className="text-gray-600">Create a personalized AI-powered itinerary</p>
                     </div>
                     <div className="flex items-center space-x-3">
-                    {/* Active Trip Shortcut */}
-                    {activeTrip && (
+                        {/* Active Trip Shortcut */}
+                        {activeTrip && (
+                            <button
+                                onClick={() => {
+                                    setSelectedTrip(activeTrip);
+                                    setSelectedTripId(activeTrip.id);
+                                    setView('manage');
+                                }}
+                                className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition-colors flex items-center space-x-2 shadow-lg"
+                            >
+                                <Check className="w-5 h-5" />
+                                <div className="text-left">
+                                    <div className="text-xs opacity-90">Active Trip</div>
+                                    <div className="font-semibold">{activeTrip.destination}</div>
+                                </div>
+                            </button>
+                        )}
+                        {trips.length > 0 && (
+                            <button
+                                onClick={() => setView('trips')}
+                                className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors flex items-center space-x-2"
+                            >
+                                <Calendar className="w-4 h-4" />
+                                <span>View All Trips ({trips.length})</span>
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </div>
+            {/* Active Trip Card - Show prominently if exists */}
+            {activeTrip && (
+                <div className="mb-8 bg-gradient-to-r from-green-500 to-blue-500 rounded-xl p-6 text-white shadow-xl">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <div className="flex items-center space-x-2 mb-2">
+                                <Check className="w-6 h-6" />
+                                <h3 className="text-2xl font-bold">Your Active Trip</h3>
+                            </div>
+                            <p className="text-xl mb-1">{activeTrip.title || `${activeTrip.destination} Trip`}</p>
+                            <div className="flex items-center space-x-4 text-green-100">
+                                <span>{activeTrip.duration} days</span>
+                                <span>•</span>
+                                <span>{activeTrip.destination}</span>
+                                {activeTrip.startDate && (
+                                    <>
+                                        <span>•</span>
+                                        <span>Starts {new Date(activeTrip.startDate).toLocaleDateString()}</span>
+                                    </>
+                                )}
+                            </div>
+                        </div>
                         <button
                             onClick={() => {
                                 setSelectedTrip(activeTrip);
                                 setSelectedTripId(activeTrip.id);
                                 setView('manage');
                             }}
-                            className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition-colors flex items-center space-x-2 shadow-lg"
+                            className="bg-white text-green-600 px-6 py-3 rounded-lg hover:bg-green-50 transition-colors font-semibold"
                         >
-                            <Check className="w-5 h-5" />
-                            <div className="text-left">
-                                <div className="text-xs opacity-90">Active Trip</div>
-                                <div className="font-semibold">{activeTrip.destination}</div>
-                            </div>
+                            Manage Trip →
                         </button>
-                    )}
-                    {trips.length > 0 && (
-                        <button
-                            onClick={() => setView('trips')}
-                            className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors flex items-center space-x-2"
-                        >
-                            <Calendar className="w-4 h-4" />
-                            <span>View All Trips ({trips.length})</span>
-                        </button>
-                    )}
-                </div>
-            </div>
-        </div> 
-            {/* Active Trip Card - Show prominently if exists */}
-        {activeTrip && (
-            <div className="mb-8 bg-gradient-to-r from-green-500 to-blue-500 rounded-xl p-6 text-white shadow-xl">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <div className="flex items-center space-x-2 mb-2">
-                            <Check className="w-6 h-6" />
-                            <h3 className="text-2xl font-bold">Your Active Trip</h3>
-                        </div>
-                        <p className="text-xl mb-1">{activeTrip.title || `${activeTrip.destination} Trip`}</p>
-                        <div className="flex items-center space-x-4 text-green-100">
-                            <span>{activeTrip.duration} days</span>
-                            <span>•</span>
-                            <span>{activeTrip.destination}</span>
-                            {activeTrip.startDate && (
-                                <>
-                                    <span>•</span>
-                                    <span>Starts {new Date(activeTrip.startDate).toLocaleDateString()}</span>
-                                </>
-                            )}
-                        </div>
                     </div>
-                    <button
-                        onClick={() => {
-                            setSelectedTrip(activeTrip);
-                            setSelectedTripId(activeTrip.id);
-                            setView('manage');
-                        }}
-                        className="bg-white text-green-600 px-6 py-3 rounded-lg hover:bg-green-50 transition-colors font-semibold"
-                    >
-                        Manage Trip →
-                    </button>
                 </div>
-            </div>
-        )}
+            )}
 
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -3570,8 +3585,8 @@ const handleTripDeactivate = async (tripId) => {
                             <div className="space-y-4">
                                 <h4 className="text-lg font-semibold text-gray-900">Your Recent Trips</h4>
                                 {trips.slice(0, 3).map(trip => (
-                                    <div 
-                                        key={trip.id} 
+                                    <div
+                                        key={trip.id}
                                         className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
                                         onClick={() => {
                                             setSelectedTrip(trip);
@@ -3705,1205 +3720,1205 @@ const handleTripDeactivate = async (tripId) => {
 // ===================================
 
 const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTrip, sendChatMessage, setChatOpen }) => {
-  // State Management
-  const [selectedPlaceType, setSelectedPlaceType] = useState('all');
-  const [searchRadius, setSearchRadius] = useState(1000);
-  const [loading, setLoading] = useState(false);
-  const [places, setPlaces] = useState([]);
-  const [showQuickToolModal, setShowQuickToolModal] = useState(null);
-  const [showScheduleEdit, setShowScheduleEdit] = useState(false);
-  const [todaySchedule, setTodaySchedule] = useState([]);
-  const [upcomingBookings, setUpcomingBookings] = useState([]);
-  const [notifications, setNotifications] = useState([]);
-  const [activeTrip, setActiveTrip] = useState(null);
-  const [scheduleLoading, setScheduleLoading] = useState(true);
-  const [currentTime, setCurrentTime] = useState(new Date());
-  
+    // State Management
+    const [selectedPlaceType, setSelectedPlaceType] = useState('all');
+    const [searchRadius, setSearchRadius] = useState(1000);
+    const [loading, setLoading] = useState(false);
+    const [places, setPlaces] = useState([]);
+    const [showQuickToolModal, setShowQuickToolModal] = useState(null);
+    const [showScheduleEdit, setShowScheduleEdit] = useState(false);
+    const [todaySchedule, setTodaySchedule] = useState([]);
+    const [upcomingBookings, setUpcomingBookings] = useState([]);
+    const [notifications, setNotifications] = useState([]);
+    const [activeTrip, setActiveTrip] = useState(null);
+    const [scheduleLoading, setScheduleLoading] = useState(true);
+    const [currentTime, setCurrentTime] = useState(new Date());
 
-  // Load active trip on mount
-  useEffect(() => {
-    loadActiveTrip();
-    loadNotifications();
-    loadUpcomingBookings();
-  }, [token]);
 
-  // Load today's schedule when active trip changes
-  useEffect(() => {
-    if (activeTrip) {
-      loadTodaySchedule();
-    }
-  }, [activeTrip]);
+    // Load active trip on mount
+    useEffect(() => {
+        loadActiveTrip();
+        loadNotifications();
+        loadUpcomingBookings();
+    }, [token]);
 
-  // Load places when location or filters change
-  useEffect(() => {
-    if (location) {
-      searchNearbyPlaces();
-    }
-  }, [location, selectedPlaceType, searchRadius]);
+    // Load today's schedule when active trip changes
+    useEffect(() => {
+        if (activeTrip) {
+            loadTodaySchedule();
+        }
+    }, [activeTrip]);
 
-   useEffect(() => {
-    const timerId = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000); // Update every second
+    // Load places when location or filters change
+    useEffect(() => {
+        if (location) {
+            searchNearbyPlaces();
+        }
+    }, [location, selectedPlaceType, searchRadius]);
 
-    // Cleanup function to clear the interval when the component unmounts
-    return () => clearInterval(timerId);
-  }, []);  
+    useEffect(() => {
+        const timerId = setInterval(() => {
+            setCurrentTime(new Date());
+        }, 1000); // Update every second
 
-  const formattedTime = currentTime.toLocaleTimeString();
-  const formattedDate = currentTime.toLocaleDateString();
+        // Cleanup function to clear the interval when the component unmounts
+        return () => clearInterval(timerId);
+    }, []);
 
-  // API Functions
-  const loadActiveTrip = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/trips/active`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await response.json();
-      if (data.success) {
-        setActiveTrip(data.data || currentTrip);
-      }
-    } catch (error) {
-      console.error('Load active trip error:', error);
-      setActiveTrip(currentTrip);
-    }
-  };
+    const formattedTime = currentTime.toLocaleTimeString();
+    const formattedDate = currentTime.toLocaleDateString();
 
-  const loadTodaySchedule = async () => {
-    if (!activeTrip) return;
-    
-    setScheduleLoading(true);
-    try {
-      const response = await fetch(`${API_BASE_URL}/trips/active/schedule`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await response.json();
-      if (data.success) {
-        setTodaySchedule(data.data || []);
-      }
-    } catch (error) {
-      console.error('Load schedule error:', error);
-    } finally {
-      setScheduleLoading(false);
-    }
-  };
-    
-
-  const loadNotifications = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/notifications`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await response.json();
-      if (data.success) {
-        setNotifications(data.data || []);
-      }
-    } catch (error) {
-      console.error('Load notifications error:', error);
-    }
-  };
-
-  const loadUpcomingBookings = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/bookings/upcoming`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await response.json();
-      if (data.success) {
-        setUpcomingBookings(data.data || []);
-      }
-    } catch (error) {
-      console.error('Load bookings error:', error);
-    }
-  };
-
-  const updateScheduleItemStatus = async (itemId, status) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/trips/active/schedule/${itemId}`, {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ status })
-      });
-      const data = await response.json();
-      if (data.success) {
-        // Update local state
-        setTodaySchedule(prev =>
-          prev.map(item => item.id === itemId ? { ...item, status } : item)
-        );
-      }
-    } catch (error) {
-      console.error('Update schedule status error:', error);
-    }
-  };
-
-  const dismissNotification = async (notificationId) => {
-    try {
-      await fetch(`${API_BASE_URL}/notifications/${notificationId}/dismiss`, {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setNotifications(prev => prev.filter(n => n.id !== notificationId));
-    } catch (error) {
-      console.error('Dismiss notification error:', error);
-    }
-  };
-
-  const placeCategories = [
-    { value: 'all', label: 'All Places', icon: '🌟' },
-    { value: 'restaurant', label: 'Restaurants', icon: '🍽️' },
-    { value: 'tourist_attraction', label: 'Attractions', icon: '🏛️' },
-    { value: 'shopping_mall', label: 'Shopping', icon: '🛍️' },
-    { value: 'cafe', label: 'Cafes', icon: '☕' },
-    { value: 'museum', label: 'Museums', icon: '🎨' },
-    { value: 'park', label: 'Parks', icon: '🌳' }
-  ];
-
-  // Generate weather forecast from current weather
-  const generateWeatherForecast = () => {
-    if (!weather) return [];
-    
-    const baseTemp = weather.temperature || 24;
-    return [
-      { time: "12 PM", temp: baseTemp + 2, condition: weather.condition || "sunny", alert: false },
-      { time: "3 PM", temp: baseTemp + 3, condition: "cloudy", alert: false },
-      { time: "6 PM", temp: baseTemp, condition: "clear", alert: false },
-      { time: "9 PM", temp: baseTemp - 2, condition: "clear", alert: false }
-    ];
-  };
-
-  const weatherForecast = generateWeatherForecast();
-
-  // Search nearby places
-  const searchNearbyPlaces = async (type = selectedPlaceType) => {
-    if (!location) return;
-
-    setLoading(true);
-    try {
-      const searchType = type === 'all' ? 'tourist_attraction' : type;
-      const response = await fetch(
-        `${API_BASE_URL}/places/nearby?lat=${location.lat}&lng=${location.lng}&type=${searchType}&radius=${searchRadius}`
-      );
-      const data = await response.json();
-
-      if (data.success) {
-        setPlaces(data.data);
-      }
-    } catch (error) {
-      console.error('Places search error:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Helper to get current trip with fallback
-  const getCurrentTrip = () => {
-    return activeTrip || currentTrip || {
-      id: null,
-      title: "No Active Trip",
-      destination: "Unknown",
-      status: "planning",
-      currentDay: 1,
-      duration: 7
+    // API Functions
+    const loadActiveTrip = async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/trips/active`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const data = await response.json();
+            if (data.success) {
+                setActiveTrip(data.data || currentTrip);
+            }
+        } catch (error) {
+            console.error('Load active trip error:', error);
+            setActiveTrip(currentTrip);
+        }
     };
-  };
 
-  const tripData = getCurrentTrip();
+    const loadTodaySchedule = async () => {
+        if (!activeTrip) return;
 
-  // Helper functions
-  const getWeatherIcon = (condition) => {
-    switch (condition?.toLowerCase()) {
-      case 'sunny':
-      case 'clear':
-        return '☀️';
-      case 'rain':
-      case 'rainy':
-        return '🌧️';
-      case 'cloudy':
-        return '☁️';
-      default:
-        return '🌙';
-    }
-  };
+        setScheduleLoading(true);
+        try {
+            const response = await fetch(`${API_BASE_URL}/trips/active/schedule`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const data = await response.json();
+            if (data.success) {
+                setTodaySchedule(data.data || []);
+            }
+        } catch (error) {
+            console.error('Load schedule error:', error);
+        } finally {
+            setScheduleLoading(false);
+        }
+    };
 
-  const getActivityIcon = (type) => {
-    switch (type) {
-      case 'dining': return <Utensils className="w-4 h-4" />;
-      case 'accommodation': return <Hotel className="w-4 h-4" />;
-      case 'transport': return <Plane className="w-4 h-4" />;
-      default: return <Calendar className="w-4 h-4" />;
-    }
-  };
 
-  const getBookingIcon = (type) => {
-    switch (type) {
-      case 'flight': return <Plane className="w-5 h-5" />;
-      case 'hotel': return <Hotel className="w-5 h-5" />;
-      default: return <Calendar className="w-5 h-5" />;
-    }
-  };
+    const loadNotifications = async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/notifications`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const data = await response.json();
+            if (data.success) {
+                setNotifications(data.data || []);
+            }
+        } catch (error) {
+            console.error('Load notifications error:', error);
+        }
+    };
 
-  // Current Activity Component
-  const CurrentActivity = () => {
-    if (scheduleLoading) {
-      return (
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl p-6 text-white mb-6">
-          <div className="flex items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-            <span className="ml-3">Loading schedule...</span>
-          </div>
-        </div>
-      );
-    }
+    const loadUpcomingBookings = async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/bookings/upcoming`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const data = await response.json();
+            if (data.success) {
+                setUpcomingBookings(data.data || []);
+            }
+        } catch (error) {
+            console.error('Load bookings error:', error);
+        }
+    };
 
-    if (todaySchedule.length === 0) {
-      return (
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl p-6 text-white mb-6">
-          <div className="text-center py-8">
-            <Calendar className="w-12 h-12 mx-auto mb-4 opacity-75" />
-            <h3 className="text-xl font-bold mb-2">No Activities Scheduled</h3>
-            <p className="opacity-90 mb-4">Start planning your day!</p>
-            <button 
-              onClick={() => sendChatMessage("Help me plan activities for today")}
-              className="bg-white/20 hover:bg-white/30 px-6 py-2 rounded-lg transition-colors"
-            >
-              Plan Activities
-            </button>
-          </div>
-        </div>
-      );
-    }
+    const updateScheduleItemStatus = async (itemId, status) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/trips/active/schedule/${itemId}`, {
+                method: 'PATCH',
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ status })
+            });
+            const data = await response.json();
+            if (data.success) {
+                // Update local state
+                setTodaySchedule(prev =>
+                    prev.map(item => item.id === itemId ? { ...item, status } : item)
+                );
+            }
+        } catch (error) {
+            console.error('Update schedule status error:', error);
+        }
+    };
 
-    const currentActivity = todaySchedule.find(item => item.status === 'current') || todaySchedule[0];
-    const nextActivity = todaySchedule[todaySchedule.findIndex(item => item.id === currentActivity.id) + 1];
+    const dismissNotification = async (notificationId) => {
+        try {
+            await fetch(`${API_BASE_URL}/notifications/${notificationId}/dismiss`, {
+                method: 'PATCH',
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setNotifications(prev => prev.filter(n => n.id !== notificationId));
+        } catch (error) {
+            console.error('Dismiss notification error:', error);
+        }
+    };
 
-    return (
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl p-6 text-white mb-6">
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex-1">
-            <div className="flex items-center space-x-2 mb-2">
-              <Clock className="w-5 h-5" />
-              <span className="text-sm font-medium opacity-90">Current Activity</span>
-            </div>
-            <h3 className="text-2xl font-bold mb-1">{currentActivity.title}</h3>
-            <div className="flex items-center space-x-4 text-sm opacity-90 flex-wrap gap-2">
+    const placeCategories = [
+        { value: 'all', label: 'All Places', icon: '🌟' },
+        { value: 'restaurant', label: 'Restaurants', icon: '🍽️' },
+        { value: 'tourist_attraction', label: 'Attractions', icon: '🏛️' },
+        { value: 'shopping_mall', label: 'Shopping', icon: '🛍️' },
+        { value: 'cafe', label: 'Cafes', icon: '☕' },
+        { value: 'museum', label: 'Museums', icon: '🎨' },
+        { value: 'park', label: 'Parks', icon: '🌳' }
+    ];
+
+    // Generate weather forecast from current weather
+    const generateWeatherForecast = () => {
+        if (!weather) return [];
+
+        const baseTemp = weather.temperature || 24;
+        return [
+            { time: "12 PM", temp: baseTemp + 2, condition: weather.condition || "sunny", alert: false },
+            { time: "3 PM", temp: baseTemp + 3, condition: "cloudy", alert: false },
+            { time: "6 PM", temp: baseTemp, condition: "clear", alert: false },
+            { time: "9 PM", temp: baseTemp - 2, condition: "clear", alert: false }
+        ];
+    };
+
+    const weatherForecast = generateWeatherForecast();
+
+    // Search nearby places
+    const searchNearbyPlaces = async (type = selectedPlaceType) => {
+        if (!location) return;
+
+        setLoading(true);
+        try {
+            const searchType = type === 'all' ? 'tourist_attraction' : type;
+            const response = await fetch(
+                `${API_BASE_URL}/places/nearby?lat=${location.lat}&lng=${location.lng}&type=${searchType}&radius=${searchRadius}`
+            );
+            const data = await response.json();
+
+            if (data.success) {
+                setPlaces(data.data);
+            }
+        } catch (error) {
+            console.error('Places search error:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Helper to get current trip with fallback
+    const getCurrentTrip = () => {
+        return activeTrip || currentTrip || {
+            id: null,
+            title: "No Active Trip",
+            destination: "Unknown",
+            status: "planning",
+            currentDay: 1,
+            duration: 7
+        };
+    };
+
+    const tripData = getCurrentTrip();
+
+    // Helper functions
+    const getWeatherIcon = (condition) => {
+        switch (condition?.toLowerCase()) {
+            case 'sunny':
+            case 'clear':
+                return '☀️';
+            case 'rain':
+            case 'rainy':
+                return '🌧️';
+            case 'cloudy':
+                return '☁️';
+            default:
+                return '🌙';
+        }
+    };
+
+    const getActivityIcon = (type) => {
+        switch (type) {
+            case 'dining': return <Utensils className="w-4 h-4" />;
+            case 'accommodation': return <Hotel className="w-4 h-4" />;
+            case 'transport': return <Plane className="w-4 h-4" />;
+            default: return <Calendar className="w-4 h-4" />;
+        }
+    };
+
+    const getBookingIcon = (type) => {
+        switch (type) {
+            case 'flight': return <Plane className="w-5 h-5" />;
+            case 'hotel': return <Hotel className="w-5 h-5" />;
+            default: return <Calendar className="w-5 h-5" />;
+        }
+    };
+
+    // Current Activity Component
+    const CurrentActivity = () => {
+        if (scheduleLoading) {
+            return (
+                <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl p-6 text-white mb-6">
+                    <div className="flex items-center justify-center py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+                        <span className="ml-3">Loading schedule...</span>
+                    </div>
+                </div>
+            );
+        }
+
+        if (todaySchedule.length === 0) {
+            return (
+                <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl p-6 text-white mb-6">
+                    <div className="text-center py-8">
+                        <Calendar className="w-12 h-12 mx-auto mb-4 opacity-75" />
+                        <h3 className="text-xl font-bold mb-2">No Activities Scheduled</h3>
+                        <p className="opacity-90 mb-4">Start planning your day!</p>
+                        <button
+                            onClick={() => sendChatMessage("Help me plan activities for today")}
+                            className="bg-white/20 hover:bg-white/30 px-6 py-2 rounded-lg transition-colors"
+                        >
+                            Plan Activities
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        const currentActivity = todaySchedule.find(item => item.status === 'current') || todaySchedule[0];
+        const nextActivity = todaySchedule[todaySchedule.findIndex(item => item.id === currentActivity.id) + 1];
+
+        return (
+            <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl p-6 text-white mb-6">
+                <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1">
+                        <div className="flex items-center space-x-2 mb-2">
+                            <Clock className="w-5 h-5" />
+                            <span className="text-sm font-medium opacity-90">Current Activity</span>
+                        </div>
+                        <h3 className="text-2xl font-bold mb-1">{currentActivity.title}</h3>
+                        <div className="flex items-center space-x-4 text-sm opacity-90 flex-wrap gap-2">
               <span className="flex items-center space-x-1">
                 <MapPin className="w-4 h-4" />
                 <span>{currentActivity.location}</span>
               </span>
-              <span>{currentActivity.time}</span>
-              {currentActivity.duration && <span>• {currentActivity.duration}</span>}
-            </div>
-          </div>
-          <button 
-            onClick={() => sendChatMessage(`Get directions to ${currentActivity.location}`)}
-            className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors"
-          >
-            <Navigation className="w-5 h-5" />
-          </button>
-        </div>
-
-        {nextActivity && (
-          <div className="bg-white/10 rounded-lg p-3 backdrop-blur-sm">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <ChevronRight className="w-4 h-4" />
-                <div>
-                  <p className="text-sm opacity-75">Up Next</p>
-                  <p className="font-medium">{nextActivity.title}</p>
-                </div>
-              </div>
-              <span className="text-sm opacity-75">{nextActivity.time}</span>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  // Weather Alert Component
-  const WeatherAlert = () => {
-    const hasAlert = weatherForecast.some(f => f.alert);
-    if (!hasAlert) return null;
-
-    return (
-      <div className="bg-yellow-50 border-l-4 border-yellow-400 rounded-lg p-4 mb-6">
-        <div className="flex items-start space-x-3">
-          <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <h4 className="font-semibold text-yellow-900 mb-1">Weather Alert</h4>
-            <p className="text-yellow-800 text-sm mb-2">
-              Weather changes expected. Consider indoor alternatives?
-            </p>
-            <div className="flex space-x-2">
-              <button 
-                onClick={() => sendChatMessage("Show me indoor activities near me")}
-                className="text-xs bg-yellow-600 text-white px-3 py-1 rounded hover:bg-yellow-700"
-              >
-                Show Alternatives
-              </button>
-              <button 
-                onClick={() => setNotifications(notifications.filter(n => n.type !== 'weather'))}
-                className="text-xs bg-white text-yellow-600 border border-yellow-200 px-3 py-1 rounded hover:bg-yellow-50"
-              >
-                Dismiss
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // Today's Schedule Panel
-  const TodaySchedulePanel = () => (
-    <div className="bg-white rounded-xl shadow-lg p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold flex items-center space-x-2">
-          <Calendar className="w-5 h-5 text-blue-600" />
-          <span>Today's Schedule</span>
-        </h3>
-        <div className="flex space-x-2">
-          <button 
-            onClick={() => setShowScheduleEdit(true)}
-            className="text-blue-600 hover:text-blue-700 text-sm flex items-center space-x-1"
-          >
-            <Edit className="w-4 h-4" />
-            <span>Modify</span>
-          </button>
-          <button 
-            onClick={() => searchNearbyPlaces()}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-
-      <div className="space-y-3">
-        {todaySchedule.map((item) => (
-          <div 
-            key={item.id}
-            className={`border rounded-lg p-3 transition-all ${
-              item.status === 'current' 
-                ? 'border-blue-500 bg-blue-50' 
-                : item.status === 'completed'
-                ? 'border-gray-200 bg-gray-50 opacity-60'
-                : 'border-gray-200 hover:border-blue-300'
-            }`}
-          >
-            <div className="flex items-start space-x-3">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                item.status === 'current' ? 'bg-blue-600 text-white' :
-                item.status === 'completed' ? 'bg-green-600 text-white' :
-                'bg-gray-200 text-gray-600'
-              }`}>
-                {item.status === 'completed' ? <CheckCircle className="w-4 h-4" /> : getActivityIcon(item.type)}
-              </div>
-              
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-900">{item.title}</p>
-                    <div className="flex items-center space-x-2 mt-1 text-sm text-gray-600">
-                      <span>{item.time}</span>
-                      {item.duration && <span>• {item.duration}</span>}
-                      {item.cost && <span>• {item.cost}</span>}
+                            <span>{currentActivity.time}</span>
+                            {currentActivity.duration && <span>• {currentActivity.duration}</span>}
+                        </div>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1 flex items-center space-x-1">
-                      <MapPin className="w-3 h-3" />
-                      <span>{item.location}</span>
-                    </p>
-                    {item.bookingConfirmation && (
-                      <p className="text-xs text-blue-600 mt-1">
-                        Booking: {item.bookingConfirmation}
-                      </p>
-                    )}
-                  </div>
+                    <button
+                        onClick={() => sendChatMessage(`Get directions to ${currentActivity.location}`)}
+                        className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors"
+                    >
+                        <Navigation className="w-5 h-5" />
+                    </button>
                 </div>
-              </div>
 
-              <button 
-                onClick={() => sendChatMessage(`Tell me more about ${item.title}`)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <ChevronRight className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <button 
-        onClick={() => sendChatMessage("Help me add a new activity to my schedule")}
-        className="w-full mt-4 border-2 border-dashed border-gray-300 rounded-lg py-3 text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors flex items-center justify-center space-x-2"
-      >
-        <Plus className="w-4 h-4" />
-        <span>Add Activity</span>
-      </button>
-    </div>
-  );
-
-  // Quick Tools Component
-  const QuickTools = () => {
-    const tools = [
-      {
-        id: 'landmark',
-        icon: <ScanLine className="w-6 h-6" />,
-        title: 'Photo ID',
-        description: 'Identify landmarks',
-        color: 'from-purple-500 to-purple-600',
-        action: () => setShowQuickToolModal('landmark')
-      },
-      {
-        id: 'translate',
-        icon: <Languages className="w-6 h-6" />,
-        title: 'Live Translate',
-        description: 'Real-time translation',
-        color: 'from-blue-500 to-blue-600',
-        action: () => setShowQuickToolModal('translate')
-      },
-      {
-        id: 'navigation',
-        icon: <Map className="w-6 h-6" />,
-        title: 'Navigation',
-        description: 'Get directions',
-        color: 'from-green-500 to-green-600',
-        action: () => setShowQuickToolModal('navigation')
-      },
-      {
-        id: 'emergency',
-        icon: <Shield className="w-6 h-6" />,
-        title: 'Emergency',
-        description: 'Local contacts',
-        color: 'from-red-500 to-red-600',
-        action: () => setShowQuickToolModal('emergency')
-      }
-    ];
-
-    return (
-      <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-        <h3 className="text-lg font-semibold mb-4 flex items-center space-x-2">
-          <Zap className="w-5 h-5 text-yellow-500" />
-          <span>Quick Tools</span>
-        </h3>
-        
-        <div className="grid grid-cols-2 gap-3">
-          {tools.map(tool => (
-            <button
-              key={tool.id}
-              onClick={tool.action}
-              className={`bg-gradient-to-r ${tool.color} text-white rounded-lg p-4 hover:shadow-lg transition-all group`}
-            >
-              <div className="flex flex-col items-center text-center space-y-2">
-                <div className="group-hover:scale-110 transition-transform">
-                  {tool.icon}
-                </div>
-                <div>
-                  <p className="font-semibold text-sm">{tool.title}</p>
-                  <p className="text-xs opacity-90">{tool.description}</p>
-                </div>
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  // Find Nearby Component
-  const FindNearby = () => (
-    <div className="bg-white rounded-xl shadow-lg p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold flex items-center space-x-2">
-          <MapPin className="w-5 h-5 text-blue-600" />
-          <span>Find Nearby</span>
-        </h3>
-        <select 
-          value={searchRadius}
-          onChange={(e) => setSearchRadius(parseInt(e.target.value))}
-          className="text-sm border border-gray-300 rounded-lg px-2 py-1"
-        >
-          <option value={500}>500m</option>
-          <option value={1000}>1km</option>
-          <option value={2000}>2km</option>
-          <option value={5000}>5km</option>
-        </select>
-      </div>
-
-      {/* Category Pills */}
-      <div className="flex overflow-x-auto space-x-2 mb-4 pb-2 scrollbar-hide">
-        {placeCategories.map(cat => (
-          <button
-            key={cat.value}
-            onClick={() => setSelectedPlaceType(cat.value)}
-            className={`flex-shrink-0 px-3 py-2 rounded-full text-sm transition-colors ${
-              selectedPlaceType === cat.value
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            <span className="mr-1">{cat.icon}</span>
-            {cat.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Places List */}
-      <div className="space-y-3 max-h-96 overflow-y-auto">
-        {loading ? (
-          <div className="flex items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <span className="ml-3 text-gray-600">Finding places...</span>
-          </div>
-        ) : places.length > 0 ? (
-          places.map((place, idx) => (
-            <div key={place.id || idx} className="border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow">
-              <div className="flex space-x-3">
-                {place.photos && place.photos.length > 0 && (
-                  <img 
-                    src={place.photos[0]}
-                    alt={place.name}
-                    className="w-20 h-20 rounded-lg object-cover"
-                  />
+                {nextActivity && (
+                    <div className="bg-white/10 rounded-lg p-3 backdrop-blur-sm">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                                <ChevronRight className="w-4 h-4" />
+                                <div>
+                                    <p className="text-sm opacity-75">Up Next</p>
+                                    <p className="font-medium">{nextActivity.title}</p>
+                                </div>
+                            </div>
+                            <span className="text-sm opacity-75">{nextActivity.time}</span>
+                        </div>
+                    </div>
                 )}
-                <div className="flex-1 min-w-0">
-                  <h4 className="font-semibold text-gray-900 truncate">{place.name}</h4>
-                  <div className="flex items-center space-x-2 mt-1">
-                    {place.rating && (
-                      <div className="flex items-center space-x-1">
-                        <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                        <span className="text-sm text-gray-700">{place.rating}</span>
-                        {place.userRatingsTotal && (
-                          <span className="text-xs text-gray-500">({place.userRatingsTotal})</span>
-                        )}
-                      </div>
-                    )}
-                    <span className="text-xs text-gray-400">•</span>
-                    <span className="text-sm text-gray-600">{place.address}</span>
-                  </div>
-                  <div className="flex items-center justify-between mt-2">
-                    {place.priceLevel && (
-                      <span className="text-xs text-gray-500">
-                        {'$'.repeat(place.priceLevel)}
-                      </span>
-                    )}
-                    {place.openNow && (
-                      <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
-                        Open Now
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <button 
-                  onClick={() => sendChatMessage(`Get directions to ${place.name}`)}
-                  className="text-blue-600 hover:text-blue-700"
-                >
-                  <Navigation className="w-5 h-5" />
-                </button>
-              </div>
             </div>
-          ))
-        ) : (
-          <div className="text-center py-8">
-            <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-            <p className="text-gray-500 text-sm">No places found nearby</p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-
-  // Upcoming Bookings Component
-  const UpcomingBookings = () => (
-    <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-      <h3 className="text-lg font-semibold mb-4 flex items-center space-x-2">
-        <Bell className="w-5 h-5 text-orange-500" />
-        <span>Upcoming Bookings</span>
-      </h3>
-
-      <div className="space-y-3">
-        {upcomingBookings.map(booking => (
-          <div key={booking.id} className="border border-gray-200 rounded-lg p-3">
-            <div className="flex items-start space-x-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600">
-                {getBookingIcon(booking.type)}
-              </div>
-              <div className="flex-1">
-                <h4 className="font-medium text-gray-900">{booking.title}</h4>
-                <p className="text-sm text-gray-600">{booking.time}</p>
-                <p className="text-xs text-gray-500 mt-1">Confirmation: {booking.confirmation}</p>
-                {booking.alert && (
-                  <p className="text-xs text-orange-600 mt-2 flex items-center space-x-1">
-                    <Info className="w-3 h-3" />
-                    <span>{booking.alert}</span>
-                  </p>
-                )}
-              </div>
-              <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
-                {booking.status}
-              </span>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
-  // Smart Insights Component
-  const SmartInsights = () => (
-    <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl p-6 mb-6">
-      <h3 className="text-lg font-semibold mb-4 flex items-center space-x-2">
-        <Zap className="w-5 h-5 text-purple-600" />
-        <span>Smart Insights</span>
-      </h3>
-
-      <div className="space-y-3">
-        <div className="bg-white rounded-lg p-3">
-          <p className="text-sm text-gray-700 mb-2">
-            💡 <strong>Local Tip:</strong> Popular attractions are less crowded before 9 AM.
-          </p>
-        </div>
-        <div className="bg-white rounded-lg p-3">
-          <p className="text-sm text-gray-700 mb-2">
-            🍜 <strong>Food Recommendation:</strong> Try local specialties at nearby restaurants!
-          </p>
-        </div>
-        {currentTrip && (
-          <div className="bg-white rounded-lg p-3">
-            <p className="text-sm text-gray-700 mb-2">
-              ⚡ <strong>Budget Alert:</strong> You're on track with your trip budget.
-            </p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-
-  // Trip Progress Component
-  const TripProgress = () => (
-    <div className="bg-white rounded-xl shadow-lg p-6">
-      <h3 className="text-lg font-semibold mb-4">Trip Progress</h3>
-      <div className="space-y-4">
-        <div>
-          <div className="flex justify-between text-sm mb-2">
-            <span className="text-gray-600">Days Completed</span>
-            <span className="font-medium">{tripData.currentDay} of {tripData.duration}</span>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div 
-              className="bg-blue-600 h-2 rounded-full transition-all duration-500" 
-              style={{width: `${(tripData.currentDay / tripData.duration) * 100}%`}}
-            ></div>
-          </div>
-        </div>
-
-        <div className="pt-3 border-t">
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600">Activities Completed</span>
-            <span className="text-2xl font-bold text-blue-600">
-              {todaySchedule.filter(s => s.status === 'completed').length}
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  // Local Information Component
-  const LocalInformation = () => (
-    <div className="bg-white rounded-xl shadow-lg p-6">
-      <h3 className="text-lg font-semibold mb-4">Local Information</h3>
-      <div className="space-y-3 text-sm">
-        <div className="flex justify-between">
-          <span className="text-gray-600">Local Time</span>
-          <span className="font-medium">{new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-gray-600">Currency</span>
-          <span className="font-medium">Local Currency</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-gray-600">Language</span>
-          <span className="font-medium">Local Language</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-gray-600">Emergency</span>
-          <span className="font-medium text-red-600">911</span>
-        </div>
-      </div>
-      
-      <button 
-        onClick={() => sendChatMessage("Tell me more about local information and customs")}
-        className="w-full mt-4 bg-blue-50 text-blue-600 py-2 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium"
-      >
-        View Full Guide
-      </button>
-    </div>
-  );
-
-  // Quick Actions Component
-  const QuickActions = () => (
-    <div className="bg-white rounded-xl shadow-lg p-6">
-      <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
-      <div className="space-y-2">
-        <button 
-          onClick={() => sendChatMessage("Help me create a new travel memory")}
-          className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3"
-        >
-          <Camera className="w-5 h-5 text-gray-600" />
-          <span className="text-sm">Add Memory</span>
-        </button>
-        <button 
-          onClick={() => sendChatMessage("Help me log a new expense")}
-          className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3"
-        >
-          <DollarSign className="w-5 h-5 text-gray-600" />
-          <span className="text-sm">Log Expense</span>
-        </button>
-        <button 
-          onClick={() => sendChatMessage("Help me rate my recent activity")}
-          className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3"
-        >
-          <Star className="w-5 h-5 text-gray-600" />
-          <span className="text-sm">Rate Activity</span>
-        </button>
-        <button 
-          onClick={() => sendChatMessage("I need help with something")}
-          className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3"
-        >
-          <MessageCircle className="w-5 h-5 text-gray-600" />
-          <span className="text-sm">Ask AI Assistant</span>
-        </button>
-      </div>
-    </div>
-  );
-
-  // Weather Forecast Strip
-  const WeatherForecast = () => (
-    <div className="bg-white rounded-xl shadow-lg p-6">
-      <h3 className="text-lg font-semibold mb-4">Today's Forecast</h3>
-      <div className="grid grid-cols-4 gap-4">
-        {weatherForecast.map((item, index) => (
-          <div 
-            key={index}
-            className={`text-center p-4 rounded-lg ${item.alert ? 'bg-yellow-50 border-2 border-yellow-400' : 'bg-gray-50'}`}
-          >
-            <p className="text-sm text-gray-600 mb-2">{item.time}</p>
-            <div className="text-3xl mb-2">
-              {getWeatherIcon(item.condition)}
-            </div>
-            <p className="text-lg font-semibold">{item.temp}°C</p>
-            {item.alert && (
-              <p className="text-xs text-yellow-700 mt-2 font-medium">⚠️ Alert</p>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
-  // Quick Tool Modals
-  const QuickToolModal = () => {
-    if (!showQuickToolModal) return null;
-
-    const modalContent = {
-      landmark: {
-        title: 'Photo ID - Identify Landmarks',
-        content: (
-          <div className="text-center">
-            <Camera className="w-16 h-16 text-purple-600 mx-auto mb-4" />
-            <p className="text-gray-600 mb-4">Take or upload a photo to identify landmarks and get detailed information</p>
-            <button 
-              onClick={() => sendChatMessage("Help me identify a landmark from a photo")}
-              className="w-full bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 mb-2"
-            >
-              Take Photo
-            </button>
-            <button 
-              onClick={() => sendChatMessage("I want to upload a photo to identify a landmark")}
-              className="w-full bg-gray-100 text-gray-700 py-3 rounded-lg hover:bg-gray-200"
-            >
-              Upload Photo
-            </button>
-          </div>
-        )
-      },
-      translate: {
-        title: 'Live Translate',
-        content: (
-          <div>
-            <textarea 
-              className="w-full border border-gray-300 rounded-lg p-3 mb-3"
-              rows="4"
-              placeholder="Enter text to translate..."
-            />
-            <div className="flex space-x-2 mb-4">
-              <select className="flex-1 border border-gray-300 rounded-lg px-3 py-2">
-                <option>English</option>
-                <option>Spanish</option>
-                <option>French</option>
-                <option>German</option>
-                <option>Chinese</option>
-                <option>Japanese</option>
-              </select>
-              <button className="px-4 py-2 bg-gray-200 rounded-lg">⇄</button>
-              <select className="flex-1 border border-gray-300 rounded-lg px-3 py-2">
-                <option>Spanish</option>
-                <option>English</option>
-                <option>French</option>
-                <option>German</option>
-                <option>Chinese</option>
-                <option>Japanese</option>
-              </select>
-            </div>
-            <button 
-              onClick={() => {
-                sendChatMessage("Help me translate text");
-                setShowQuickToolModal(null);
-              }}
-              className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700"
-            >
-              Translate
-            </button>
-          </div>
-        )
-      },
-      navigation: {
-        title: 'Navigation',
-        content: (
-          <div>
-            <div className="bg-blue-50 rounded-lg p-4 mb-4">
-              <p className="text-sm text-gray-700 mb-2">Current Location:</p>
-              <p className="font-medium">
-                {location ? `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` : 'Unknown'}
-              </p>
-            </div>
-            <input 
-              type="text" 
-              placeholder="Where do you want to go?"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 mb-3"
-            />
-            <button 
-              onClick={() => {
-                sendChatMessage("Help me navigate to my destination");
-                setShowQuickToolModal(null);
-              }}
-              className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 mb-2"
-            >
-              Get Directions
-            </button>
-            <button 
-              onClick={() => {
-                const nextActivity = todaySchedule.find(s => s.status === 'upcoming');
-                if (nextActivity) {
-                  sendChatMessage(`Get directions to ${nextActivity.location}`);
-                }
-                setShowQuickToolModal(null);
-              }}
-              className="w-full bg-gray-100 text-gray-700 py-3 rounded-lg hover:bg-gray-200"
-            >
-              Navigate to Next Activity
-            </button>
-          </div>
-        )
-      },
-      emergency: {
-        title: 'Emergency & Local Contacts',
-        content: (
-          <div className="space-y-3">
-            <div className="bg-red-50 border-l-4 border-red-500 rounded p-3">
-              <p className="font-semibold text-red-900 mb-2">Emergency Services</p>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between items-center">
-                  <span>Police</span>
-                  <button className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700">
-                    Call 911
-                  </button>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span>Ambulance/Fire</span>
-                  <button className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700">
-                    Call 911
-                  </button>
-                </div>
-              </div>
-            </div>
-            
-            <div className="border border-gray-200 rounded-lg p-3">
-              <p className="font-semibold text-gray-900 mb-2">Local Contacts</p>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between items-center">
-                  <span>US Embassy</span>
-                  <button 
-                    onClick={() => sendChatMessage("Show me embassy contact information")}
-                    className="text-blue-600 hover:text-blue-700"
-                  >
-                    Contact
-                  </button>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span>Hotel Concierge</span>
-                  <button 
-                    onClick={() => sendChatMessage("Connect me with hotel concierge")}
-                    className="text-blue-600 hover:text-blue-700"
-                  >
-                    Contact
-                  </button>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span>Travel Insurance</span>
-                  <button 
-                    onClick={() => sendChatMessage("Show me my travel insurance details")}
-                    className="text-blue-600 hover:text-blue-700"
-                  >
-                    Contact
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <button 
-              onClick={() => {
-                sendChatMessage("Share my current location for emergency assistance");
-                setShowQuickToolModal(null);
-              }}
-              className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
-            >
-              Share My Location
-            </button>
-          </div>
-        )
-      }
+        );
     };
 
-    const modal = modalContent[showQuickToolModal];
-    if (!modal) return null;
+    // Weather Alert Component
+    const WeatherAlert = () => {
+        const hasAlert = weatherForecast.some(f => f.alert);
+        if (!hasAlert) return null;
 
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-          <div className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-semibold">{modal.title}</h3>
-              <button
-                onClick={() => setShowQuickToolModal(null)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            {modal.content}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // Schedule Edit Modal
-  const ScheduleEditModal = () => {
-    if (!showScheduleEdit) return null;
-
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-          <div className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-semibold">Modify Today's Schedule</h3>
-              <button
-                onClick={() => setShowScheduleEdit(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-
-            <div className="space-y-4 mb-6">
-              {todaySchedule.map((item, index) => (
-                <div key={item.id} className="border border-gray-200 rounded-lg p-4">
-                  <div className="flex items-start justify-between mb-3">
-                    <input
-                      type="text"
-                      defaultValue={item.title}
-                      className="flex-1 font-medium border-b border-gray-300 focus:border-blue-500 outline-none"
-                    />
-                    <button 
-                      onClick={() => {
-                        const newSchedule = todaySchedule.filter((_, i) => i !== index);
-                        setTodaySchedule(newSchedule);
-                      }}
-                      className="text-red-500 hover:text-red-700 ml-4"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-3">
-                    <input
-                      type="time"
-                      defaultValue={item.time}
-                      className="text-sm border border-gray-300 rounded px-2 py-1"
-                    />
-                    <input
-                      type="text"
-                      defaultValue={item.duration}
-                      placeholder="Duration"
-                      className="text-sm border border-gray-300 rounded px-2 py-1"
-                    />
-                    <input
-                      type="text"
-                      defaultValue={item.location}
-                      placeholder="Location"
-                      className="text-sm border border-gray-300 rounded px-2 py-1 col-span-2"
-                    />
-                  </div>
+        return (
+            <div className="bg-yellow-50 border-l-4 border-yellow-400 rounded-lg p-4 mb-6">
+                <div className="flex items-start space-x-3">
+                    <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                        <h4 className="font-semibold text-yellow-900 mb-1">Weather Alert</h4>
+                        <p className="text-yellow-800 text-sm mb-2">
+                            Weather changes expected. Consider indoor alternatives?
+                        </p>
+                        <div className="flex space-x-2">
+                            <button
+                                onClick={() => sendChatMessage("Show me indoor activities near me")}
+                                className="text-xs bg-yellow-600 text-white px-3 py-1 rounded hover:bg-yellow-700"
+                            >
+                                Show Alternatives
+                            </button>
+                            <button
+                                onClick={() => setNotifications(notifications.filter(n => n.type !== 'weather'))}
+                                className="text-xs bg-white text-yellow-600 border border-yellow-200 px-3 py-1 rounded hover:bg-yellow-50"
+                            >
+                                Dismiss
+                            </button>
+                        </div>
+                    </div>
                 </div>
-              ))}
+            </div>
+        );
+    };
+
+    // Today's Schedule Panel
+    const TodaySchedulePanel = () => (
+        <div className="bg-white rounded-xl shadow-lg p-6">
+            <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold flex items-center space-x-2">
+                    <Calendar className="w-5 h-5 text-blue-600" />
+                    <span>Today's Schedule</span>
+                </h3>
+                <div className="flex space-x-2">
+                    <button
+                        onClick={() => setShowScheduleEdit(true)}
+                        className="text-blue-600 hover:text-blue-700 text-sm flex items-center space-x-1"
+                    >
+                        <Edit className="w-4 h-4" />
+                        <span>Modify</span>
+                    </button>
+                    <button
+                        onClick={() => searchNearbyPlaces()}
+                        className="text-gray-400 hover:text-gray-600"
+                    >
+                        <RefreshCw className="w-4 h-4" />
+                    </button>
+                </div>
             </div>
 
-            <button 
-              onClick={() => sendChatMessage("Help me add a new activity to my schedule")}
-              className="w-full border-2 border-dashed border-gray-300 rounded-lg py-3 text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors flex items-center justify-center space-x-2 mb-4"
+            <div className="space-y-3">
+                {todaySchedule.map((item) => (
+                    <div
+                        key={item.id}
+                        className={`border rounded-lg p-3 transition-all ${
+                            item.status === 'current'
+                                ? 'border-blue-500 bg-blue-50'
+                                : item.status === 'completed'
+                                    ? 'border-gray-200 bg-gray-50 opacity-60'
+                                    : 'border-gray-200 hover:border-blue-300'
+                        }`}
+                    >
+                        <div className="flex items-start space-x-3">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                                item.status === 'current' ? 'bg-blue-600 text-white' :
+                                    item.status === 'completed' ? 'bg-green-600 text-white' :
+                                        'bg-gray-200 text-gray-600'
+                            }`}>
+                                {item.status === 'completed' ? <CheckCircle className="w-4 h-4" /> : getActivityIcon(item.type)}
+                            </div>
+
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-start justify-between">
+                                    <div className="flex-1">
+                                        <p className="font-medium text-gray-900">{item.title}</p>
+                                        <div className="flex items-center space-x-2 mt-1 text-sm text-gray-600">
+                                            <span>{item.time}</span>
+                                            {item.duration && <span>• {item.duration}</span>}
+                                            {item.cost && <span>• {item.cost}</span>}
+                                        </div>
+                                        <p className="text-xs text-gray-500 mt-1 flex items-center space-x-1">
+                                            <MapPin className="w-3 h-3" />
+                                            <span>{item.location}</span>
+                                        </p>
+                                        {item.bookingConfirmation && (
+                                            <p className="text-xs text-blue-600 mt-1">
+                                                Booking: {item.bookingConfirmation}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={() => sendChatMessage(`Tell me more about ${item.title}`)}
+                                className="text-gray-400 hover:text-gray-600"
+                            >
+                                <ChevronRight className="w-5 h-5" />
+                            </button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            <button
+                onClick={() => sendChatMessage("Help me add a new activity to my schedule")}
+                className="w-full mt-4 border-2 border-dashed border-gray-300 rounded-lg py-3 text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors flex items-center justify-center space-x-2"
             >
-              <Plus className="w-5 h-5" />
-              <span>Add New Activity</span>
+                <Plus className="w-4 h-4" />
+                <span>Add Activity</span>
             </button>
-
-            <div className="flex space-x-3">
-              <button
-                onClick={() => setShowScheduleEdit(false)}
-                className="flex-1 border border-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => setShowScheduleEdit(false)}
-                className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700"
-              >
-                Save Changes
-              </button>
-            </div>
-          </div>
         </div>
-      </div>
     );
-  };
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header with Location and Weather */}
-      <div className="bg-white shadow-sm border-b sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2 text-gray-700">
-                <MapPin className="w-5 h-5 text-blue-600" />
-                <span className="font-medium">
+    // Quick Tools Component
+    const QuickTools = () => {
+        const tools = [
+            {
+                id: 'landmark',
+                icon: <ScanLine className="w-6 h-6" />,
+                title: 'Photo ID',
+                description: 'Identify landmarks',
+                color: 'from-purple-500 to-purple-600',
+                action: () => setShowQuickToolModal('landmark')
+            },
+            {
+                id: 'translate',
+                icon: <Languages className="w-6 h-6" />,
+                title: 'Live Translate',
+                description: 'Real-time translation',
+                color: 'from-blue-500 to-blue-600',
+                action: () => setShowQuickToolModal('translate')
+            },
+            {
+                id: 'navigation',
+                icon: <Map className="w-6 h-6" />,
+                title: 'Navigation',
+                description: 'Get directions',
+                color: 'from-green-500 to-green-600',
+                action: () => setShowQuickToolModal('navigation')
+            },
+            {
+                id: 'emergency',
+                icon: <Shield className="w-6 h-6" />,
+                title: 'Emergency',
+                description: 'Local contacts',
+                color: 'from-red-500 to-red-600',
+                action: () => setShowQuickToolModal('emergency')
+            }
+        ];
+
+        return (
+            <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center space-x-2">
+                    <Zap className="w-5 h-5 text-yellow-500" />
+                    <span>Quick Tools</span>
+                </h3>
+
+                <div className="grid grid-cols-2 gap-3">
+                    {tools.map(tool => (
+                        <button
+                            key={tool.id}
+                            onClick={tool.action}
+                            className={`bg-gradient-to-r ${tool.color} text-white rounded-lg p-4 hover:shadow-lg transition-all group`}
+                        >
+                            <div className="flex flex-col items-center text-center space-y-2">
+                                <div className="group-hover:scale-110 transition-transform">
+                                    {tool.icon}
+                                </div>
+                                <div>
+                                    <p className="font-semibold text-sm">{tool.title}</p>
+                                    <p className="text-xs opacity-90">{tool.description}</p>
+                                </div>
+                            </div>
+                        </button>
+                    ))}
+                </div>
+            </div>
+        );
+    };
+
+    // Find Nearby Component
+    const FindNearby = () => (
+        <div className="bg-white rounded-xl shadow-lg p-6">
+            <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold flex items-center space-x-2">
+                    <MapPin className="w-5 h-5 text-blue-600" />
+                    <span>Find Nearby</span>
+                </h3>
+                <select
+                    value={searchRadius}
+                    onChange={(e) => setSearchRadius(parseInt(e.target.value))}
+                    className="text-sm border border-gray-300 rounded-lg px-2 py-1"
+                >
+                    <option value={500}>500m</option>
+                    <option value={1000}>1km</option>
+                    <option value={2000}>2km</option>
+                    <option value={5000}>5km</option>
+                </select>
+            </div>
+
+            {/* Category Pills */}
+            <div className="flex overflow-x-auto space-x-2 mb-4 pb-2 scrollbar-hide">
+                {placeCategories.map(cat => (
+                    <button
+                        key={cat.value}
+                        onClick={() => setSelectedPlaceType(cat.value)}
+                        className={`flex-shrink-0 px-3 py-2 rounded-full text-sm transition-colors ${
+                            selectedPlaceType === cat.value
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                    >
+                        <span className="mr-1">{cat.icon}</span>
+                        {cat.label}
+                    </button>
+                ))}
+            </div>
+
+            {/* Places List */}
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+                {loading ? (
+                    <div className="flex items-center justify-center py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                        <span className="ml-3 text-gray-600">Finding places...</span>
+                    </div>
+                ) : places.length > 0 ? (
+                    places.map((place, idx) => (
+                        <div key={place.id || idx} className="border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow">
+                            <div className="flex space-x-3">
+                                {place.photos && place.photos.length > 0 && (
+                                    <img
+                                        src={place.photos[0]}
+                                        alt={place.name}
+                                        className="w-20 h-20 rounded-lg object-cover"
+                                    />
+                                )}
+                                <div className="flex-1 min-w-0">
+                                    <h4 className="font-semibold text-gray-900 truncate">{place.name}</h4>
+                                    <div className="flex items-center space-x-2 mt-1">
+                                        {place.rating && (
+                                            <div className="flex items-center space-x-1">
+                                                <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                                                <span className="text-sm text-gray-700">{place.rating}</span>
+                                                {place.userRatingsTotal && (
+                                                    <span className="text-xs text-gray-500">({place.userRatingsTotal})</span>
+                                                )}
+                                            </div>
+                                        )}
+                                        <span className="text-xs text-gray-400">•</span>
+                                        <span className="text-sm text-gray-600">{place.address}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between mt-2">
+                                        {place.priceLevel && (
+                                            <span className="text-xs text-gray-500">
+                        {'$'.repeat(place.priceLevel)}
+                      </span>
+                                        )}
+                                        {place.openNow && (
+                                            <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
+                        Open Now
+                      </span>
+                                        )}
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => sendChatMessage(`Get directions to ${place.name}`)}
+                                    className="text-blue-600 hover:text-blue-700"
+                                >
+                                    <Navigation className="w-5 h-5" />
+                                </button>
+                            </div>
+                        </div>
+                    ))
+                ) : (
+                    <div className="text-center py-8">
+                        <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                        <p className="text-gray-500 text-sm">No places found nearby</p>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+
+    // Upcoming Bookings Component
+    const UpcomingBookings = () => (
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+            <h3 className="text-lg font-semibold mb-4 flex items-center space-x-2">
+                <Bell className="w-5 h-5 text-orange-500" />
+                <span>Upcoming Bookings</span>
+            </h3>
+
+            <div className="space-y-3">
+                {upcomingBookings.map(booking => (
+                    <div key={booking.id} className="border border-gray-200 rounded-lg p-3">
+                        <div className="flex items-start space-x-3">
+                            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600">
+                                {getBookingIcon(booking.type)}
+                            </div>
+                            <div className="flex-1">
+                                <h4 className="font-medium text-gray-900">{booking.title}</h4>
+                                <p className="text-sm text-gray-600">{booking.time}</p>
+                                <p className="text-xs text-gray-500 mt-1">Confirmation: {booking.confirmation}</p>
+                                {booking.alert && (
+                                    <p className="text-xs text-orange-600 mt-2 flex items-center space-x-1">
+                                        <Info className="w-3 h-3" />
+                                        <span>{booking.alert}</span>
+                                    </p>
+                                )}
+                            </div>
+                            <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
+                {booking.status}
+              </span>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+
+    // Smart Insights Component
+    const SmartInsights = () => (
+        <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl p-6 mb-6">
+            <h3 className="text-lg font-semibold mb-4 flex items-center space-x-2">
+                <Zap className="w-5 h-5 text-purple-600" />
+                <span>Smart Insights</span>
+            </h3>
+
+            <div className="space-y-3">
+                <div className="bg-white rounded-lg p-3">
+                    <p className="text-sm text-gray-700 mb-2">
+                        💡 <strong>Local Tip:</strong> Popular attractions are less crowded before 9 AM.
+                    </p>
+                </div>
+                <div className="bg-white rounded-lg p-3">
+                    <p className="text-sm text-gray-700 mb-2">
+                        🍜 <strong>Food Recommendation:</strong> Try local specialties at nearby restaurants!
+                    </p>
+                </div>
+                {currentTrip && (
+                    <div className="bg-white rounded-lg p-3">
+                        <p className="text-sm text-gray-700 mb-2">
+                            ⚡ <strong>Budget Alert:</strong> You're on track with your trip budget.
+                        </p>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+
+    // Trip Progress Component
+    const TripProgress = () => (
+        <div className="bg-white rounded-xl shadow-lg p-6">
+            <h3 className="text-lg font-semibold mb-4">Trip Progress</h3>
+            <div className="space-y-4">
+                <div>
+                    <div className="flex justify-between text-sm mb-2">
+                        <span className="text-gray-600">Days Completed</span>
+                        <span className="font-medium">{tripData.currentDay} of {tripData.duration}</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-500"
+                            style={{width: `${(tripData.currentDay / tripData.duration) * 100}%`}}
+                        ></div>
+                    </div>
+                </div>
+
+                <div className="pt-3 border-t">
+                    <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Activities Completed</span>
+                        <span className="text-2xl font-bold text-blue-600">
+              {todaySchedule.filter(s => s.status === 'completed').length}
+            </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+
+    // Local Information Component
+    const LocalInformation = () => (
+        <div className="bg-white rounded-xl shadow-lg p-6">
+            <h3 className="text-lg font-semibold mb-4">Local Information</h3>
+            <div className="space-y-3 text-sm">
+                <div className="flex justify-between">
+                    <span className="text-gray-600">Local Time</span>
+                    <span className="font-medium">{new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+                <div className="flex justify-between">
+                    <span className="text-gray-600">Currency</span>
+                    <span className="font-medium">Local Currency</span>
+                </div>
+                <div className="flex justify-between">
+                    <span className="text-gray-600">Language</span>
+                    <span className="font-medium">Local Language</span>
+                </div>
+                <div className="flex justify-between">
+                    <span className="text-gray-600">Emergency</span>
+                    <span className="font-medium text-red-600">911</span>
+                </div>
+            </div>
+
+            <button
+                onClick={() => sendChatMessage("Tell me more about local information and customs")}
+                className="w-full mt-4 bg-blue-50 text-blue-600 py-2 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium"
+            >
+                View Full Guide
+            </button>
+        </div>
+    );
+
+    // Quick Actions Component
+    const QuickActions = () => (
+        <div className="bg-white rounded-xl shadow-lg p-6">
+            <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
+            <div className="space-y-2">
+                <button
+                    onClick={() => sendChatMessage("Help me create a new travel memory")}
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3"
+                >
+                    <Camera className="w-5 h-5 text-gray-600" />
+                    <span className="text-sm">Add Memory</span>
+                </button>
+                <button
+                    onClick={() => sendChatMessage("Help me log a new expense")}
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3"
+                >
+                    <DollarSign className="w-5 h-5 text-gray-600" />
+                    <span className="text-sm">Log Expense</span>
+                </button>
+                <button
+                    onClick={() => sendChatMessage("Help me rate my recent activity")}
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3"
+                >
+                    <Star className="w-5 h-5 text-gray-600" />
+                    <span className="text-sm">Rate Activity</span>
+                </button>
+                <button
+                    onClick={() => sendChatMessage("I need help with something")}
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3"
+                >
+                    <MessageCircle className="w-5 h-5 text-gray-600" />
+                    <span className="text-sm">Ask AI Assistant</span>
+                </button>
+            </div>
+        </div>
+    );
+
+    // Weather Forecast Strip
+    const WeatherForecast = () => (
+        <div className="bg-white rounded-xl shadow-lg p-6">
+            <h3 className="text-lg font-semibold mb-4">Today's Forecast</h3>
+            <div className="grid grid-cols-4 gap-4">
+                {weatherForecast.map((item, index) => (
+                    <div
+                        key={index}
+                        className={`text-center p-4 rounded-lg ${item.alert ? 'bg-yellow-50 border-2 border-yellow-400' : 'bg-gray-50'}`}
+                    >
+                        <p className="text-sm text-gray-600 mb-2">{item.time}</p>
+                        <div className="text-3xl mb-2">
+                            {getWeatherIcon(item.condition)}
+                        </div>
+                        <p className="text-lg font-semibold">{item.temp}°C</p>
+                        {item.alert && (
+                            <p className="text-xs text-yellow-700 mt-2 font-medium">⚠️ Alert</p>
+                        )}
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+
+    // Quick Tool Modals
+    const QuickToolModal = () => {
+        if (!showQuickToolModal) return null;
+
+        const modalContent = {
+            landmark: {
+                title: 'Photo ID - Identify Landmarks',
+                content: (
+                    <div className="text-center">
+                        <Camera className="w-16 h-16 text-purple-600 mx-auto mb-4" />
+                        <p className="text-gray-600 mb-4">Take or upload a photo to identify landmarks and get detailed information</p>
+                        <button
+                            onClick={() => sendChatMessage("Help me identify a landmark from a photo")}
+                            className="w-full bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 mb-2"
+                        >
+                            Take Photo
+                        </button>
+                        <button
+                            onClick={() => sendChatMessage("I want to upload a photo to identify a landmark")}
+                            className="w-full bg-gray-100 text-gray-700 py-3 rounded-lg hover:bg-gray-200"
+                        >
+                            Upload Photo
+                        </button>
+                    </div>
+                )
+            },
+            translate: {
+                title: 'Live Translate',
+                content: (
+                    <div>
+            <textarea
+                className="w-full border border-gray-300 rounded-lg p-3 mb-3"
+                rows="4"
+                placeholder="Enter text to translate..."
+            />
+                        <div className="flex space-x-2 mb-4">
+                            <select className="flex-1 border border-gray-300 rounded-lg px-3 py-2">
+                                <option>English</option>
+                                <option>Spanish</option>
+                                <option>French</option>
+                                <option>German</option>
+                                <option>Chinese</option>
+                                <option>Japanese</option>
+                            </select>
+                            <button className="px-4 py-2 bg-gray-200 rounded-lg">⇄</button>
+                            <select className="flex-1 border border-gray-300 rounded-lg px-3 py-2">
+                                <option>Spanish</option>
+                                <option>English</option>
+                                <option>French</option>
+                                <option>German</option>
+                                <option>Chinese</option>
+                                <option>Japanese</option>
+                            </select>
+                        </div>
+                        <button
+                            onClick={() => {
+                                sendChatMessage("Help me translate text");
+                                setShowQuickToolModal(null);
+                            }}
+                            className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700"
+                        >
+                            Translate
+                        </button>
+                    </div>
+                )
+            },
+            navigation: {
+                title: 'Navigation',
+                content: (
+                    <div>
+                        <div className="bg-blue-50 rounded-lg p-4 mb-4">
+                            <p className="text-sm text-gray-700 mb-2">Current Location:</p>
+                            <p className="font-medium">
+                                {location ? `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` : 'Unknown'}
+                            </p>
+                        </div>
+                        <input
+                            type="text"
+                            placeholder="Where do you want to go?"
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 mb-3"
+                        />
+                        <button
+                            onClick={() => {
+                                sendChatMessage("Help me navigate to my destination");
+                                setShowQuickToolModal(null);
+                            }}
+                            className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 mb-2"
+                        >
+                            Get Directions
+                        </button>
+                        <button
+                            onClick={() => {
+                                const nextActivity = todaySchedule.find(s => s.status === 'upcoming');
+                                if (nextActivity) {
+                                    sendChatMessage(`Get directions to ${nextActivity.location}`);
+                                }
+                                setShowQuickToolModal(null);
+                            }}
+                            className="w-full bg-gray-100 text-gray-700 py-3 rounded-lg hover:bg-gray-200"
+                        >
+                            Navigate to Next Activity
+                        </button>
+                    </div>
+                )
+            },
+            emergency: {
+                title: 'Emergency & Local Contacts',
+                content: (
+                    <div className="space-y-3">
+                        <div className="bg-red-50 border-l-4 border-red-500 rounded p-3">
+                            <p className="font-semibold text-red-900 mb-2">Emergency Services</p>
+                            <div className="space-y-2 text-sm">
+                                <div className="flex justify-between items-center">
+                                    <span>Police</span>
+                                    <button className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700">
+                                        Call 911
+                                    </button>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span>Ambulance/Fire</span>
+                                    <button className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700">
+                                        Call 911
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="border border-gray-200 rounded-lg p-3">
+                            <p className="font-semibold text-gray-900 mb-2">Local Contacts</p>
+                            <div className="space-y-2 text-sm">
+                                <div className="flex justify-between items-center">
+                                    <span>US Embassy</span>
+                                    <button
+                                        onClick={() => sendChatMessage("Show me embassy contact information")}
+                                        className="text-blue-600 hover:text-blue-700"
+                                    >
+                                        Contact
+                                    </button>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span>Hotel Concierge</span>
+                                    <button
+                                        onClick={() => sendChatMessage("Connect me with hotel concierge")}
+                                        className="text-blue-600 hover:text-blue-700"
+                                    >
+                                        Contact
+                                    </button>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span>Travel Insurance</span>
+                                    <button
+                                        onClick={() => sendChatMessage("Show me my travel insurance details")}
+                                        className="text-blue-600 hover:text-blue-700"
+                                    >
+                                        Contact
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={() => {
+                                sendChatMessage("Share my current location for emergency assistance");
+                                setShowQuickToolModal(null);
+                            }}
+                            className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
+                        >
+                            Share My Location
+                        </button>
+                    </div>
+                )
+            }
+        };
+
+        const modal = modalContent[showQuickToolModal];
+        if (!modal) return null;
+
+        return (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+                    <div className="p-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-xl font-semibold">{modal.title}</h3>
+                            <button
+                                onClick={() => setShowQuickToolModal(null)}
+                                className="text-gray-400 hover:text-gray-600"
+                            >
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+                        {modal.content}
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    // Schedule Edit Modal
+    const ScheduleEditModal = () => {
+        if (!showScheduleEdit) return null;
+
+        return (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                    <div className="p-6">
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-xl font-semibold">Modify Today's Schedule</h3>
+                            <button
+                                onClick={() => setShowScheduleEdit(false)}
+                                className="text-gray-400 hover:text-gray-600"
+                            >
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        <div className="space-y-4 mb-6">
+                            {todaySchedule.map((item, index) => (
+                                <div key={item.id} className="border border-gray-200 rounded-lg p-4">
+                                    <div className="flex items-start justify-between mb-3">
+                                        <input
+                                            type="text"
+                                            defaultValue={item.title}
+                                            className="flex-1 font-medium border-b border-gray-300 focus:border-blue-500 outline-none"
+                                        />
+                                        <button
+                                            onClick={() => {
+                                                const newSchedule = todaySchedule.filter((_, i) => i !== index);
+                                                setTodaySchedule(newSchedule);
+                                            }}
+                                            className="text-red-500 hover:text-red-700 ml-4"
+                                        >
+                                            <X className="w-5 h-5" />
+                                        </button>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <input
+                                            type="time"
+                                            defaultValue={item.time}
+                                            className="text-sm border border-gray-300 rounded px-2 py-1"
+                                        />
+                                        <input
+                                            type="text"
+                                            defaultValue={item.duration}
+                                            placeholder="Duration"
+                                            className="text-sm border border-gray-300 rounded px-2 py-1"
+                                        />
+                                        <input
+                                            type="text"
+                                            defaultValue={item.location}
+                                            placeholder="Location"
+                                            className="text-sm border border-gray-300 rounded px-2 py-1 col-span-2"
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <button
+                            onClick={() => sendChatMessage("Help me add a new activity to my schedule")}
+                            className="w-full border-2 border-dashed border-gray-300 rounded-lg py-3 text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors flex items-center justify-center space-x-2 mb-4"
+                        >
+                            <Plus className="w-5 h-5" />
+                            <span>Add New Activity</span>
+                        </button>
+
+                        <div className="flex space-x-3">
+                            <button
+                                onClick={() => setShowScheduleEdit(false)}
+                                className="flex-1 border border-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => setShowScheduleEdit(false)}
+                                className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700"
+                            >
+                                Save Changes
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    return (
+        <div className="min-h-screen bg-gray-50">
+            {/* Header with Location and Weather */}
+            <div className="bg-white shadow-sm border-b sticky top-0 z-40">
+                <div className="max-w-7xl mx-auto px-4 py-3">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                            <div className="flex items-center space-x-2 text-gray-700">
+                                <MapPin className="w-5 h-5 text-blue-600" />
+                                <span className="font-medium">
                   {location ? `${location.lat.toFixed(2)}, ${location.lng.toFixed(2)}` : 'Location unavailable'}
                 </span>
-              </div>
-              {weather && (
-                <div className="hidden md:flex items-center space-x-2 text-gray-700">
-                  <Cloud className="w-5 h-5 text-blue-600" />
-                  <span>{Math.round(weather.temperature)}°C</span>
-                  <span className="text-gray-500">•</span>
-                  <span className="text-gray-600 capitalize">{weather.description}</span>
-                  <span className="text-gray-600">{formattedTime}•{formattedDate}</span>  
+                            </div>
+                            {weather && (
+                                <div className="hidden md:flex items-center space-x-2 text-gray-700">
+                                    <Cloud className="w-5 h-5 text-blue-600" />
+                                    <span>{Math.round(weather.temperature)}°C</span>
+                                    <span className="text-gray-500">•</span>
+                                    <span className="text-gray-600 capitalize">{weather.description}</span>
+                                    <span className="text-gray-600">{formattedTime}•{formattedDate}</span>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex items-center space-x-3">
+                            <div className="hidden md:block text-sm text-gray-600">
+                                Day {tripData?.currentDay || 1} of {tripData?.duration || 7} • {tripData?.title || 'No Active Trip'}
+                            </div>
+                            <button className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg">
+                                <Bell className="w-5 h-5" />
+                                {notifications.length > 0 && (
+                                    <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                                )}
+                            </button>
+                        </div>
+                    </div>
                 </div>
-              )}
             </div>
 
-            <div className="flex items-center space-x-3">
-              <div className="hidden md:block text-sm text-gray-600">
-                Day {currentTrip.currentDay} of {currentTrip.title}
-              </div>
-              <button className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg">
-                <Bell className="w-5 h-5" />
-                {notifications.length > 0 && (
-                  <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+            {/* Main Content */}
+            <div className="max-w-7xl mx-auto px-4 py-6">
+                {/* Notifications Bar */}
+                {notifications.filter(n => n.priority === 'high').length > 0 && (
+                    <div className="mb-6 space-y-2">
+                        {notifications.filter(n => n.priority === 'high').map(notif => (
+                            <div key={notif.id} className="bg-yellow-50 border-l-4 border-yellow-400 rounded-lg p-4">
+                                <div className="flex items-start justify-between">
+                                    <div className="flex items-start space-x-3">
+                                        <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                                        <p className="text-sm text-yellow-800">{notif.message}</p>
+                                    </div>
+                                    <button
+                                        onClick={() => setNotifications(notifications.filter(n => n.id !== notif.id))}
+                                        className="text-yellow-600 hover:text-yellow-800"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 )}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        {/* Notifications Bar */}
-        {notifications.filter(n => n.priority === 'high').length > 0 && (
-          <div className="mb-6 space-y-2">
-            {notifications.filter(n => n.priority === 'high').map(notif => (
-              <div key={notif.id} className="bg-yellow-50 border-l-4 border-yellow-400 rounded-lg p-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start space-x-3">
-                    <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-                    <p className="text-sm text-yellow-800">{notif.message}</p>
-                  </div>
-                  <button 
-                    onClick={() => setNotifications(notifications.filter(n => n.id !== notif.id))}
-                    className="text-yellow-600 hover:text-yellow-800"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+                {/* Current Activity Section */}
+                <CurrentActivity />
+
+                {/* Weather Alert */}
+                <WeatherAlert />
+
+                {/* Main Grid Layout */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Left Column - Schedule and Bookings */}
+                    <div className="lg:col-span-1 space-y-6">
+                        <TodaySchedulePanel />
+                        <UpcomingBookings />
+                        <SmartInsights />
+                    </div>
+
+                    {/* Middle Column - Nearby Places */}
+                    <div className="lg:col-span-1">
+                        <FindNearby />
+                    </div>
+
+                    {/* Right Column - Quick Tools and Info */}
+                    <div className="lg:col-span-1 space-y-6">
+                        <QuickTools />
+                        <TripProgress />
+                        <LocalInformation />
+                        <QuickActions />
+                    </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
 
-        {/* Current Activity Section */}
-        <CurrentActivity />
+                {/* Weather Forecast Strip */}
+                <div className="mt-6">
+                    <WeatherForecast />
+                </div>
+            </div>
 
-        {/* Weather Alert */}
-        <WeatherAlert />
+            {/* Modals */}
+            <QuickToolModal />
+            <ScheduleEditModal />
 
-        {/* Main Grid Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Schedule and Bookings */}
-          <div className="lg:col-span-1 space-y-6">
-            <TodaySchedulePanel />
-            <UpcomingBookings />
-            <SmartInsights />
-          </div>
-
-          {/* Middle Column - Nearby Places */}
-          <div className="lg:col-span-1">
-            <FindNearby />
-          </div>
-
-          {/* Right Column - Quick Tools and Info */}
-          <div className="lg:col-span-1 space-y-6">
-            <QuickTools />
-            <TripProgress />
-            <LocalInformation />
-            <QuickActions />
-          </div>
+            {/* Floating AI Assistant Button */}
+            <button
+                onClick={() => sendChatMessage("Hi, I need help with something")}
+                className="fixed bottom-6 right-6 bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 z-40 group"
+                aria-label="Open AI Chat"
+            >
+                <MessageCircle className="w-6 h-6 group-hover:scale-110 transition-transform" />
+                <div className="absolute -top-2 -right-2 w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+            </button>
         </div>
-
-        {/* Weather Forecast Strip */}
-        <div className="mt-6">
-          <WeatherForecast />
-        </div>
-      </div>
-
-      {/* Modals */}
-      <QuickToolModal />
-      <ScheduleEditModal />
-
-      {/* Floating AI Assistant Button */}
-      <button 
-        onClick={() => sendChatMessage("Hi, I need help with something")}
-        className="fixed bottom-6 right-6 bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 z-40 group"
-        aria-label="Open AI Chat"
-      >
-        <MessageCircle className="w-6 h-6 group-hover:scale-110 transition-transform" />
-        <div className="absolute -top-2 -right-2 w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
-      </button>
-    </div>
-  );
+    );
 };
 
 // ===================================

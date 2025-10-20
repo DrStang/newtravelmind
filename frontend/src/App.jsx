@@ -396,29 +396,42 @@ const App = () => {
             const response = await fetch(`${API_BASE_URL}/trips?limit=10`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
+            console.log('📡 Response status:', response.status);
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
             const data = await response.json();
+
             console.log('✅ Trips response:', data);
+            console.log('📊 Number of trips:', data.data?.length || 0);
 
 
             if (data.success) {
-                // Ensure IDs are numbers, not BigInt
-                const processedTrips = data.data.map(trip => ({
+                const processedTrips = (data.data || []).map(trip => ({
                     ...trip,
                     id: Number(trip.id),
                     user_id: Number(trip.user_id)
                 }));
-                console.log('📊 Processed trips:', processedTrips);
+
+                console.log('📊 Setting trips:', processedTrips);
                 setTrips(processedTrips);
 
                 // Set active trip as current
                 const activeTrip = processedTrips.find(trip => trip.status === 'active');
                 if (activeTrip) {
-                    console.log('✅ Found active trip:', activeTrip);
+                    console.log('✅ Found active trip:', activeTrip.title);
                     setCurrentTrip(activeTrip);
+                } else {
+                    console.log('⚠️ No active trip found');
                 }
+            } else {
+                console.error('❌ API returned success: false');
             }
         } catch (error) {
             console.error('❌ Trips load error:', error);
+            console.error('❌ Error details:', error.message);
             // Mock data for demo
             setTrips([
                 {
@@ -3785,19 +3798,31 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
     };
 
     const loadTodaySchedule = async () => {
-        if (!activeTrip) return;
+        if (!activeTrip) {
+            console.log('⚠️ No active trip, skipping schedule load');
+            setScheduleLoading(false);
+            setTodaySchedule([]);
+            return;
+        }
 
         setScheduleLoading(true);
         try {
+            console.log('🔄 Loading schedule for trip:', activeTrip.id);
             const response = await fetch(`${API_BASE_URL}/trips/active/schedule`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
             const data = await response.json();
+            console.log('✅ Schedule response:', data);
+
             if (data.success) {
                 setTodaySchedule(data.data || []);
             }
         } catch (error) {
             console.error('Load schedule error:', error);
+            setTodaySchedule([]);
         } finally {
             setScheduleLoading(false);
         }

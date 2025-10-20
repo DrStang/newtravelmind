@@ -272,7 +272,7 @@ class DatabaseService {
         const trips = await Promise.race([
             conn.query(query, params),
             new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Query timeout after 5s')), 5000)
+                setTimeout(() => reject(new Error('Query timeout after 30s')), 30000)
             )
         ]);
 
@@ -648,5 +648,6 @@ class DatabaseService {
 }
 
 module.exports = { DatabaseService };
+
 
 

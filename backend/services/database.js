@@ -7,6 +7,10 @@ class DatabaseService {
 
     async initialize() {
         try {
+            if(this.pool) {
+                console.log('⚠️ Database pool already exists, skipping initialization');
+                return;
+            }
             this.pool = mariadb.createPool({
                 host: process.env.DB_HOST || 'localhost',
                 port: process.env.DB_PORT || 3306,
@@ -17,8 +21,13 @@ class DatabaseService {
                 //ssl: { rejectUnauthorized: true, minVersion: 'TLSv1.2' },
                 acquireTimeout: 30000,
                 timeout: 30000,
-                bigIntAsNumber: true // Convert BigInt to Number automatically
+                bigIntAsNumber: true, // Convert BigInt to Number automatically
+                multipleStatements: false,
+                resetAfterUse: true
             });
+            const conn = await this.pool.getConnection();
+            await conn.query('SELECT 1');
+            conn.release();
 
             console.log('✅ Database connection pool initialized');
         } catch (error) {
@@ -238,6 +247,8 @@ class DatabaseService {
 
     async getUserTrips(userId, status = null, limit = 20) {
         try {
+            console.log('🔍 getUserTrips called:', { userId, status, limit });
+
             let query = 'SELECT * FROM trips WHERE user_id = ?';
             let params = [userId];
 
@@ -249,31 +260,64 @@ class DatabaseService {
             query += ' ORDER BY created_at DESC LIMIT ?';
             params.push(limit);
 
+            console.log('🔍 Executing query:', query);
+            console.log('🔍 With params:', params);
+
+
             const trips = await this.pool.query(query, params);
 
-            // Safe JSON parsing with error handling
+            console.log('✅ Query returned:', trips.length, 'trips');
+            console.log('✅ Raw trips data:', JSON.stringify(trips.slice(0, 1), null, 2)); // Log first trip
+
+            // CRITICAL: Handle the case where trips is empty
+            if (!trips || trips.length === 0) {
+                console.log('⚠️ No trips found for user:', userId);
+                return [];
+            }
+
             return trips.map(trip => {
                 try {
-                    return this.convertBigIntToNumber({
+                    // Safely parse JSON fields
+                    let interests = [];
+                    let itinerary = {};
+
+                    if (trip.interests) {
+                        interests = typeof trip.interests === 'string'
+                            ? JSON.parse(trip.interests)
+                            : trip.interests;
+                    }
+
+                    if (trip.itinerary) {
+                        itinerary = typeof trip.itinerary === 'string'
+                            ? JSON.parse(trip.itinerary)
+                            : trip.itinerary;
+                    }
+
+                    return {
                         ...trip,
-                        interests: this.safeJsonParse(trip.interests, []),
-                        itinerary: this.safeJsonParse(trip.itinerary, {})
-                    });
-                } catch (error) {
-                    console.error('Error processing trip:', trip.id, error);
-                    return this.convertBigIntToNumber({
+                        id: Number(trip.id),
+                        user_id: Number(trip.user_id),
+                        interests,
+                        itinerary
+                    };
+                } catch (parseError) {
+                    console.error('❌ Error parsing trip:', trip.id, parseError);
+                    // Return trip with default values if parsing fails
+                    return {
                         ...trip,
+                        id: Number(trip.id),
+                        user_id: Number(trip.user_id),
                         interests: [],
                         itinerary: {}
-                    });
+                    };
                 }
             });
         } catch (error) {
-            console.error('Get user trips error:', error);
-            throw error;
+            console.error('❌ Get user trips error:', error);
+            console.error('❌ Error stack:', error.stack);
+            throw error; // Re-throw so the endpoint can handle it
         }
     }
-
     async getTripById(tripId, userId) {
         try {
             const rows = await this.pool.query(
@@ -328,39 +372,39 @@ class DatabaseService {
         try {
             // First check if trip_flights table exists, if not create it
             await this.pool.query(`
-            CREATE TABLE IF NOT EXISTS trip_flights (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                trip_id INT NOT NULL,
-                user_id INT NOT NULL,
-                offer_id VARCHAR(255),
-                origin VARCHAR(10),
-                destination VARCHAR(10),
-                departure_date DATE,
-                return_date DATE,
-                price DECIMAL(10,2),
-                currency VARCHAR(10),
-                airline VARCHAR(50),
-                airline_name VARCHAR(255),
-                itinerary_data JSON,
-                passengers INT,
-                travel_class VARCHAR(50),
-                status VARCHAR(50) DEFAULT 'selected',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (trip_id) REFERENCES trips(id) ON DELETE CASCADE,
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-                INDEX idx_trip (trip_id),
-                INDEX idx_user (user_id)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-        `);
+                CREATE TABLE IF NOT EXISTS trip_flights (
+                                                            id INT AUTO_INCREMENT PRIMARY KEY,
+                                                            trip_id INT NOT NULL,
+                                                            user_id INT NOT NULL,
+                                                            offer_id VARCHAR(255),
+                    origin VARCHAR(10),
+                    destination VARCHAR(10),
+                    departure_date DATE,
+                    return_date DATE,
+                    price DECIMAL(10,2),
+                    currency VARCHAR(10),
+                    airline VARCHAR(50),
+                    airline_name VARCHAR(255),
+                    itinerary_data JSON,
+                    passengers INT,
+                    travel_class VARCHAR(50),
+                    status VARCHAR(50) DEFAULT 'selected',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (trip_id) REFERENCES trips(id) ON DELETE CASCADE,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                    INDEX idx_trip (trip_id),
+                    INDEX idx_user (user_id)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            `);
 
             const result = await this.pool.query(`
-            INSERT INTO trip_flights (
-                trip_id, user_id, offer_id, origin, destination, 
-                departure_date, return_date, price, currency, airline, 
-                airline_name, itinerary_data, passengers, travel_class, 
-                status, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'selected', NOW())
-        `, [
+                INSERT INTO trip_flights (
+                    trip_id, user_id, offer_id, origin, destination,
+                    departure_date, return_date, price, currency, airline,
+                    airline_name, itinerary_data, passengers, travel_class,
+                    status, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'selected', NOW())
+            `, [
                 tripId,
                 userId,
                 flightData.offerId,
@@ -387,10 +431,10 @@ class DatabaseService {
     async getTripFlights(tripId, userId) {
         try {
             const flights = await this.pool.query(`
-            SELECT * FROM trip_flights 
-            WHERE trip_id = ? AND user_id = ?
-            ORDER BY departure_date ASC
-        `, [tripId, userId]);
+                SELECT * FROM trip_flights
+                WHERE trip_id = ? AND user_id = ?
+                ORDER BY departure_date ASC
+            `, [tripId, userId]);
 
             return flights.map(f => this.convertBigIntToNumber({
                 ...f,
@@ -405,9 +449,9 @@ class DatabaseService {
     async deleteTripFlight(flightId, userId) {
         try {
             await this.pool.query(`
-            DELETE FROM trip_flights 
-            WHERE id = ? AND user_id = ?
-        `, [flightId, userId]);
+                DELETE FROM trip_flights
+                WHERE id = ? AND user_id = ?
+            `, [flightId, userId]);
         } catch (error) {
             console.error('Delete trip flight error:', error);
             throw error;
@@ -582,5 +626,4 @@ class DatabaseService {
 }
 
 module.exports = { DatabaseService };
-
 

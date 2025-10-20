@@ -1592,26 +1592,23 @@ app.get('/api/trips', authenticateToken, async (req, res) => {
     try {
         const { status, limit = 20 } = req.query;
         console.log('📊 Getting trips for user:', req.user.id);
+        console.log('📊 With filters:', { status, limit });
 
         const trips = await database.getUserTrips(req.user.id, status, parseInt(limit));
-        console.log('📊 Found trips:', trips.length);
-        const safeTrips = trips.map(trip => ({
-            ...trip,
-            id: Number(trip.id),
-            user_id: Number(trip.user_id),
-            // Parse JSON fields
-            interests: typeof trip.interests === 'string' ? JSON.parse(trip.interests) : trip.interests,
-            itinerary: typeof trip.itinerary === 'string' ? JSON.parse(trip.itinerary) : trip.itinerary
-        }));
+        console.log('✅ getUserTrips returned:', trips ? trips.length : 0, 'trips');
+        // Even if empty, return success
         res.json({
             success: true,
-            data: trips
+            data: trips || [],
+            count: trips ? trips.length : 0
         });
     } catch (error) {
-        console.error('Get trips error:', error);
+        console.error('❌ Get trips endpoint error:', error);
+        console.error('❌ Error stack:', error.stack);
         res.status(500).json({
             success: false,
-            error: 'Failed to get trips'
+            error: 'Failed to get trips',
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
     }
 });

@@ -647,16 +647,16 @@ app.post('/api/ai/generate-itinerary', authenticateToken, async (req, res) => {
 app.patch('/api/trips/:id/activate', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
-        
+
         // First, deactivate all other trips
         await database.pool.query(
             'UPDATE trips SET status = ? WHERE user_id = ? AND status = ?',
             ['planning', req.user.id, 'active']
         );
-        
+
         // Activate this trip
         await database.updateTrip(id, req.user.id, { status: 'active' });
-        
+
         res.json({ success: true });
     } catch (error) {
         console.error('Activate trip error:', error);
@@ -666,10 +666,10 @@ app.patch('/api/trips/:id/activate', authenticateToken, async (req, res) => {
 app.patch('/api/trips/:id/deactivate', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
-        
+
         // Deactivate this trip
         await database.updateTrip(id, req.user.id, { status: 'planning' });
-        
+
         res.json({ success: true });
     } catch (error) {
         console.error('Deactivate trip error:', error);
@@ -682,9 +682,9 @@ app.patch('/api/trips/:id/itinerary', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
         const { itinerary } = req.body;
-        
+
         await database.updateTrip(id, req.user.id, { itinerary });
-        
+
         res.json({ success: true });
     } catch (error) {
         console.error('Update itinerary error:', error);
@@ -997,11 +997,11 @@ app.patch('/api/trips/active/schedule/:itemId', authenticateToken, async (req, r
         const dayKey = `day_${currentDay}`;
 
         if (itinerary[dayKey]) {
-            itinerary[dayKey] = itinerary[dayKey].map(item => 
+            itinerary[dayKey] = itinerary[dayKey].map(item =>
                 item.id === parseInt(itemId) ? { ...item, status } : item
             );
         }
-        
+
         await database.updateTrip(activeTrip.id, req.user.id, { itinerary });
 
         res.json({
@@ -1045,8 +1045,8 @@ app.get('/api/bookings/upcoming', authenticateToken, async (req, res) => {
 
         // Parse details JSON and format response
         const formattedBookings = bookings.map(booking => {
-            const details = typeof booking.details === 'string' 
-                ? JSON.parse(booking.details) 
+            const details = typeof booking.details === 'string'
+                ? JSON.parse(booking.details)
                 : booking.details;
 
             return {
@@ -1084,7 +1084,7 @@ app.post('/api/trips/:id/schedule', authenticateToken, async (req, res) => {
         const { schedule, day } = req.body;
 
         const trip = await database.getTripById(id, req.user.id);
-        
+
         if (!trip) {
             return res.status(404).json({
                 success: false,
@@ -1241,7 +1241,7 @@ app.put('/api/trips/:id/days/:dayNumber', authenticateToken, async (req, res) =>
 
         // Get current trip
         const trip = await database.getTripById(id, req.user.id);
-        
+
         if (!trip) {
             return res.status(404).json({ success: false, error: 'Trip not found' });
         }
@@ -1255,10 +1255,10 @@ app.put('/api/trips/:id/days/:dayNumber', authenticateToken, async (req, res) =>
 
         for (let line of lines) {
             const dayMatch = line.match(/Day\s+(\d+)/i);
-            
+
             if (dayMatch) {
                 const lineDay = parseInt(dayMatch[1]);
-                
+
                 if (lineDay === parseInt(dayNumber)) {
                     // Start of target day
                     inTargetDay = true;
@@ -1273,7 +1273,7 @@ app.put('/api/trips/:id/days/:dayNumber', authenticateToken, async (req, res) =>
                     inTargetDay = false;
                 }
             }
-            
+
             if (!inTargetDay) {
                 updatedLines.push(line);
             }
@@ -1591,8 +1591,18 @@ app.get('/api/analytics/events', authenticateToken, async (req, res) => {
 app.get('/api/trips', authenticateToken, async (req, res) => {
     try {
         const { status, limit = 20 } = req.query;
-        const trips = await database.getUserTrips(req.user.id, status, parseInt(limit));
+        console.log('📊 Getting trips for user:', req.user.id);
 
+        const trips = await database.getUserTrips(req.user.id, status, parseInt(limit));
+        console.log('📊 Found trips:', trips.length);
+        const safeTrips = trips.map(trip => ({
+            ...trip,
+            id: Number(trip.id),
+            user_id: Number(trip.user_id),
+            // Parse JSON fields
+            interests: typeof trip.interests === 'string' ? JSON.parse(trip.interests) : trip.interests,
+            itinerary: typeof trip.itinerary === 'string' ? JSON.parse(trip.itinerary) : trip.itinerary
+        }));
         res.json({
             success: true,
             data: trips
@@ -1630,7 +1640,30 @@ app.get('/api/trips/:id', authenticateToken, async (req, res) => {
         });
     }
 });
+// Add this route after the existing /api/trips route
+app.get('/api/trips/debug', authenticateToken, async (req, res) => {
+    try {
+        const rows = await database.pool.query(
+            'SELECT id, title, destination, duration, status, created_at FROM trips WHERE user_id = ? ORDER BY created_at DESC',
+            [req.user.id]
+        );
 
+        console.log('📊 Debug - Found trips:', rows.length);
+        console.log('📊 Trip data:', JSON.stringify(rows, null, 2));
+
+        res.json({
+            success: true,
+            count: rows.length,
+            trips: rows
+        });
+    } catch (error) {
+        console.error('Debug trips error:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
 // Memory Routes
 app.post('/api/memories', authenticateToken, upload.array('photos', 10), async (req, res) => {
     try {
@@ -2050,6 +2083,7 @@ process.on('SIGTERM', async () => {
 startServer();
 
 module.exports = app;
+
 
 
 

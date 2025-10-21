@@ -3762,7 +3762,16 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
     const [targetLanguage, setTargetLanguage] = useState('es');
     const [translating, setTranslating] = useState(false);
     const [translationResult, setTranslationResult] = useState(null);
-
+    const emergencyContacts = {
+        default: { general: '112', police: '112', ambulance: '112', fire: '112' },
+        US: { general: '911', police: '911', ambulance: '911', fire: '911' },
+        EU: { general: '112', police: '112', ambulance: '112', fire: '112' },
+        UK: { general: '999', police: '999', ambulance: '999', fire: '999' },
+        AU: { general: '000', police: '000', ambulance: '000', fire: '000' },
+        JP: { general: '110', police: '110', ambulance: '119', fire: '119' },
+        CN: { general: '110', police: '110', ambulance: '120', fire: '119' },
+        IN: { general: '112', police: '100', ambulance: '102', fire: '101' }
+    };
     // Emergency contacts states
     const [showEmergencyModal, setShowEmergencyModal] = useState(false);
     const [localEmergency, setLocalEmergency] = useState(emergencyContacts.default);
@@ -3803,16 +3812,7 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
         }, 1000);
         return () => clearInterval(timerId);
     }, []);
-    const emergencyContacts = {
-        default: { general: '112', police: '112', ambulance: '112', fire: '112' },
-        US: { general: '911', police: '911', ambulance: '911', fire: '911' },
-        EU: { general: '112', police: '112', ambulance: '112', fire: '112' },
-        UK: { general: '999', police: '999', ambulance: '999', fire: '999' },
-        AU: { general: '000', police: '000', ambulance: '000', fire: '000' },
-        JP: { general: '110', police: '110', ambulance: '119', fire: '119' },
-        CN: { general: '110', police: '110', ambulance: '120', fire: '119' },
-        IN: { general: '112', police: '100', ambulance: '102', fire: '101' }
-    };
+    
     const formattedTime = currentTime.toLocaleTimeString();
     const formattedDate = currentTime.toLocaleDateString();
 

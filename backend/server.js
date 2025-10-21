@@ -752,7 +752,7 @@ app.get('/api/trips/:id/bookings', authenticateToken, async (req, res) => {
         }
 
         const bookings = await database.pool.query(`
-            SELECT * FROM trip_bookings 
+            SELECT * FROM trip_bookings
             WHERE trip_id = ?
             ORDER BY booking_date ASC
         `, [tripId]);
@@ -787,7 +787,7 @@ app.delete('/api/trips/:id/bookings/:bookingId', authenticateToken, async (req, 
         }
 
         await database.pool.query(`
-            DELETE FROM trip_bookings 
+            DELETE FROM trip_bookings
             WHERE id = ? AND trip_id = ?
         `, [bookingId, tripId]);
 
@@ -856,7 +856,7 @@ app.get('/api/trips/:id/reminders', authenticateToken, async (req, res) => {
         }
 
         const reminders = await database.pool.query(`
-            SELECT * FROM trip_reminders 
+            SELECT * FROM trip_reminders
             WHERE trip_id = ?
             ORDER BY reminder_date ASC
         `, [tripId]);
@@ -888,7 +888,7 @@ app.delete('/api/trips/:id/reminders/:reminderId', authenticateToken, async (req
         }
 
         await database.pool.query(`
-            DELETE FROM trip_reminders 
+            DELETE FROM trip_reminders
             WHERE id = ? AND trip_id = ?
         `, [reminderId, tripId]);
 
@@ -1036,11 +1036,11 @@ app.get('/api/bookings/upcoming', authenticateToken, async (req, res) => {
         const bookings = await database.pool.query(`
             SELECT tb.*, t.title as trip_title, t.destination
             FROM trip_bookings tb
-            JOIN trips t ON tb.trip_id = t.id
+                     JOIN trips t ON tb.trip_id = t.id
             WHERE tb.trip_id IN (${placeholders})
-            AND tb.booking_date >= CURDATE()
+              AND tb.booking_date >= CURDATE()
             ORDER BY tb.booking_date ASC, tb.created_at ASC
-            LIMIT 10
+                LIMIT 10
         `, tripIds);
 
         // Parse details JSON and format response
@@ -1115,11 +1115,11 @@ app.get('/api/notifications', authenticateToken, async (req, res) => {
     try {
         // Query notifications from database
         const notifications = await database.pool.query(`
-            SELECT * FROM notifications 
-            WHERE user_id = ? 
-            AND dismissed = FALSE 
-            ORDER BY priority DESC, created_at DESC 
-            LIMIT 10
+            SELECT * FROM notifications
+            WHERE user_id = ?
+              AND dismissed = FALSE
+            ORDER BY priority DESC, created_at DESC
+                LIMIT 10
         `, [req.user.id]);
 
         res.json({
@@ -1191,7 +1191,296 @@ app.post('/api/ai/translate', authenticateToken, async (req, res) => {
     }
 });
 
-// Places Routes
+// ===================================
+// PHOTO IDENTIFICATION ENDPOINT
+// Add this after the /api/ai/translate route (around line 900)
+// ===================================
+
+app.post('/api/ai/identify-photo', authenticateToken, upload.single('photo'), async (req, res) => {
+    try {
+        const photoFile = req.file;
+        const location = req.body.location ? JSON.parse(req.body.location) : null;
+
+        if (!photoFile) {
+            return res.status(400).json({
+                success: false,
+                error: 'Photo file is required'
+            });
+        }
+
+        console.log('📸 Photo identification request:', {
+            filename: photoFile.filename,
+            size: photoFile.size,
+            mimetype: photoFile.mimetype,
+            location: location
+        });
+
+        // Build context for AI
+        const context = {
+            location: location,
+            photoPath: photoFile.path,
+            filename: photoFile.filename
+        };
+
+        // Create prompt for photo identification
+        let prompt = `You are analyzing a travel photo to identify landmarks, locations, or points of interest. 
+
+Photo context:
+${location ? `- Approximate location: ${location.lat}, ${location.lng}` : '- Location unknown'}
+- Filename: ${photoFile.filename}
+
+Please identify:
+1. What landmark or location this might be
+2. Key features or characteristics visible
+3. Historical or cultural significance if applicable
+4. Recommended visiting tips
+
+Format your response as:
+NAME: [landmark/location name]
+DESCRIPTION: [detailed description]
+LANDMARKS: [comma-separated list of visible landmarks]
+CONFIDENCE: [0.0-1.0 confidence score]`;
+
+        // Try to use vision model if available (llava or similar)
+        let identificationResult;
+
+        try {
+            // Check if Ollama has a vision model available
+            const hasVisionModel = await checkOllamaVisionModel();
+
+            if (hasVisionModel) {
+                // Use Ollama vision model (llava)
+                identificationResult = await identifyPhotoWithOllama(photoFile.path, prompt, location);
+            } else if (process.env.OPENAI_API_KEY) {
+                // Fallback to OpenAI vision API
+                identificationResult = await identifyPhotoWithOpenAI(photoFile.path, prompt, location);
+            } else {
+                // Fallback to location-based analysis
+                identificationResult = await identifyPhotoBasic(location, photoFile);
+            }
+
+            // Log analytics
+            await database.logAnalyticsEvent(req.user.id, 'photo_identification', {
+                location: location,
+                confidence: identificationResult.confidence,
+                method: identificationResult.method
+            });
+
+            res.json({
+                success: true,
+                data: identificationResult
+            });
+
+        } catch (aiError) {
+            console.error('AI identification error:', aiError);
+
+            // Provide basic fallback response
+            const fallbackResult = {
+                name: 'Location Identified',
+                description: 'Photo received successfully. For detailed identification, ensure Ollama with llava model or OpenAI API is configured.',
+                landmarks: location ? ['Location data available'] : ['No location data'],
+                confidence: 0.3,
+                method: 'fallback',
+                location: location
+            };
+
+            res.json({
+                success: true,
+                data: fallbackResult
+            });
+        }
+
+    } catch (error) {
+        console.error('Photo identification error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to identify photo',
+            message: error.message
+        });
+    }
+});
+
+// ===================================
+// HELPER FUNCTIONS FOR PHOTO IDENTIFICATION
+// ===================================
+
+async function checkOllamaVisionModel() {
+    try {
+        const ollamaUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+        const response = await fetch(`${ollamaUrl}/api/tags`, {
+            signal: AbortSignal.timeout(5000)
+        });
+
+        if (!response.ok) return false;
+
+        const data = await response.json();
+        const models = data.models || [];
+
+        // Check for vision models (llava, bakllava, etc.)
+        return models.some(model =>
+            model.name.includes('llava') ||
+            model.name.includes('bakllava') ||
+            model.name.includes('vision')
+        );
+    } catch (error) {
+        console.error('Ollama vision check error:', error);
+        return false;
+    }
+}
+
+async function identifyPhotoWithOllama(photoPath, prompt, location) {
+    const fs = require('fs');
+    const ollamaUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+
+    // Read image as base64
+    const imageBuffer = await fs.promises.readFile(photoPath);
+    const imageBase64 = imageBuffer.toString('base64');
+
+    const response = await fetch(`${ollamaUrl}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            model: 'llava',
+            prompt: prompt,
+            images: [imageBase64],
+            stream: false,
+            options: {
+                temperature: 0.3,
+                top_p: 0.9
+            }
+        }),
+        signal: AbortSignal.timeout(60000) // 60 second timeout for vision
+    });
+
+    if (!response.ok) {
+        throw new Error(`Ollama vision API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return parseIdentificationResponse(data.response, 'ollama-vision', location);
+}
+
+async function identifyPhotoWithOpenAI(photoPath, prompt, location) {
+    const fs = require('fs');
+    const imageBuffer = await fs.promises.readFile(photoPath);
+    const imageBase64 = imageBuffer.toString('base64');
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+        },
+        body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [
+                {
+                    role: 'user',
+                    content: [
+                        { type: 'text', text: prompt },
+                        {
+                            type: 'image_url',
+                            image_url: {
+                                url: `data:image/jpeg;base64,${imageBase64}`
+                            }
+                        }
+                    ]
+                }
+            ],
+            max_tokens: 500
+        }),
+        signal: AbortSignal.timeout(30000)
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`OpenAI Vision API error: ${errorData.error?.message}`);
+    }
+
+    const data = await response.json();
+    return parseIdentificationResponse(
+        data.choices[0].message.content,
+        'openai-vision',
+        location
+    );
+}
+
+async function identifyPhotoBasic(location, photoFile) {
+    // Basic identification using location data and Google Places if available
+    let description = 'Photo uploaded successfully. ';
+    let landmarks = [];
+
+    if (location) {
+        description += `Photo taken near coordinates: ${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}. `;
+
+        // If Google Places is available, try to find nearby landmarks
+        try {
+            const places = await googlePlaces.searchNearby(
+                location,
+                'tourist_attraction',
+                500
+            );
+
+            if (places && places.length > 0) {
+                landmarks = places.slice(0, 3).map(p => p.name);
+                description += `Nearby landmarks include: ${landmarks.join(', ')}. `;
+            }
+        } catch (error) {
+            console.error('Places lookup error:', error);
+        }
+    }
+
+    return {
+        name: 'Photo Location',
+        description: description + 'For detailed landmark identification, configure Ollama with llava model or OpenAI Vision API.',
+        landmarks: landmarks,
+        confidence: 0.5,
+        method: 'basic',
+        location: location,
+        photoSize: photoFile.size,
+        photoType: photoFile.mimetype
+    };
+}
+
+function parseIdentificationResponse(aiResponse, method, location) {
+    // Parse structured response from AI
+    const lines = aiResponse.split('\n');
+    let name = 'Unknown Location';
+    let description = '';
+    let landmarks = [];
+    let confidence = 0.7;
+
+    for (const line of lines) {
+        if (line.startsWith('NAME:')) {
+            name = line.replace('NAME:', '').trim();
+        } else if (line.startsWith('DESCRIPTION:')) {
+            description = line.replace('DESCRIPTION:', '').trim();
+        } else if (line.startsWith('LANDMARKS:')) {
+            const landmarkStr = line.replace('LANDMARKS:', '').trim();
+            landmarks = landmarkStr.split(',').map(l => l.trim()).filter(Boolean);
+        } else if (line.startsWith('CONFIDENCE:')) {
+            const confStr = line.replace('CONFIDENCE:', '').trim();
+            confidence = parseFloat(confStr) || 0.7;
+        } else if (line.trim() && !description) {
+            // If no explicit description found, use the text
+            description += line.trim() + ' ';
+        }
+    }
+
+    // If parsing failed, use the raw response
+    if (!description) {
+        description = aiResponse;
+    }
+
+    return {
+        name,
+        description: description.trim(),
+        landmarks,
+        confidence,
+        method,
+        location
+    };
+}
 // Places Routes
 app.get('/api/places/nearby', async (req, res) => {
     try {
@@ -2080,6 +2369,7 @@ process.on('SIGTERM', async () => {
 startServer();
 
 module.exports = app;
+
 
 
 

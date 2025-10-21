@@ -3738,7 +3738,6 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
     const [searchRadius, setSearchRadius] = useState(1000);
     const [loading, setLoading] = useState(false);
     const [places, setPlaces] = useState([]);
-    const [showQuickToolModal, setShowQuickToolModal] = useState(null);
     const [showScheduleEdit, setShowScheduleEdit] = useState(false);
     const [todaySchedule, setTodaySchedule] = useState([]);
     const [upcomingBookings, setUpcomingBookings] = useState([]);
@@ -3747,37 +3746,73 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
     const [scheduleLoading, setScheduleLoading] = useState(true);
     const [currentTime, setCurrentTime] = useState(new Date());
 
+    // Photo ID states
+    const [showPhotoModal, setShowPhotoModal] = useState(false);
+    const [photoFile, setPhotoFile] = useState(null);
+    const [photoPreview, setPhotoPreview] = useState(null);
+    const [photoIdentifying, setPhotoIdentifying] = useState(false);
+    const [photoResult, setPhotoResult] = useState(null);
+    const videoRef = useRef(null);
+    const canvasRef = useRef(null);
+    const [cameraActive, setCameraActive] = useState(false);
 
-    // Load active trip on mount
+    // Translation states
+    const [showTranslateModal, setShowTranslateModal] = useState(false);
+    const [translateText, setTranslateText] = useState('');
+    const [targetLanguage, setTargetLanguage] = useState('es');
+    const [translating, setTranslating] = useState(false);
+    const [translationResult, setTranslationResult] = useState(null);
+
+    // Emergency contacts states
+    const [showEmergencyModal, setShowEmergencyModal] = useState(false);
+    const [localEmergency, setLocalEmergency] = useState(emergencyContacts.default);
+
+    // Load data on mount
     useEffect(() => {
         loadActiveTrip();
         loadNotifications();
         loadUpcomingBookings();
     }, [token]);
 
-    // Load today's schedule when active trip changes
     useEffect(() => {
         if (activeTrip) {
             loadTodaySchedule();
         }
     }, [activeTrip]);
 
-    // Load places when location or filters change
+    useEffect(() => {
+        if (location) {
+            setLocalEmergency(emergencyContacts.default);
+            fetchLocalEmergencyNumbers();
+        }
+    }, [location]);
+
+    useEffect(() => {
+        setPlaces(nearbyPlaces);
+    }, [nearbyPlaces]);
+
     useEffect(() => {
         if (location) {
             searchNearbyPlaces();
         }
-    }, [location, selectedPlaceType, searchRadius]);
+    }, [selectedPlaceType, searchRadius, location]);
 
     useEffect(() => {
         const timerId = setInterval(() => {
             setCurrentTime(new Date());
-        }, 1000); // Update every second
-
-        // Cleanup function to clear the interval when the component unmounts
+        }, 1000);
         return () => clearInterval(timerId);
     }, []);
-
+    const emergencyContacts = {
+        default: { general: '112', police: '112', ambulance: '112', fire: '112' },
+        US: { general: '911', police: '911', ambulance: '911', fire: '911' },
+        EU: { general: '112', police: '112', ambulance: '112', fire: '112' },
+        UK: { general: '999', police: '999', ambulance: '999', fire: '999' },
+        AU: { general: '000', police: '000', ambulance: '000', fire: '000' },
+        JP: { general: '110', police: '110', ambulance: '119', fire: '119' },
+        CN: { general: '110', police: '110', ambulance: '120', fire: '119' },
+        IN: { general: '112', police: '100', ambulance: '102', fire: '101' }
+    };
     const formattedTime = currentTime.toLocaleTimeString();
     const formattedDate = currentTime.toLocaleDateString();
 
@@ -3799,7 +3834,6 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
 
     const loadTodaySchedule = async () => {
         if (!activeTrip) {
-            console.log('⚠️ No active trip, skipping schedule load');
             setScheduleLoading(false);
             setTodaySchedule([]);
             return;
@@ -3807,16 +3841,11 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
 
         setScheduleLoading(true);
         try {
-            console.log('🔄 Loading schedule for trip:', activeTrip.id);
             const response = await fetch(`${API_BASE_URL}/trips/active/schedule`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const data = await response.json();
-            console.log('✅ Schedule response:', data);
-
             if (data.success) {
                 setTodaySchedule(data.data || []);
             }
@@ -3827,7 +3856,6 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
             setScheduleLoading(false);
         }
     };
-
 
     const loadNotifications = async () => {
         try {
@@ -3857,38 +3885,152 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
         }
     };
 
-    const updateScheduleItemStatus = async (itemId, status) => {
+    const fetchLocalEmergencyNumbers = async () => {
+        if (!location) return;
         try {
-            const response = await fetch(`${API_BASE_URL}/trips/active/schedule/${itemId}`, {
-                method: 'PATCH',
+            setLocalEmergency(emergencyContacts.default);
+        } catch (error) {
+            console.error('Error fetching emergency numbers:', error);
+        }
+    };
+
+    // Photo ID Functions
+    const startCamera = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment' }
+            });
+            if (videoRef.current) {
+                videoRef.current.srcObject = stream;
+                setCameraActive(true);
+            }
+        } catch (error) {
+            console.error('Camera access error:', error);
+            alert('Could not access camera. Please check permissions.');
+        }
+    };
+
+    const stopCamera = () => {
+        if (videoRef.current && videoRef.current.srcObject) {
+            videoRef.current.srcObject.getTracks().forEach(track => track.stop());
+            setCameraActive(false);
+        }
+    };
+
+    const capturePhoto = () => {
+        if (videoRef.current && canvasRef.current) {
+            const canvas = canvasRef.current;
+            const video = videoRef.current;
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0);
+
+            canvas.toBlob((blob) => {
+                const file = new File([blob], 'camera-capture.jpg', { type: 'image/jpeg' });
+                setPhotoFile(file);
+                setPhotoPreview(canvas.toDataURL('image/jpeg'));
+                stopCamera();
+            }, 'image/jpeg', 0.95);
+        }
+    };
+
+    const handleFileUpload = (e) => {
+        const file = e.target.files[0];
+        if (file && file.type.startsWith('image/')) {
+            setPhotoFile(file);
+            const reader = new FileReader();
+            reader.onload = (e) => setPhotoPreview(e.target.result);
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const identifyPhoto = async () => {
+        if (!photoFile) return;
+
+        setPhotoIdentifying(true);
+        setPhotoResult(null);
+
+        try {
+            const formData = new FormData();
+            formData.append('photo', photoFile);
+            formData.append('location', JSON.stringify(location));
+
+            const response = await fetch(`${API_BASE_URL}/ai/identify-photo`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                setPhotoResult(data.data);
+            } else {
+                setPhotoResult({ error: data.error || 'Identification failed' });
+            }
+        } catch (error) {
+            console.error('Photo identification error:', error);
+            setPhotoResult({ error: 'Failed to identify photo' });
+        } finally {
+            setPhotoIdentifying(false);
+        }
+    };
+
+    const closePhotoModal = () => {
+        setShowPhotoModal(false);
+        setPhotoFile(null);
+        setPhotoPreview(null);
+        setPhotoResult(null);
+        stopCamera();
+    };
+
+    // Translation Functions
+    const handleTranslate = async () => {
+        if (!translateText.trim()) return;
+
+        setTranslating(true);
+        setTranslationResult(null);
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/ai/translate`, {
+                method: 'POST',
                 headers: {
                     Authorization: `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ status })
+                body: JSON.stringify({
+                    text: translateText,
+                    targetLanguage: targetLanguage,
+                    sourceLanguage: 'auto',
+                    context: { location: location }
+                })
             });
+
             const data = await response.json();
+
             if (data.success) {
-                // Update local state
-                setTodaySchedule(prev =>
-                    prev.map(item => item.id === itemId ? { ...item, status } : item)
-                );
+                setTranslationResult(data.data);
+            } else {
+                setTranslationResult({ error: data.error || 'Translation failed' });
             }
         } catch (error) {
-            console.error('Update schedule status error:', error);
+            console.error('Translation error:', error);
+            setTranslationResult({ error: 'Failed to translate text' });
+        } finally {
+            setTranslating(false);
         }
     };
 
-    const dismissNotification = async (notificationId) => {
-        try {
-            await fetch(`${API_BASE_URL}/notifications/${notificationId}/dismiss`, {
-                method: 'PATCH',
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            setNotifications(prev => prev.filter(n => n.id !== notificationId));
-        } catch (error) {
-            console.error('Dismiss notification error:', error);
-        }
+    // Navigation Functions
+    const getDirections = (place) => {
+        if (!location || !place.location) return;
+
+        const origin = `${location.lat},${location.lng}`;
+        const destination = `${place.location.lat},${place.location.lng}`;
+        const mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`;
+
+        window.open(mapsUrl, '_blank');
     };
 
     const placeCategories = [
@@ -3898,13 +4040,14 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
         { value: 'shopping_mall', label: 'Shopping', icon: '🛍️' },
         { value: 'cafe', label: 'Cafes', icon: '☕' },
         { value: 'museum', label: 'Museums', icon: '🎨' },
+        { value: 'lodging', label: 'Hotels', icon: '🏨' },
+        { value: 'gas_station', label: 'Gas Stations', icon: '⛽' },
+        { value: 'hospital', label: 'Healthcare', icon: '🏥' },
         { value: 'park', label: 'Parks', icon: '🌳' }
     ];
 
-    // Generate weather forecast from current weather
     const generateWeatherForecast = () => {
         if (!weather) return [];
-
         const baseTemp = weather.temperature || 24;
         return [
             { time: "12 PM", temp: baseTemp + 2, condition: weather.condition || "sunny", alert: false },
@@ -3916,7 +4059,6 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
 
     const weatherForecast = generateWeatherForecast();
 
-    // Search nearby places
     const searchNearbyPlaces = async (type = selectedPlaceType) => {
         if (!location) return;
 
@@ -3938,7 +4080,6 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
         }
     };
 
-    // Helper to get current trip with fallback
     const getCurrentTrip = () => {
         return activeTrip || currentTrip || {
             id: null,
@@ -3952,7 +4093,6 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
 
     const tripData = getCurrentTrip();
 
-    // Helper functions
     const getWeatherIcon = (condition) => {
         switch (condition?.toLowerCase()) {
             case 'sunny':
@@ -3985,7 +4125,7 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
         }
     };
 
-    // Current Activity Component
+    // Component: Current Activity
     const CurrentActivity = () => {
         if (scheduleLoading) {
             return (
@@ -4029,10 +4169,10 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
                         </div>
                         <h3 className="text-2xl font-bold mb-1">{currentActivity.title}</h3>
                         <div className="flex items-center space-x-4 text-sm opacity-90 flex-wrap gap-2">
-              <span className="flex items-center space-x-1">
-                <MapPin className="w-4 h-4" />
-                <span>{currentActivity.location}</span>
-              </span>
+                            <span className="flex items-center space-x-1">
+                                <MapPin className="w-4 h-4" />
+                                <span>{currentActivity.location}</span>
+                            </span>
                             <span>{currentActivity.time}</span>
                             {currentActivity.duration && <span>• {currentActivity.duration}</span>}
                         </div>
@@ -4063,130 +4203,7 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
         );
     };
 
-    // Weather Alert Component
-    const WeatherAlert = () => {
-        const hasAlert = weatherForecast.some(f => f.alert);
-        if (!hasAlert) return null;
-
-        return (
-            <div className="bg-yellow-50 border-l-4 border-yellow-400 rounded-lg p-4 mb-6">
-                <div className="flex items-start space-x-3">
-                    <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                        <h4 className="font-semibold text-yellow-900 mb-1">Weather Alert</h4>
-                        <p className="text-yellow-800 text-sm mb-2">
-                            Weather changes expected. Consider indoor alternatives?
-                        </p>
-                        <div className="flex space-x-2">
-                            <button
-                                onClick={() => sendChatMessage("Show me indoor activities near me")}
-                                className="text-xs bg-yellow-600 text-white px-3 py-1 rounded hover:bg-yellow-700"
-                            >
-                                Show Alternatives
-                            </button>
-                            <button
-                                onClick={() => setNotifications(notifications.filter(n => n.type !== 'weather'))}
-                                className="text-xs bg-white text-yellow-600 border border-yellow-200 px-3 py-1 rounded hover:bg-yellow-50"
-                            >
-                                Dismiss
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        );
-    };
-
-    // Today's Schedule Panel
-    const TodaySchedulePanel = () => (
-        <div className="bg-white rounded-xl shadow-lg p-6">
-            <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold flex items-center space-x-2">
-                    <Calendar className="w-5 h-5 text-blue-600" />
-                    <span>Today's Schedule</span>
-                </h3>
-                <div className="flex space-x-2">
-                    <button
-                        onClick={() => setShowScheduleEdit(true)}
-                        className="text-blue-600 hover:text-blue-700 text-sm flex items-center space-x-1"
-                    >
-                        <Edit className="w-4 h-4" />
-                        <span>Modify</span>
-                    </button>
-                    <button
-                        onClick={() => searchNearbyPlaces()}
-                        className="text-gray-400 hover:text-gray-600"
-                    >
-                        <RefreshCw className="w-4 h-4" />
-                    </button>
-                </div>
-            </div>
-
-            <div className="space-y-3">
-                {todaySchedule.map((item) => (
-                    <div
-                        key={item.id}
-                        className={`border rounded-lg p-3 transition-all ${
-                            item.status === 'current'
-                                ? 'border-blue-500 bg-blue-50'
-                                : item.status === 'completed'
-                                    ? 'border-gray-200 bg-gray-50 opacity-60'
-                                    : 'border-gray-200 hover:border-blue-300'
-                        }`}
-                    >
-                        <div className="flex items-start space-x-3">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                                item.status === 'current' ? 'bg-blue-600 text-white' :
-                                    item.status === 'completed' ? 'bg-green-600 text-white' :
-                                        'bg-gray-200 text-gray-600'
-                            }`}>
-                                {item.status === 'completed' ? <CheckCircle className="w-4 h-4" /> : getActivityIcon(item.type)}
-                            </div>
-
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-start justify-between">
-                                    <div className="flex-1">
-                                        <p className="font-medium text-gray-900">{item.title}</p>
-                                        <div className="flex items-center space-x-2 mt-1 text-sm text-gray-600">
-                                            <span>{item.time}</span>
-                                            {item.duration && <span>• {item.duration}</span>}
-                                            {item.cost && <span>• {item.cost}</span>}
-                                        </div>
-                                        <p className="text-xs text-gray-500 mt-1 flex items-center space-x-1">
-                                            <MapPin className="w-3 h-3" />
-                                            <span>{item.location}</span>
-                                        </p>
-                                        {item.bookingConfirmation && (
-                                            <p className="text-xs text-blue-600 mt-1">
-                                                Booking: {item.bookingConfirmation}
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <button
-                                onClick={() => sendChatMessage(`Tell me more about ${item.title}`)}
-                                className="text-gray-400 hover:text-gray-600"
-                            >
-                                <ChevronRight className="w-5 h-5" />
-                            </button>
-                        </div>
-                    </div>
-                ))}
-            </div>
-
-            <button
-                onClick={() => sendChatMessage("Help me add a new activity to my schedule")}
-                className="w-full mt-4 border-2 border-dashed border-gray-300 rounded-lg py-3 text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors flex items-center justify-center space-x-2"
-            >
-                <Plus className="w-4 h-4" />
-                <span>Add Activity</span>
-            </button>
-        </div>
-    );
-
-    // Quick Tools Component
+    // Component: Quick Tools
     const QuickTools = () => {
         const tools = [
             {
@@ -4195,7 +4212,7 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
                 title: 'Photo ID',
                 description: 'Identify landmarks',
                 color: 'from-purple-500 to-purple-600',
-                action: () => setShowQuickToolModal('landmark')
+                action: () => setShowPhotoModal(true)
             },
             {
                 id: 'translate',
@@ -4203,7 +4220,7 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
                 title: 'Live Translate',
                 description: 'Real-time translation',
                 color: 'from-blue-500 to-blue-600',
-                action: () => setShowQuickToolModal('translate')
+                action: () => setShowTranslateModal(true)
             },
             {
                 id: 'navigation',
@@ -4211,7 +4228,13 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
                 title: 'Navigation',
                 description: 'Get directions',
                 color: 'from-green-500 to-green-600',
-                action: () => setShowQuickToolModal('navigation')
+                action: () => {
+                    if (places.length > 0) {
+                        getDirections(places[0]);
+                    } else {
+                        alert('Search for a place first to get directions');
+                    }
+                }
             },
             {
                 id: 'emergency',
@@ -4219,7 +4242,7 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
                 title: 'Emergency',
                 description: 'Local contacts',
                 color: 'from-red-500 to-red-600',
-                action: () => setShowQuickToolModal('emergency')
+                action: () => setShowEmergencyModal(true)
             }
         ];
 
@@ -4253,7 +4276,7 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
         );
     };
 
-    // Find Nearby Component
+    // Component: Find Nearby
     const FindNearby = () => (
         <div className="bg-white rounded-xl shadow-lg p-6">
             <div className="flex items-center justify-between mb-4">
@@ -4273,7 +4296,6 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
                 </select>
             </div>
 
-            {/* Category Pills */}
             <div className="flex overflow-x-auto space-x-2 mb-4 pb-2 scrollbar-hide">
                 {placeCategories.map(cat => (
                     <button
@@ -4291,549 +4313,58 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
                 ))}
             </div>
 
-            {/* Places List */}
-            <div className="space-y-3 max-h-96 overflow-y-auto">
-                {loading ? (
-                    <div className="flex items-center justify-center py-8">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                        <span className="ml-3 text-gray-600">Finding places...</span>
-                    </div>
-                ) : places.length > 0 ? (
-                    places.map((place, idx) => (
-                        <div key={place.id || idx} className="border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow">
-                            <div className="flex space-x-3">
-                                {place.photos && place.photos.length > 0 && (
-                                    <img
-                                        src={place.photos[0]}
-                                        alt={place.name}
-                                        className="w-20 h-20 rounded-lg object-cover"
-                                    />
-                                )}
-                                <div className="flex-1 min-w-0">
-                                    <h4 className="font-semibold text-gray-900 truncate">{place.name}</h4>
-                                    <div className="flex items-center space-x-2 mt-1">
-                                        {place.rating && (
-                                            <div className="flex items-center space-x-1">
-                                                <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                                                <span className="text-sm text-gray-700">{place.rating}</span>
-                                                {place.userRatingsTotal && (
-                                                    <span className="text-xs text-gray-500">({place.userRatingsTotal})</span>
-                                                )}
-                                            </div>
-                                        )}
-                                        <span className="text-xs text-gray-400">•</span>
-                                        <span className="text-sm text-gray-600">{place.address}</span>
-                                    </div>
-                                    <div className="flex items-center justify-between mt-2">
-                                        {place.priceLevel && (
-                                            <span className="text-xs text-gray-500">
-                        {'$'.repeat(place.priceLevel)}
-                      </span>
-                                        )}
-                                        {place.openNow && (
-                                            <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
-                        Open Now
-                      </span>
-                                        )}
-                                    </div>
+            {loading ? (
+                <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    <span className="ml-3 text-gray-600">Finding places...</span>
+                </div>
+            ) : places.length > 0 ? (
+                <div className="space-y-3">
+                    {places.slice(0, 5).map((place, index) => (
+                        <div key={place.id || index} className="border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow">
+                            <h4 className="font-semibold text-gray-800 mb-1">{place.name}</h4>
+                            <p className="text-sm text-gray-600 mb-2">{place.address}</p>
+
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-2">
+                                    {place.rating && (
+                                        <div className="flex items-center space-x-1">
+                                            <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                                            <span className="text-sm text-gray-700">{place.rating}</span>
+                                        </div>
+                                    )}
+                                    {place.openNow !== undefined && (
+                                        <span className={`text-xs px-2 py-1 rounded ${
+                                            place.openNow ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                        }`}>
+                                            {place.openNow ? 'Open' : 'Closed'}
+                                        </span>
+                                    )}
                                 </div>
+
                                 <button
-                                    onClick={() => sendChatMessage(`Get directions to ${place.name}`)}
-                                    className="text-blue-600 hover:text-blue-700"
+                                    onClick={() => getDirections(place)}
+                                    className="flex items-center space-x-1 text-blue-600 hover:text-blue-700 text-sm font-medium"
                                 >
-                                    <Navigation className="w-5 h-5" />
+                                    <Navigation className="w-4 h-4" />
+                                    <span>Directions</span>
                                 </button>
                             </div>
                         </div>
-                    ))
-                ) : (
-                    <div className="text-center py-8">
-                        <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-                        <p className="text-gray-500 text-sm">No places found nearby</p>
-                    </div>
-                )}
-            </div>
+                    ))}
+                </div>
+            ) : (
+                <div className="text-center py-8">
+                    <MapPin className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                    <p className="text-gray-500">No places found nearby</p>
+                </div>
+            )}
         </div>
     );
-
-    // Upcoming Bookings Component
-    const UpcomingBookings = () => (
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-            <h3 className="text-lg font-semibold mb-4 flex items-center space-x-2">
-                <Bell className="w-5 h-5 text-orange-500" />
-                <span>Upcoming Bookings</span>
-            </h3>
-
-            <div className="space-y-3">
-                {upcomingBookings.map(booking => (
-                    <div key={booking.id} className="border border-gray-200 rounded-lg p-3">
-                        <div className="flex items-start space-x-3">
-                            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600">
-                                {getBookingIcon(booking.type)}
-                            </div>
-                            <div className="flex-1">
-                                <h4 className="font-medium text-gray-900">{booking.title}</h4>
-                                <p className="text-sm text-gray-600">{booking.time}</p>
-                                <p className="text-xs text-gray-500 mt-1">Confirmation: {booking.confirmation}</p>
-                                {booking.alert && (
-                                    <p className="text-xs text-orange-600 mt-2 flex items-center space-x-1">
-                                        <Info className="w-3 h-3" />
-                                        <span>{booking.alert}</span>
-                                    </p>
-                                )}
-                            </div>
-                            <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
-                {booking.status}
-              </span>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-
-    // Smart Insights Component
-    const SmartInsights = () => (
-        <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl p-6 mb-6">
-            <h3 className="text-lg font-semibold mb-4 flex items-center space-x-2">
-                <Zap className="w-5 h-5 text-purple-600" />
-                <span>Smart Insights</span>
-            </h3>
-
-            <div className="space-y-3">
-                <div className="bg-white rounded-lg p-3">
-                    <p className="text-sm text-gray-700 mb-2">
-                        💡 <strong>Local Tip:</strong> Popular attractions are less crowded before 9 AM.
-                    </p>
-                </div>
-                <div className="bg-white rounded-lg p-3">
-                    <p className="text-sm text-gray-700 mb-2">
-                        🍜 <strong>Food Recommendation:</strong> Try local specialties at nearby restaurants!
-                    </p>
-                </div>
-                {currentTrip && (
-                    <div className="bg-white rounded-lg p-3">
-                        <p className="text-sm text-gray-700 mb-2">
-                            ⚡ <strong>Budget Alert:</strong> You're on track with your trip budget.
-                        </p>
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-
-    // Trip Progress Component
-    const TripProgress = () => (
-        <div className="bg-white rounded-xl shadow-lg p-6">
-            <h3 className="text-lg font-semibold mb-4">Trip Progress</h3>
-            <div className="space-y-4">
-                <div>
-                    <div className="flex justify-between text-sm mb-2">
-                        <span className="text-gray-600">Days Completed</span>
-                        <span className="font-medium">{tripData.currentDay} of {tripData.duration}</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                            className="bg-blue-600 h-2 rounded-full transition-all duration-500"
-                            style={{width: `${(tripData.currentDay / tripData.duration) * 100}%`}}
-                        ></div>
-                    </div>
-                </div>
-
-                <div className="pt-3 border-t">
-                    <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">Activities Completed</span>
-                        <span className="text-2xl font-bold text-blue-600">
-              {todaySchedule.filter(s => s.status === 'completed').length}
-            </span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-
-    // Local Information Component
-    const LocalInformation = () => (
-        <div className="bg-white rounded-xl shadow-lg p-6">
-            <h3 className="text-lg font-semibold mb-4">Local Information</h3>
-            <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                    <span className="text-gray-600">Local Time</span>
-                    <span className="font-medium">{new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
-                </div>
-                <div className="flex justify-between">
-                    <span className="text-gray-600">Currency</span>
-                    <span className="font-medium">Local Currency</span>
-                </div>
-                <div className="flex justify-between">
-                    <span className="text-gray-600">Language</span>
-                    <span className="font-medium">Local Language</span>
-                </div>
-                <div className="flex justify-between">
-                    <span className="text-gray-600">Emergency</span>
-                    <span className="font-medium text-red-600">911</span>
-                </div>
-            </div>
-
-            <button
-                onClick={() => sendChatMessage("Tell me more about local information and customs")}
-                className="w-full mt-4 bg-blue-50 text-blue-600 py-2 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium"
-            >
-                View Full Guide
-            </button>
-        </div>
-    );
-
-    // Quick Actions Component
-    const QuickActions = () => (
-        <div className="bg-white rounded-xl shadow-lg p-6">
-            <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
-            <div className="space-y-2">
-                <button
-                    onClick={() => sendChatMessage("Help me create a new travel memory")}
-                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3"
-                >
-                    <Camera className="w-5 h-5 text-gray-600" />
-                    <span className="text-sm">Add Memory</span>
-                </button>
-                <button
-                    onClick={() => sendChatMessage("Help me log a new expense")}
-                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3"
-                >
-                    <DollarSign className="w-5 h-5 text-gray-600" />
-                    <span className="text-sm">Log Expense</span>
-                </button>
-                <button
-                    onClick={() => sendChatMessage("Help me rate my recent activity")}
-                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3"
-                >
-                    <Star className="w-5 h-5 text-gray-600" />
-                    <span className="text-sm">Rate Activity</span>
-                </button>
-                <button
-                    onClick={() => sendChatMessage("I need help with something")}
-                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3"
-                >
-                    <MessageCircle className="w-5 h-5 text-gray-600" />
-                    <span className="text-sm">Ask AI Assistant</span>
-                </button>
-            </div>
-        </div>
-    );
-
-    // Weather Forecast Strip
-    const WeatherForecast = () => (
-        <div className="bg-white rounded-xl shadow-lg p-6">
-            <h3 className="text-lg font-semibold mb-4">Today's Forecast</h3>
-            <div className="grid grid-cols-4 gap-4">
-                {weatherForecast.map((item, index) => (
-                    <div
-                        key={index}
-                        className={`text-center p-4 rounded-lg ${item.alert ? 'bg-yellow-50 border-2 border-yellow-400' : 'bg-gray-50'}`}
-                    >
-                        <p className="text-sm text-gray-600 mb-2">{item.time}</p>
-                        <div className="text-3xl mb-2">
-                            {getWeatherIcon(item.condition)}
-                        </div>
-                        <p className="text-lg font-semibold">{item.temp}°C</p>
-                        {item.alert && (
-                            <p className="text-xs text-yellow-700 mt-2 font-medium">⚠️ Alert</p>
-                        )}
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-
-    // Quick Tool Modals
-    const QuickToolModal = () => {
-        if (!showQuickToolModal) return null;
-
-        const modalContent = {
-            landmark: {
-                title: 'Photo ID - Identify Landmarks',
-                content: (
-                    <div className="text-center">
-                        <Camera className="w-16 h-16 text-purple-600 mx-auto mb-4" />
-                        <p className="text-gray-600 mb-4">Take or upload a photo to identify landmarks and get detailed information</p>
-                        <button
-                            onClick={() => sendChatMessage("Help me identify a landmark from a photo")}
-                            className="w-full bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 mb-2"
-                        >
-                            Take Photo
-                        </button>
-                        <button
-                            onClick={() => sendChatMessage("I want to upload a photo to identify a landmark")}
-                            className="w-full bg-gray-100 text-gray-700 py-3 rounded-lg hover:bg-gray-200"
-                        >
-                            Upload Photo
-                        </button>
-                    </div>
-                )
-            },
-            translate: {
-                title: 'Live Translate',
-                content: (
-                    <div>
-            <textarea
-                className="w-full border border-gray-300 rounded-lg p-3 mb-3"
-                rows="4"
-                placeholder="Enter text to translate..."
-            />
-                        <div className="flex space-x-2 mb-4">
-                            <select className="flex-1 border border-gray-300 rounded-lg px-3 py-2">
-                                <option>English</option>
-                                <option>Spanish</option>
-                                <option>French</option>
-                                <option>German</option>
-                                <option>Chinese</option>
-                                <option>Japanese</option>
-                            </select>
-                            <button className="px-4 py-2 bg-gray-200 rounded-lg">⇄</button>
-                            <select className="flex-1 border border-gray-300 rounded-lg px-3 py-2">
-                                <option>Spanish</option>
-                                <option>English</option>
-                                <option>French</option>
-                                <option>German</option>
-                                <option>Chinese</option>
-                                <option>Japanese</option>
-                            </select>
-                        </div>
-                        <button
-                            onClick={() => {
-                                sendChatMessage("Help me translate text");
-                                setShowQuickToolModal(null);
-                            }}
-                            className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700"
-                        >
-                            Translate
-                        </button>
-                    </div>
-                )
-            },
-            navigation: {
-                title: 'Navigation',
-                content: (
-                    <div>
-                        <div className="bg-blue-50 rounded-lg p-4 mb-4">
-                            <p className="text-sm text-gray-700 mb-2">Current Location:</p>
-                            <p className="font-medium">
-                                {location ? `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` : 'Unknown'}
-                            </p>
-                        </div>
-                        <input
-                            type="text"
-                            placeholder="Where do you want to go?"
-                            className="w-full border border-gray-300 rounded-lg px-3 py-2 mb-3"
-                        />
-                        <button
-                            onClick={() => {
-                                sendChatMessage("Help me navigate to my destination");
-                                setShowQuickToolModal(null);
-                            }}
-                            className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 mb-2"
-                        >
-                            Get Directions
-                        </button>
-                        <button
-                            onClick={() => {
-                                const nextActivity = todaySchedule.find(s => s.status === 'upcoming');
-                                if (nextActivity) {
-                                    sendChatMessage(`Get directions to ${nextActivity.location}`);
-                                }
-                                setShowQuickToolModal(null);
-                            }}
-                            className="w-full bg-gray-100 text-gray-700 py-3 rounded-lg hover:bg-gray-200"
-                        >
-                            Navigate to Next Activity
-                        </button>
-                    </div>
-                )
-            },
-            emergency: {
-                title: 'Emergency & Local Contacts',
-                content: (
-                    <div className="space-y-3">
-                        <div className="bg-red-50 border-l-4 border-red-500 rounded p-3">
-                            <p className="font-semibold text-red-900 mb-2">Emergency Services</p>
-                            <div className="space-y-2 text-sm">
-                                <div className="flex justify-between items-center">
-                                    <span>Police</span>
-                                    <button className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700">
-                                        Call 911
-                                    </button>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <span>Ambulance/Fire</span>
-                                    <button className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700">
-                                        Call 911
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="border border-gray-200 rounded-lg p-3">
-                            <p className="font-semibold text-gray-900 mb-2">Local Contacts</p>
-                            <div className="space-y-2 text-sm">
-                                <div className="flex justify-between items-center">
-                                    <span>US Embassy</span>
-                                    <button
-                                        onClick={() => sendChatMessage("Show me embassy contact information")}
-                                        className="text-blue-600 hover:text-blue-700"
-                                    >
-                                        Contact
-                                    </button>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <span>Hotel Concierge</span>
-                                    <button
-                                        onClick={() => sendChatMessage("Connect me with hotel concierge")}
-                                        className="text-blue-600 hover:text-blue-700"
-                                    >
-                                        Contact
-                                    </button>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <span>Travel Insurance</span>
-                                    <button
-                                        onClick={() => sendChatMessage("Show me my travel insurance details")}
-                                        className="text-blue-600 hover:text-blue-700"
-                                    >
-                                        Contact
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <button
-                            onClick={() => {
-                                sendChatMessage("Share my current location for emergency assistance");
-                                setShowQuickToolModal(null);
-                            }}
-                            className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
-                        >
-                            Share My Location
-                        </button>
-                    </div>
-                )
-            }
-        };
-
-        const modal = modalContent[showQuickToolModal];
-        if (!modal) return null;
-
-        return (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-                    <div className="p-6">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-xl font-semibold">{modal.title}</h3>
-                            <button
-                                onClick={() => setShowQuickToolModal(null)}
-                                className="text-gray-400 hover:text-gray-600"
-                            >
-                                <X className="w-6 h-6" />
-                            </button>
-                        </div>
-                        {modal.content}
-                    </div>
-                </div>
-            </div>
-        );
-    };
-
-    // Schedule Edit Modal
-    const ScheduleEditModal = () => {
-        if (!showScheduleEdit) return null;
-
-        return (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                    <div className="p-6">
-                        <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-xl font-semibold">Modify Today's Schedule</h3>
-                            <button
-                                onClick={() => setShowScheduleEdit(false)}
-                                className="text-gray-400 hover:text-gray-600"
-                            >
-                                <X className="w-6 h-6" />
-                            </button>
-                        </div>
-
-                        <div className="space-y-4 mb-6">
-                            {todaySchedule.map((item, index) => (
-                                <div key={item.id} className="border border-gray-200 rounded-lg p-4">
-                                    <div className="flex items-start justify-between mb-3">
-                                        <input
-                                            type="text"
-                                            defaultValue={item.title}
-                                            className="flex-1 font-medium border-b border-gray-300 focus:border-blue-500 outline-none"
-                                        />
-                                        <button
-                                            onClick={() => {
-                                                const newSchedule = todaySchedule.filter((_, i) => i !== index);
-                                                setTodaySchedule(newSchedule);
-                                            }}
-                                            className="text-red-500 hover:text-red-700 ml-4"
-                                        >
-                                            <X className="w-5 h-5" />
-                                        </button>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <input
-                                            type="time"
-                                            defaultValue={item.time}
-                                            className="text-sm border border-gray-300 rounded px-2 py-1"
-                                        />
-                                        <input
-                                            type="text"
-                                            defaultValue={item.duration}
-                                            placeholder="Duration"
-                                            className="text-sm border border-gray-300 rounded px-2 py-1"
-                                        />
-                                        <input
-                                            type="text"
-                                            defaultValue={item.location}
-                                            placeholder="Location"
-                                            className="text-sm border border-gray-300 rounded px-2 py-1 col-span-2"
-                                        />
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-
-                        <button
-                            onClick={() => sendChatMessage("Help me add a new activity to my schedule")}
-                            className="w-full border-2 border-dashed border-gray-300 rounded-lg py-3 text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors flex items-center justify-center space-x-2 mb-4"
-                        >
-                            <Plus className="w-5 h-5" />
-                            <span>Add New Activity</span>
-                        </button>
-
-                        <div className="flex space-x-3">
-                            <button
-                                onClick={() => setShowScheduleEdit(false)}
-                                className="flex-1 border border-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-50"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={() => setShowScheduleEdit(false)}
-                                className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700"
-                            >
-                                Save Changes
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        );
-    };
 
     return (
         <div className="min-h-screen bg-gray-50">
-            {/* Header with Location and Weather */}
+            {/* Header */}
             <div className="bg-white shadow-sm border-b sticky top-0 z-40">
                 <div className="max-w-7xl mx-auto px-4 py-3">
                     <div className="flex items-center justify-between">
@@ -4841,8 +4372,8 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
                             <div className="flex items-center space-x-2 text-gray-700">
                                 <MapPin className="w-5 h-5 text-blue-600" />
                                 <span className="font-medium">
-                  {location ? `${location.lat.toFixed(2)}, ${location.lng.toFixed(2)}` : 'Location unavailable'}
-                </span>
+                                    {location ? `${location.lat.toFixed(2)}, ${location.lng.toFixed(2)}` : 'Location unavailable'}
+                                </span>
                             </div>
                             {weather && (
                                 <div className="hidden md:flex items-center space-x-2 text-gray-700">
@@ -4857,7 +4388,7 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
 
                         <div className="flex items-center space-x-3">
                             <div className="hidden md:block text-sm text-gray-600">
-                                Day {tripData?.currentDay || 1} of {tripData?.duration || 7} • {tripData?.title || 'No Active Trip'}
+                                Day {tripData?.currentDay || 1} of {tripData?.duration || 7}
                             </div>
                             <button className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg">
                                 <Bell className="w-5 h-5" />
@@ -4872,66 +4403,367 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
 
             {/* Main Content */}
             <div className="max-w-7xl mx-auto px-4 py-6">
-                {/* Notifications Bar */}
-                {notifications.filter(n => n.priority === 'high').length > 0 && (
-                    <div className="mb-6 space-y-2">
-                        {notifications.filter(n => n.priority === 'high').map(notif => (
-                            <div key={notif.id} className="bg-yellow-50 border-l-4 border-yellow-400 rounded-lg p-4">
-                                <div className="flex items-start justify-between">
-                                    <div className="flex items-start space-x-3">
-                                        <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-                                        <p className="text-sm text-yellow-800">{notif.message}</p>
-                                    </div>
-                                    <button
-                                        onClick={() => setNotifications(notifications.filter(n => n.id !== notif.id))}
-                                        className="text-yellow-600 hover:text-yellow-800"
-                                    >
-                                        <X className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-
-                {/* Current Activity Section */}
                 <CurrentActivity />
 
-                {/* Weather Alert */}
-                <WeatherAlert />
-
-                {/* Main Grid Layout */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Left Column - Schedule and Bookings */}
-                    <div className="lg:col-span-1 space-y-6">
-                        <TodaySchedulePanel />
-                        <UpcomingBookings />
-                        <SmartInsights />
-                    </div>
-
-                    {/* Middle Column - Nearby Places */}
                     <div className="lg:col-span-1">
+                        <QuickTools />
+                    </div>
+                    <div className="lg:col-span-2">
                         <FindNearby />
                     </div>
-
-                    {/* Right Column - Quick Tools and Info */}
-                    <div className="lg:col-span-1 space-y-6">
-                        <QuickTools />
-                        <TripProgress />
-                        <LocalInformation />
-                        <QuickActions />
-                    </div>
-                </div>
-
-                {/* Weather Forecast Strip */}
-                <div className="mt-6">
-                    <WeatherForecast />
                 </div>
             </div>
 
-            {/* Modals */}
-            <QuickToolModal />
-            <ScheduleEditModal />
+            {/* Photo ID Modal */}
+            {showPhotoModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                        <div className="p-6">
+                            <div className="flex items-center justify-between mb-6">
+                                <h3 className="text-xl font-semibold">Identify Photo</h3>
+                                <button onClick={closePhotoModal} className="text-gray-400 hover:text-gray-600">
+                                    <X className="w-6 h-6" />
+                                </button>
+                            </div>
+
+                            {!photoPreview ? (
+                                <div className="space-y-4">
+                                    {!cameraActive ? (
+                                        <>
+                                            <button
+                                                onClick={startCamera}
+                                                className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 flex items-center justify-center space-x-2"
+                                            >
+                                                <Camera className="w-5 h-5" />
+                                                <span>Take Photo</span>
+                                            </button>
+
+                                            <div className="relative">
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    onChange={handleFileUpload}
+                                                    className="hidden"
+                                                    id="photo-upload"
+                                                />
+                                                <label
+                                                    htmlFor="photo-upload"
+                                                    className="w-full bg-gray-100 text-gray-700 py-3 rounded-lg hover:bg-gray-200 flex items-center justify-center space-x-2 cursor-pointer"
+                                                >
+                                                    <Upload className="w-5 h-5" />
+                                                    <span>Upload Photo</span>
+                                                </label>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            <video
+                                                ref={videoRef}
+                                                autoPlay
+                                                playsInline
+                                                className="w-full rounded-lg"
+                                            />
+                                            <canvas ref={canvasRef} className="hidden" />
+                                            <div className="flex space-x-3">
+                                                <button
+                                                    onClick={capturePhoto}
+                                                    className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700"
+                                                >
+                                                    Capture
+                                                </button>
+                                                <button
+                                                    onClick={stopCamera}
+                                                    className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-lg hover:bg-gray-200"
+                                                >
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    <img src={photoPreview} alt="Preview" className="w-full rounded-lg" />
+
+                                    {!photoResult ? (
+                                        <div className="flex space-x-3">
+                                            <button
+                                                onClick={identifyPhoto}
+                                                disabled={photoIdentifying}
+                                                className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center space-x-2"
+                                            >
+                                                {photoIdentifying ? (
+                                                    <>
+                                                        <Loader className="w-5 h-5 animate-spin" />
+                                                        <span>Identifying...</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Send className="w-5 h-5" />
+                                                        <span>Identify</span>
+                                                    </>
+                                                )}
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    setPhotoPreview(null);
+                                                    setPhotoFile(null);
+                                                }}
+                                                className="px-6 bg-gray-100 text-gray-700 py-3 rounded-lg hover:bg-gray-200"
+                                            >
+                                                Retake
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="bg-gray-50 rounded-lg p-4">
+                                            {photoResult.error ? (
+                                                <div className="text-red-600">
+                                                    <AlertCircle className="w-5 h-5 inline mr-2" />
+                                                    {photoResult.error}
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-3">
+                                                    <h4 className="font-semibold text-lg">{photoResult.name || 'Identification Result'}</h4>
+                                                    <p className="text-gray-700">{photoResult.description}</p>
+                                                    {photoResult.landmarks && photoResult.landmarks.length > 0 && (
+                                                        <div>
+                                                            <p className="text-sm font-medium text-gray-600 mb-1">Detected Landmarks:</p>
+                                                            <ul className="list-disc list-inside text-sm text-gray-700">
+                                                                {photoResult.landmarks.map((landmark, idx) => (
+                                                                    <li key={idx}>{landmark}</li>
+                                                                ))}
+                                                            </ul>
+                                                        </div>
+                                                    )}
+                                                    {photoResult.confidence && (
+                                                        <p className="text-sm text-gray-600">
+                                                            Confidence: {(photoResult.confidence * 100).toFixed(1)}%
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Translation Modal */}
+            {showTranslateModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl max-w-2xl w-full">
+                        <div className="p-6">
+                            <div className="flex items-center justify-between mb-6">
+                                <h3 className="text-xl font-semibold">Live Translation</h3>
+                                <button onClick={() => setShowTranslateModal(false)} className="text-gray-400 hover:text-gray-600">
+                                    <X className="w-6 h-6" />
+                                </button>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Text to translate
+                                    </label>
+                                    <textarea
+                                        value={translateText}
+                                        onChange={(e) => setTranslateText(e.target.value)}
+                                        placeholder="Enter text to translate..."
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 min-h-[100px]"
+                                        disabled={translating}
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Target Language
+                                    </label>
+                                    <select
+                                        value={targetLanguage}
+                                        onChange={(e) => setTargetLanguage(e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                        disabled={translating}
+                                    >
+                                        <option value="es">Spanish</option>
+                                        <option value="fr">French</option>
+                                        <option value="de">German</option>
+                                        <option value="it">Italian</option>
+                                        <option value="pt">Portuguese</option>
+                                        <option value="ja">Japanese</option>
+                                        <option value="zh">Chinese</option>
+                                        <option value="ko">Korean</option>
+                                        <option value="ar">Arabic</option>
+                                        <option value="ru">Russian</option>
+                                        <option value="hi">Hindi</option>
+                                    </select>
+                                </div>
+
+                                <button
+                                    onClick={handleTranslate}
+                                    disabled={!translateText.trim() || translating}
+                                    className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center justify-center space-x-2"
+                                >
+                                    {translating ? (
+                                        <>
+                                            <Loader className="w-5 h-5 animate-spin" />
+                                            <span>Translating...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Globe className="w-5 h-5" />
+                                            <span>Translate</span>
+                                        </>
+                                    )}
+                                </button>
+
+                                {translationResult && (
+                                    <div className="bg-gray-50 rounded-lg p-4">
+                                        {translationResult.error ? (
+                                            <div className="text-red-600">
+                                                <AlertCircle className="w-5 h-5 inline mr-2" />
+                                                {translationResult.error}
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-3">
+                                                <div>
+                                                    <p className="text-sm text-gray-600 mb-1">Translation:</p>
+                                                    <p className="text-lg font-medium text-gray-900">{translationResult.translation}</p>
+                                                </div>
+                                                <div className="flex items-center justify-between text-sm text-gray-600">
+                                                    <span>
+                                                        {translationResult.sourceLanguage} → {translationResult.targetLanguage}
+                                                    </span>
+                                                    {translationResult.confidence && (
+                                                        <span>Confidence: {(translationResult.confidence * 100).toFixed(0)}%</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Emergency Contacts Modal */}
+            {showEmergencyModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl max-w-md w-full">
+                        <div className="p-6">
+                            <div className="flex items-center justify-between mb-6">
+                                <div className="flex items-center space-x-3">
+                                    <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                                        <AlertCircle className="w-6 h-6 text-red-600" />
+                                    </div>
+                                    <h3 className="text-xl font-semibold">Emergency Contacts</h3>
+                                </div>
+                                <button onClick={() => setShowEmergencyModal(false)} className="text-gray-400 hover:text-gray-600">
+                                    <X className="w-6 h-6" />
+                                </button>
+                            </div>
+
+                            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                                <p className="text-sm text-red-800 font-medium mb-2">
+                                    ⚠️ In case of emergency, call immediately
+                                </p>
+                                <p className="text-xs text-red-700">
+                                    Based on your current location
+                                </p>
+                            </div>
+
+                            <div className="space-y-3">
+                                <div className="bg-white border-2 border-red-600 rounded-lg p-4">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="text-sm font-medium text-gray-700">General Emergency</span>
+                                        <Phone className="w-5 h-5 text-red-600" />
+                                    </div>
+                                    <a
+                                        href={`tel:${localEmergency.general}`}
+                                        className="text-3xl font-bold text-red-600 hover:text-red-700"
+                                    >
+                                        {localEmergency.general}
+                                    </a>
+                                </div>
+
+                                <div className="grid grid-cols-3 gap-3">
+                                    <div className="bg-gray-50 rounded-lg p-4 text-center">
+                                        <Phone className="w-5 h-5 text-blue-600 mx-auto mb-2" />
+                                        <p className="text-xs text-gray-600 mb-1">Police</p>
+                                        <a
+                                            href={`tel:${localEmergency.police}`}
+                                            className="text-lg font-bold text-blue-600 hover:text-blue-700"
+                                        >
+                                            {localEmergency.police}
+                                        </a>
+                                    </div>
+
+                                    <div className="bg-gray-50 rounded-lg p-4 text-center">
+                                        <Phone className="w-5 h-5 text-red-600 mx-auto mb-2" />
+                                        <p className="text-xs text-gray-600 mb-1">Ambulance</p>
+                                        <a
+                                            href={`tel:${localEmergency.ambulance}`}
+                                            className="text-lg font-bold text-red-600 hover:text-red-700"
+                                        >
+                                            {localEmergency.ambulance}
+                                        </a>
+                                    </div>
+
+                                    <div className="bg-gray-50 rounded-lg p-4 text-center">
+                                        <Phone className="w-5 h-5 text-orange-600 mx-auto mb-2" />
+                                        <p className="text-xs text-gray-600 mb-1">Fire</p>
+                                        <a
+                                            href={`tel:${localEmergency.fire}`}
+                                            className="text-lg font-bold text-orange-600 hover:text-orange-700"
+                                        >
+                                            {localEmergency.fire}
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="mt-6 space-y-3">
+                                <button
+                                    onClick={() => {
+                                        if (location) {
+                                            const mapsUrl = `https://www.google.com/maps/search/hospital/@${location.lat},${location.lng},15z`;
+                                            window.open(mapsUrl, '_blank');
+                                        }
+                                    }}
+                                    className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 flex items-center justify-center space-x-2"
+                                >
+                                    <MapPin className="w-5 h-5" />
+                                    <span>Find Nearest Hospital</span>
+                                </button>
+
+                                <button
+                                    onClick={() => {
+                                        if (location) {
+                                            const mapsUrl = `https://www.google.com/maps/search/police+station/@${location.lat},${location.lng},15z`;
+                                            window.open(mapsUrl, '_blank');
+                                        }
+                                    }}
+                                    className="w-full bg-gray-100 text-gray-700 py-3 rounded-lg hover:bg-gray-200 flex items-center justify-center space-x-2"
+                                >
+                                    <MapPin className="w-5 h-5" />
+                                    <span>Find Nearest Police Station</span>
+                                </button>
+                            </div>
+
+                            <div className="mt-6 pt-6 border-t border-gray-200">
+                                <p className="text-xs text-gray-500 text-center">
+                                    Emergency numbers are based on international standards. Always verify local numbers when traveling.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Floating AI Assistant Button */}
             <button

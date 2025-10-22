@@ -19,6 +19,7 @@ require('dotenv').config();
 // Import services
 const { OllamaService } = require('./services/ollama');
 const { GooglePlacesService } = require('./services/googlePlaces');
+const { FoursquarePlacesService } = require('./services/foursquare');
 const { AmadeusService } = require('./services/amadeus');
 const { MemoryService } = require('./services/memory');
 const { DatabaseService } = require('./services/database');
@@ -33,6 +34,7 @@ app.set('trust proxy', 1);
 // Initialize services
 const ollama = new OllamaService();
 const googlePlaces = new GooglePlacesService();
+const foursquare = new FoursquarePlacesService();
 const amadeus = new AmadeusService();
 const database = new DatabaseService();
 const redis = new RedisService();
@@ -298,16 +300,51 @@ io.on('connection', (socket) => {
             // Get weather and nearby recommendations
             const weather = await googlePlaces.getWeatherInfo({ lat, lng });
 
-            // ✅ FIX: Try multiple place types if first search returns no results
+            // ✅ FIX: Try multiple place types and combine results from both APIs
             let nearbyPlaces = [];
             const placeTypes = ['restaurant', 'tourist_attraction', 'lodging', 'cafe'];
 
             for (const type of placeTypes) {
-                nearbyPlaces = await googlePlaces.searchNearby({ lat, lng }, type, 500);
+                // Search both Google and Foursquare in parallel
+                const [googleResults, foursquareResults] = await Promise.all([
+                    googlePlaces.searchNearby({ lat, lng }, type, 500)
+                        .catch(err => {
+                            console.error('Google Places error in location_update:', err);
+                            return [];
+                        }),
+                    foursquare.searchNearby({ lat, lng }, type, 500)
+                        .catch(err => {
+                            console.error('Foursquare error in location_update:', err);
+                            return [];
+                        })
+                ]);
+
+                // Combine and deduplicate
+                const combined = [...googleResults, ...foursquareResults];
+                const unique = [];
+                const seen = new Set();
+
+                for (const place of combined) {
+                    const key = `${place.name.toLowerCase().trim()}_${Math.round(place.location.lat * 1000)},${Math.round(place.location.lng * 1000)}`;
+                    if (!seen.has(key)) {
+                        seen.add(key);
+                        unique.push(place);
+                    }
+                }
+
+                nearbyPlaces = unique;
                 if (nearbyPlaces.length > 0) {
                     break; // Found results, stop searching
                 }
             }
+
+            // Sort by rating
+            nearbyPlaces.sort((a, b) => {
+                if (a.rating && b.rating) return b.rating - a.rating;
+                if (a.rating) return -1;
+                if (b.rating) return 1;
+                return 0;
+            });
 
             socket.emit('location_context', {
                 weather,
@@ -1499,19 +1536,61 @@ app.get('/api/places/nearby', async (req, res) => {
         if (maxprice) options.maxprice = parseInt(maxprice);
         if (opennow === 'true') options.opennow = true;
 
-        const places = await googlePlaces.searchNearby(
-            { lat: parseFloat(lat), lng: parseFloat(lng) },
-            type,
-            parseInt(radius),
-            options
-        );
+        const location = { lat: parseFloat(lat), lng: parseFloat(lng) };
+        const searchRadius = parseInt(radius);
 
-        // ✅ FIX: Always return success with empty array if no results
+        // Search both Google Places and Foursquare in parallel
+        const [googleResults, foursquareResults] = await Promise.all([
+            googlePlaces.searchNearby(location, type, searchRadius, options)
+                .catch(err => {
+                    console.error('Google Places error:', err);
+                    return [];
+                }),
+            foursquare.searchNearby(location, type, searchRadius, options)
+                .catch(err => {
+                    console.error('Foursquare error:', err);
+                    return [];
+                })
+        ]);
+
+        // Combine results from both sources
+        const combinedPlaces = [...googleResults, ...foursquareResults];
+
+        // Remove duplicates based on name and approximate location (within 50 meters)
+        const uniquePlaces = [];
+        const seenPlaces = new Set();
+
+        for (const place of combinedPlaces) {
+            // Create a unique key based on name and location
+            const locationKey = `${Math.round(place.location.lat * 1000)},${Math.round(place.location.lng * 1000)}`;
+            const placeKey = `${place.name.toLowerCase().trim()}_${locationKey}`;
+
+            if (!seenPlaces.has(placeKey)) {
+                seenPlaces.add(placeKey);
+                uniquePlaces.push(place);
+            }
+        }
+
+        // Sort by rating (descending), with unrated places at the end
+        uniquePlaces.sort((a, b) => {
+            if (a.rating && b.rating) return b.rating - a.rating;
+            if (a.rating) return -1;
+            if (b.rating) return 1;
+            return 0;
+        });
+
+        console.log(`📍 Places found: ${googleResults.length} from Google, ${foursquareResults.length} from Foursquare, ${uniquePlaces.length} unique`);
+
         res.json({
             success: true,
-            data: places,
-            count: places.length,
-            message: places.length === 0 ? 'No places found matching your criteria' : undefined
+            data: uniquePlaces,
+            count: uniquePlaces.length,
+            sources: {
+                google: googleResults.length,
+                foursquare: foursquareResults.length,
+                unique: uniquePlaces.length
+            },
+            message: uniquePlaces.length === 0 ? 'No places found matching your criteria' : undefined
         });
     } catch (error) {
         console.error('Places search error:', error);

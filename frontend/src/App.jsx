@@ -3733,6 +3733,18 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
 // ===================================
 
 const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTrip, sendChatMessage, setChatOpen }) => {
+
+// Emergency contacts data
+const emergencyContacts = {
+    default: { general: '112', police: '112', ambulance: '112', fire: '112' },
+    US: { general: '911', police: '911', ambulance: '911', fire: '911' },
+    EU: { general: '112', police: '112', ambulance: '112', fire: '112' },
+    UK: { general: '999', police: '999', ambulance: '999', fire: '999' },
+    AU: { general: '000', police: '000', ambulance: '000', fire: '000' },
+    JP: { general: '110', police: '110', ambulance: '119', fire: '119' },
+    CN: { general: '110', police: '110', ambulance: '120', fire: '119' },
+    IN: { general: '112', police: '100', ambulance: '102', fire: '101' }
+};
     // State Management
     const [selectedPlaceType, setSelectedPlaceType] = useState('all');
     const [searchRadius, setSearchRadius] = useState(1000);
@@ -3762,17 +3774,8 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
     const [targetLanguage, setTargetLanguage] = useState('es');
     const [translating, setTranslating] = useState(false);
     const [translationResult, setTranslationResult] = useState(null);
-    const emergencyContacts = {
-        default: { general: '112', police: '112', ambulance: '112', fire: '112' },
-        US: { general: '911', police: '911', ambulance: '911', fire: '911' },
-        EU: { general: '112', police: '112', ambulance: '112', fire: '112' },
-        UK: { general: '999', police: '999', ambulance: '999', fire: '999' },
-        AU: { general: '000', police: '000', ambulance: '000', fire: '000' },
-        JP: { general: '110', police: '110', ambulance: '119', fire: '119' },
-        CN: { general: '110', police: '110', ambulance: '120', fire: '119' },
-        IN: { general: '112', police: '100', ambulance: '102', fire: '101' }
-    };
-    // Emergency contacts states
+
+    // Emergency states
     const [showEmergencyModal, setShowEmergencyModal] = useState(false);
     const [localEmergency, setLocalEmergency] = useState(emergencyContacts.default);
 
@@ -3792,7 +3795,6 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
     useEffect(() => {
         if (location) {
             setLocalEmergency(emergencyContacts.default);
-            fetchLocalEmergencyNumbers();
         }
     }, [location]);
 
@@ -3885,12 +3887,24 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
         }
     };
 
-    const fetchLocalEmergencyNumbers = async () => {
+    const searchNearbyPlaces = async (type = selectedPlaceType) => {
         if (!location) return;
+
+        setLoading(true);
         try {
-            setLocalEmergency(emergencyContacts.default);
+            const searchType = type === 'all' ? 'tourist_attraction' : type;
+            const response = await fetch(
+                `${API_BASE_URL}/places/nearby?lat=${location.lat}&lng=${location.lng}&type=${searchType}&radius=${searchRadius}`
+            );
+            const data = await response.json();
+
+            if (data.success) {
+                setPlaces(data.data);
+            }
         } catch (error) {
-            console.error('Error fetching emergency numbers:', error);
+            console.error('Places search error:', error);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -4033,53 +4047,7 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
         window.open(mapsUrl, '_blank');
     };
 
-    const placeCategories = [
-        { value: 'all', label: 'All Places', icon: '🌟' },
-        { value: 'restaurant', label: 'Restaurants', icon: '🍽️' },
-        { value: 'tourist_attraction', label: 'Attractions', icon: '🏛️' },
-        { value: 'shopping_mall', label: 'Shopping', icon: '🛍️' },
-        { value: 'cafe', label: 'Cafes', icon: '☕' },
-        { value: 'museum', label: 'Museums', icon: '🎨' },
-        { value: 'lodging', label: 'Hotels', icon: '🏨' },
-        { value: 'gas_station', label: 'Gas Stations', icon: '⛽' },
-        { value: 'hospital', label: 'Healthcare', icon: '🏥' },
-        { value: 'park', label: 'Parks', icon: '🌳' }
-    ];
-
-    const generateWeatherForecast = () => {
-        if (!weather) return [];
-        const baseTemp = weather.temperature || 24;
-        return [
-            { time: "12 PM", temp: baseTemp + 2, condition: weather.condition || "sunny", alert: false },
-            { time: "3 PM", temp: baseTemp + 3, condition: "cloudy", alert: false },
-            { time: "6 PM", temp: baseTemp, condition: "clear", alert: false },
-            { time: "9 PM", temp: baseTemp - 2, condition: "clear", alert: false }
-        ];
-    };
-
-    const weatherForecast = generateWeatherForecast();
-
-    const searchNearbyPlaces = async (type = selectedPlaceType) => {
-        if (!location) return;
-
-        setLoading(true);
-        try {
-            const searchType = type === 'all' ? 'tourist_attraction' : type;
-            const response = await fetch(
-                `${API_BASE_URL}/places/nearby?lat=${location.lat}&lng=${location.lng}&type=${searchType}&radius=${searchRadius}`
-            );
-            const data = await response.json();
-
-            if (data.success) {
-                setPlaces(data.data);
-            }
-        } catch (error) {
-            console.error('Places search error:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
+    // Helper functions
     const getCurrentTrip = () => {
         return activeTrip || currentTrip || {
             id: null,
@@ -4125,7 +4093,33 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
         }
     };
 
-    // Component: Current Activity
+    const placeCategories = [
+        { value: 'all', label: 'All Places', icon: '🌟' },
+        { value: 'restaurant', label: 'Restaurants', icon: '🍽️' },
+        { value: 'tourist_attraction', label: 'Attractions', icon: '🏛️' },
+        { value: 'shopping_mall', label: 'Shopping', icon: '🛍️' },
+        { value: 'cafe', label: 'Cafes', icon: '☕' },
+        { value: 'museum', label: 'Museums', icon: '🎨' },
+        { value: 'lodging', label: 'Hotels', icon: '🏨' },
+        { value: 'gas_station', label: 'Gas Stations', icon: '⛽' },
+        { value: 'hospital', label: 'Healthcare', icon: '🏥' },
+        { value: 'park', label: 'Parks', icon: '🌳' }
+    ];
+
+    const generateWeatherForecast = () => {
+        if (!weather) return [];
+        const baseTemp = weather.temperature || 24;
+        return [
+            { time: "12 PM", temp: baseTemp + 2, condition: weather.condition || "sunny", alert: false },
+            { time: "3 PM", temp: baseTemp + 3, condition: "cloudy", alert: false },
+            { time: "6 PM", temp: baseTemp, condition: "clear", alert: false },
+            { time: "9 PM", temp: baseTemp - 2, condition: "clear", alert: false }
+        ];
+    };
+
+    const weatherForecast = generateWeatherForecast();
+
+    // COMPONENTS
     const CurrentActivity = () => {
         if (scheduleLoading) {
             return (
@@ -4202,6 +4196,7 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
             </div>
         );
     };
+
     const WeatherAlert = () => {
         const hasAlert = weatherForecast.some(f => f.alert);
         if (!hasAlert) return null;
@@ -4215,47 +4210,32 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
                         <p className="text-yellow-800 text-sm mb-2">
                             Weather changes expected. Consider indoor alternatives?
                         </p>
-                        <div className="flex space-x-2">
-                            <button
-                                onClick={() => sendChatMessage("Show me indoor activities near me")}
-                                className="text-xs bg-yellow-600 text-white px-3 py-1 rounded hover:bg-yellow-700"
-                            >
-                                Show Alternatives
-                            </button>
-                            <button
-                                onClick={() => setNotifications(notifications.filter(n => n.type !== 'weather'))}
-                                className="text-xs bg-white text-yellow-600 border border-yellow-200 px-3 py-1 rounded hover:bg-yellow-50"
-                            >
-                                Dismiss
-                            </button>
-                        </div>
+                        <button
+                            onClick={() => sendChatMessage("Show me indoor activities near me")}
+                            className="text-xs bg-yellow-600 text-white px-3 py-1 rounded hover:bg-yellow-700"
+                        >
+                            Show Alternatives
+                        </button>
                     </div>
                 </div>
             </div>
         );
     };
+
     const TodaySchedulePanel = () => (
         <div className="bg-white rounded-xl shadow-lg p-6">
             <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold flex items-center space-x-2">
                     <Calendar className="w-5 h-5 text-blue-600" />
-                    <span>Today&apos;s Schedule</span>
+                    <span>Today's Schedule</span>
                 </h3>
-                <div className="flex space-x-2">
-                    <button
-                        onClick={() => setShowScheduleEdit(true)}
-                        className="text-blue-600 hover:text-blue-700 text-sm flex items-center space-x-1"
-                    >
-                        <Edit className="w-4 h-4" />
-                        <span>Modify</span>
-                    </button>
-                    <button
-                        onClick={() => searchNearbyPlaces()}
-                        className="text-gray-400 hover:text-gray-600"
-                    >
-                        <RefreshCw className="w-4 h-4" />
-                    </button>
-                </div>
+                <button
+                    onClick={() => setShowScheduleEdit(true)}
+                    className="text-blue-600 hover:text-blue-700 text-sm flex items-center space-x-1"
+                >
+                    <Edit className="w-4 h-4" />
+                    <span>Edit</span>
+                </button>
             </div>
 
             <div className="space-y-3">
@@ -4279,36 +4259,24 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
                                 {item.status === 'completed' ? <CheckCircle className="w-4 h-4" /> : getActivityIcon(item.type)}
                             </div>
 
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-start justify-between">
-                                    <div className="flex-1">
-                                        <p className="font-medium text-gray-900">{item.title}</p>
-                                        <div className="flex items-center space-x-2 mt-1 text-sm text-gray-600">
-                                            <span>{item.time}</span>
-                                            {item.duration && <span>• {item.duration}</span>}
-                                            {item.cost && <span>• {item.cost}</span>}
-                                        </div>
-                                        <p className="text-xs text-gray-500 mt-1 flex items-center space-x-1">
-                                            <MapPin className="w-3 h-3" />
-                                            <span>{item.location}</span>
-                                        </p>
-                                    </div>
+                            <div className="flex-1">
+                                <p className="font-medium text-gray-900">{item.title}</p>
+                                <div className="flex items-center space-x-2 mt-1 text-sm text-gray-600">
+                                    <span>{item.time}</span>
+                                    {item.duration && <span>• {item.duration}</span>}
                                 </div>
+                                <p className="text-xs text-gray-500 mt-1 flex items-center space-x-1">
+                                    <MapPin className="w-3 h-3" />
+                                    <span>{item.location}</span>
+                                </p>
                             </div>
-
-                            <button
-                                onClick={() => sendChatMessage(`Tell me more about ${item.title}`)}
-                                className="text-gray-400 hover:text-gray-600"
-                            >
-                                <ChevronRight className="w-5 h-5" />
-                            </button>
                         </div>
                     </div>
                 ))}
             </div>
 
             <button
-                onClick={() => sendChatMessage("Help me add a new activity to my schedule")}
+                onClick={() => sendChatMessage("Help me add a new activity")}
                 className="w-full mt-4 border-2 border-dashed border-gray-300 rounded-lg py-3 text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors flex items-center justify-center space-x-2"
             >
                 <Plus className="w-4 h-4" />
@@ -4317,7 +4285,59 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
         </div>
     );
 
-    // Component: Quick Tools
+    const UpcomingBookings = () => (
+        <div className="bg-white rounded-xl shadow-lg p-6">
+            <h3 className="text-lg font-semibold mb-4 flex items-center space-x-2">
+                <Bell className="w-5 h-5 text-orange-500" />
+                <span>Upcoming Bookings</span>
+            </h3>
+
+            <div className="space-y-3">
+                {upcomingBookings.length > 0 ? upcomingBookings.map(booking => (
+                    <div key={booking.id} className="border border-gray-200 rounded-lg p-3">
+                        <div className="flex items-start space-x-3">
+                            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600">
+                                {getBookingIcon(booking.type)}
+                            </div>
+                            <div className="flex-1">
+                                <h4 className="font-medium text-gray-900">{booking.title}</h4>
+                                <p className="text-sm text-gray-600">{booking.time}</p>
+                                <p className="text-xs text-gray-500 mt-1">Confirmation: {booking.confirmation}</p>
+                            </div>
+                            <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
+                                {booking.status}
+                            </span>
+                        </div>
+                    </div>
+                )) : (
+                    <p className="text-gray-500 text-sm text-center py-4">No upcoming bookings</p>
+                )}
+            </div>
+        </div>
+    );
+
+    const SmartInsights = () => (
+        <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl p-6">
+            <h3 className="text-lg font-semibold mb-4 flex items-center space-x-2">
+                <Zap className="w-5 h-5 text-purple-600" />
+                <span>Smart Insights</span>
+            </h3>
+
+            <div className="space-y-3">
+                <div className="bg-white rounded-lg p-3">
+                    <p className="text-sm text-gray-700">
+                        💡 <strong>Local Tip:</strong> Popular attractions are less crowded before 9 AM.
+                    </p>
+                </div>
+                <div className="bg-white rounded-lg p-3">
+                    <p className="text-sm text-gray-700">
+                        🍜 <strong>Food Recommendation:</strong> Try local specialties at nearby restaurants!
+                    </p>
+                </div>
+            </div>
+        </div>
+    );
+
     const QuickTools = () => {
         const tools = [
             {
@@ -4346,7 +4366,7 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
                     if (places.length > 0) {
                         getDirections(places[0]);
                     } else {
-                        alert('Search for a place first to get directions');
+                        alert('Search for a place first');
                     }
                 }
             },
@@ -4372,12 +4392,10 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
                         <button
                             key={tool.id}
                             onClick={tool.action}
-                            className={`bg-gradient-to-r ${tool.color} text-white rounded-lg p-4 hover:shadow-lg transition-all group`}
+                            className={`bg-gradient-to-r ${tool.color} text-white rounded-lg p-4 hover:shadow-lg transition-all`}
                         >
                             <div className="flex flex-col items-center text-center space-y-2">
-                                <div className="group-hover:scale-110 transition-transform">
-                                    {tool.icon}
-                                </div>
+                                {tool.icon}
                                 <div>
                                     <p className="font-semibold text-sm">{tool.title}</p>
                                     <p className="text-xs opacity-90">{tool.description}</p>
@@ -4389,74 +4407,91 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
             </div>
         );
     };
-    const UpcomingBookings = () => (
+
+    const FindNearby = () => (
         <div className="bg-white rounded-xl shadow-lg p-6">
-            <h3 className="text-lg font-semibold mb-4 flex items-center space-x-2">
-                <Bell className="w-5 h-5 text-orange-500" />
-                <span>Upcoming Bookings</span>
-            </h3>
+            <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold flex items-center space-x-2">
+                    <MapPin className="w-5 h-5 text-blue-600" />
+                    <span>Find Nearby</span>
+                </h3>
+                <select
+                    value={searchRadius}
+                    onChange={(e) => setSearchRadius(parseInt(e.target.value))}
+                    className="text-sm border border-gray-300 rounded-lg px-2 py-1"
+                >
+                    <option value={500}>500m</option>
+                    <option value={1000}>1km</option>
+                    <option value={2000}>2km</option>
+                    <option value={5000}>5km</option>
+                </select>
+            </div>
 
-            <div className="space-y-3">
-                {upcomingBookings.length > 0 ? upcomingBookings.map(booking => (
-                    <div key={booking.id} className="border border-gray-200 rounded-lg p-3">
-                        <div className="flex items-start space-x-3">
-                            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600">
-                                {getBookingIcon(booking.type)}
-                            </div>
-                            <div className="flex-1">
-                                <h4 className="font-medium text-gray-900">{booking.title}</h4>
-                                <p className="text-sm text-gray-600">{booking.time}</p>
-                                <p className="text-xs text-gray-500 mt-1">Confirmation: {booking.confirmation}</p>
-                                {booking.alert && (
-                                    <p className="text-xs text-orange-600 mt-2 flex items-center space-x-1">
-                                        <Info className="w-3 h-3" />
-                                        <span>{booking.alert}</span>
-                                    </p>
+            <div className="flex overflow-x-auto space-x-2 mb-4 pb-2">
+                {placeCategories.map(cat => (
+                    <button
+                        key={cat.value}
+                        onClick={() => setSelectedPlaceType(cat.value)}
+                        className={`flex-shrink-0 px-3 py-2 rounded-full text-sm transition-colors ${
+                            selectedPlaceType === cat.value
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                    >
+                        <span className="mr-1">{cat.icon}</span>
+                        {cat.label}
+                    </button>
+                ))}
+            </div>
+
+            {loading ? (
+                <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    <span className="ml-3 text-gray-600">Finding places...</span>
+                </div>
+            ) : places.length > 0 ? (
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                    {places.map((place, index) => (
+                        <div key={place.id || index} className="border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow">
+                            <div className="flex space-x-3">
+                                {place.photos && place.photos.length > 0 && (
+                                    <img
+                                        src={place.photos[0]}
+                                        alt={place.name}
+                                        className="w-20 h-20 rounded-lg object-cover"
+                                    />
                                 )}
+                                <div className="flex-1 min-w-0">
+                                    <h4 className="font-semibold text-gray-900 truncate">{place.name}</h4>
+                                    <div className="flex items-center space-x-2 mt-1">
+                                        {place.rating && (
+                                            <div className="flex items-center space-x-1">
+                                                <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                                                <span className="text-sm text-gray-700">{place.rating}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <p className="text-xs text-gray-600 mt-1">{place.address}</p>
+                                </div>
+                                <button
+                                    onClick={() => getDirections(place)}
+                                    className="text-blue-600 hover:text-blue-700"
+                                >
+                                    <Navigation className="w-5 h-5" />
+                                </button>
                             </div>
-                            <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
-                                {booking.status}
-                            </span>
                         </div>
-                    </div>
-                )) : (
-                    <p className="text-gray-500 text-sm text-center py-4">No upcoming bookings</p>
-                )}
-            </div>
+                    ))}
+                </div>
+            ) : (
+                <div className="text-center py-8">
+                    <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                    <p className="text-gray-500 text-sm">No places found nearby</p>
+                </div>
+            )}
         </div>
     );
 
-    // Component: Smart Insights
-    const SmartInsights = () => (
-        <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl p-6">
-            <h3 className="text-lg font-semibold mb-4 flex items-center space-x-2">
-                <Zap className="w-5 h-5 text-purple-600" />
-                <span>Smart Insights</span>
-            </h3>
-
-            <div className="space-y-3">
-                <div className="bg-white rounded-lg p-3">
-                    <p className="text-sm text-gray-700 mb-2">
-                        💡 <strong>Local Tip:</strong> Popular attractions are less crowded before 9 AM.
-                    </p>
-                </div>
-                <div className="bg-white rounded-lg p-3">
-                    <p className="text-sm text-gray-700 mb-2">
-                        🍜 <strong>Food Recommendation:</strong> Try local specialties at nearby restaurants!
-                    </p>
-                </div>
-                {currentTrip && (
-                    <div className="bg-white rounded-lg p-3">
-                        <p className="text-sm text-gray-700 mb-2">
-                            ⚡ <strong>Budget Alert:</strong> You're on track with your trip budget.
-                        </p>
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-
-    // Component: Trip Progress
     const TripProgress = () => (
         <div className="bg-white rounded-xl shadow-lg p-6">
             <h3 className="text-lg font-semibold mb-4">Trip Progress</h3>
@@ -4486,7 +4521,6 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
         </div>
     );
 
-    // Component: Local Information
     const LocalInformation = () => (
         <div className="bg-white rounded-xl shadow-lg p-6">
             <h3 className="text-lg font-semibold mb-4">Local Information</h3>
@@ -4500,10 +4534,6 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
                     <span className="font-medium">{formattedDate}</span>
                 </div>
                 <div className="flex justify-between">
-                    <span className="text-gray-600">Currency</span>
-                    <span className="font-medium">Local Currency</span>
-                </div>
-                <div className="flex justify-between">
                     <span className="text-gray-600">Emergency</span>
                     <button
                         onClick={() => setShowEmergencyModal(true)}
@@ -4515,7 +4545,7 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
             </div>
 
             <button
-                onClick={() => sendChatMessage("Tell me more about local information and customs")}
+                onClick={() => sendChatMessage("Tell me about local customs")}
                 className="w-full mt-4 bg-blue-50 text-blue-600 py-2 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium"
             >
                 View Full Guide
@@ -4523,7 +4553,6 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
         </div>
     );
 
-    // Component: Quick Actions
     const QuickActions = () => (
         <div className="bg-white rounded-xl shadow-lg p-6">
             <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
@@ -4543,13 +4572,6 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
                     <span className="text-sm">Log Expense</span>
                 </button>
                 <button
-                    onClick={() => sendChatMessage("Help me rate my recent activity")}
-                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3"
-                >
-                    <Star className="w-5 h-5 text-gray-600" />
-                    <span className="text-sm">Rate Activity</span>
-                </button>
-                <button
                     onClick={() => sendChatMessage("I need help with something")}
                     className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3"
                 >
@@ -4560,10 +4582,9 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
         </div>
     );
 
-    // Component: Weather Forecast Strip
     const WeatherForecast = () => (
         <div className="bg-white rounded-xl shadow-lg p-6">
-            <h3 className="text-lg font-semibold mb-4">Today's Forecast</h3>
+            <h3 className="text-lg font-semibold mb-4">Today&apos;s Forecast</h3>
             <div className="grid grid-cols-4 gap-4">
                 {weatherForecast.map((item, index) => (
                     <div
@@ -4584,171 +4605,310 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
         </div>
     );
 
-    // Component: Find Nearby
-    const FindNearby = () => (
-        <div className="bg-white rounded-xl shadow-lg p-6">
-            <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold flex items-center space-x-2">
-                    <MapPin className="w-5 h-5 text-blue-600" />
-                    <span>Find Nearby</span>
-                </h3>
-                <select
-                    value={searchRadius}
-                    onChange={(e) => setSearchRadius(parseInt(e.target.value))}
-                    className="text-sm border border-gray-300 rounded-lg px-2 py-1"
-                >
-                    <option value={500}>500m</option>
-                    <option value={1000}>1km</option>
-                    <option value={2000}>2km</option>
-                    <option value={5000}>5km</option>
-                </select>
-            </div>
-
-            <div className="flex overflow-x-auto space-x-2 mb-4 pb-2 scrollbar-hide">
-                {placeCategories.map(cat => (
-                    <button
-                        key={cat.value}
-                        onClick={() => setSelectedPlaceType(cat.value)}
-                        className={`flex-shrink-0 px-3 py-2 rounded-full text-sm transition-colors ${
-                            selectedPlaceType === cat.value
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                    >
-                        <span className="mr-1">{cat.icon}</span>
-                        {cat.label}
-                    </button>
-                ))}
-            </div>
-
-            {loading ? (
-                <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                    <span className="ml-3 text-gray-600">Finding places...</span>
-                </div>
-            ) : places.length > 0 ? (
-                <div className="space-y-3">
-                    {places.slice(0, 5).map((place, index) => (
-                        <div key={place.id || index} className="border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow">
-                            <h4 className="font-semibold text-gray-800 mb-1">{place.name}</h4>
-                            <p className="text-sm text-gray-600 mb-2">{place.address}</p>
-
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center space-x-2">
-                                    {place.rating && (
-                                        <div className="flex items-center space-x-1">
-                                            <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                                            <span className="text-sm text-gray-700">{place.rating}</span>
-                                        </div>
-                                    )}
-                                    {place.openNow !== undefined && (
-                                        <span className={`text-xs px-2 py-1 rounded ${
-                                            place.openNow ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                                        }`}>
-                                            {place.openNow ? 'Open' : 'Closed'}
-                                        </span>
-                                    )}
-                                </div>
-
-                                <button
-                                    onClick={() => getDirections(place)}
-                                    className="flex items-center space-x-1 text-blue-600 hover:text-blue-700 text-sm font-medium"
-                                >
-                                    <Navigation className="w-4 h-4" />
-                                    <span>Directions</span>
-                                </button>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            ) : (
-                <div className="text-center py-8">
-                    <MapPin className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                    <p className="text-gray-500">No places found nearby</p>
-                </div>
-            )}
-        </div>
-    );
-    const ScheduleEditModal = () => {
-        if (!showScheduleEdit) return null;
+    // MODALS
+    const PhotoModal = () => {
+        if (!showPhotoModal) return null;
 
         return (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                 <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
                     <div className="p-6">
                         <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-xl font-semibold">Modify Today's Schedule</h3>
-                            <button
-                                onClick={() => setShowScheduleEdit(false)}
-                                className="text-gray-400 hover:text-gray-600"
-                            >
+                            <h3 className="text-xl font-semibold">Identify Photo</h3>
+                            <button onClick={closePhotoModal} className="text-gray-400 hover:text-gray-600">
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+                        
+                        {!photoPreview ? (
+                            <div className="space-y-4">
+                                {!cameraActive ? (
+                                    <>
+                                        <button
+                                            onClick={startCamera}
+                                            className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 flex items-center justify-center space-x-2"
+                                        >
+                                            <Camera className="w-5 h-5" />
+                                            <span>Take Photo</span>
+                                        </button>
+
+                                        <div className="relative">
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={handleFileUpload}
+                                                className="hidden"
+                                                id="photo-upload"
+                                            />
+                                            <label
+                                                htmlFor="photo-upload"
+                                                className="w-full bg-gray-100 text-gray-700 py-3 rounded-lg hover:bg-gray-200 flex items-center justify-center space-x-2 cursor-pointer"
+                                            >
+                                                <Upload className="w-5 h-5" />
+                                                <span>Upload Photo</span>
+                                            </label>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="space-y-4">
+                                        <video
+                                            ref={videoRef}
+                                            autoPlay
+                                            playsInline
+                                            className="w-full rounded-lg"
+                                        />
+                                        <canvas ref={canvasRef} className="hidden" />
+                                        <div className="flex space-x-3">
+                                            <button
+                                                onClick={capturePhoto}
+                                                className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700"
+                                            >
+                                                Capture
+                                            </button>
+                                            <button
+                                                onClick={stopCamera}
+                                                className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-lg hover:bg-gray-200"
+                                            >
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                <img src={photoPreview} alt="Preview" className="w-full rounded-lg" />
+
+                                {!photoResult ? (
+                                    <div className="flex space-x-3">
+                                        <button
+                                            onClick={identifyPhoto}
+                                            disabled={photoIdentifying}
+                                            className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center space-x-2"
+                                        >
+                                            {photoIdentifying ? (
+                                                <>
+                                                    <Loader className="w-5 h-5 animate-spin" />
+                                                    <span>Identifying...</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Send className="w-5 h-5" />
+                                                    <span>Identify</span>
+                                                </>
+                                            )}
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setPhotoPreview(null);
+                                                setPhotoFile(null);
+                                            }}
+                                            className="px-6 bg-gray-100 text-gray-700 py-3 rounded-lg hover:bg-gray-200"
+                                        >
+                                            Retake
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="bg-gray-50 rounded-lg p-4">
+                                        {photoResult.error ? (
+                                            <div className="text-red-600">
+                                                <AlertCircle className="w-5 h-5 inline mr-2" />
+                                                {photoResult.error}
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-3">
+                                                <h4 className="font-semibold text-lg">{photoResult.name || 'Result'}</h4>
+                                                <p className="text-gray-700">{photoResult.description}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const TranslateModal = () => {
+        if (!showTranslateModal) return null;
+
+        return (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-xl max-w-2xl w-full">
+                    <div className="p-6">
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-xl font-semibold">Live Translation</h3>
+                            <button onClick={() => setShowTranslateModal(false)} className="text-gray-400 hover:text-gray-600">
                                 <X className="w-6 h-6" />
                             </button>
                         </div>
 
-                        <div className="space-y-4 mb-6">
-                            {todaySchedule.map((item, index) => (
-                                <div key={item.id} className="border border-gray-200 rounded-lg p-4">
-                                    <div className="flex items-start justify-between mb-3">
-                                        <input
-                                            type="text"
-                                            defaultValue={item.title}
-                                            className="flex-1 font-medium border-b border-gray-300 focus:border-blue-500 outline-none"
-                                        />
-                                        <button
-                                            onClick={() => {
-                                                const newSchedule = todaySchedule.filter((_, i) => i !== index);
-                                                setTodaySchedule(newSchedule);
-                                            }}
-                                            className="text-red-500 hover:text-red-700 ml-4"
-                                        >
-                                            <X className="w-5 h-5" />
-                                        </button>
-                                    </div>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Text to translate
+                                </label>
+                                <textarea
+                                    value={translateText}
+                                    onChange={(e) => setTranslateText(e.target.value)}
+                                    placeholder="Enter text to translate..."
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 min-h-[100px]"
+                                    disabled={translating}
+                                />
+                            </div>
 
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <input
-                                            type="time"
-                                            defaultValue={item.time}
-                                            className="text-sm border border-gray-300 rounded px-2 py-1"
-                                        />
-                                        <input
-                                            type="text"
-                                            defaultValue={item.duration}
-                                            placeholder="Duration"
-                                            className="text-sm border border-gray-300 rounded px-2 py-1"
-                                        />
-                                        <input
-                                            type="text"
-                                            defaultValue={item.location}
-                                            placeholder="Location"
-                                            className="text-sm border border-gray-300 rounded px-2 py-1 col-span-2"
-                                        />
-                                    </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Target Language
+                                </label>
+                                <select
+                                    value={targetLanguage}
+                                    onChange={(e) => setTargetLanguage(e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    disabled={translating}
+                                >
+                                    <option value="es">Spanish</option>
+                                    <option value="fr">French</option>
+                                    <option value="de">German</option>
+                                    <option value="it">Italian</option>
+                                    <option value="pt">Portuguese</option>
+                                    <option value="ja">Japanese</option>
+                                    <option value="zh">Chinese</option>
+                                    <option value="ko">Korean</option>
+                                </select>
+                            </div>
+
+                            <button
+                                onClick={handleTranslate}
+                                disabled={!translateText.trim() || translating}
+                                className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center justify-center space-x-2"
+                            >
+                                {translating ? (
+                                    <>
+                                        <Loader className="w-5 h-5 animate-spin" />
+                                        <span>Translating...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Globe className="w-5 h-5" />
+                                        <span>Translate</span>
+                                    </>
+                                )}
+                            </button>
+
+                            {translationResult && (
+                                <div className="bg-gray-50 rounded-lg p-4">
+                                    {translationResult.error ? (
+                                        <div className="text-red-600">
+                                            <AlertCircle className="w-5 h-5 inline mr-2" />
+                                            {translationResult.error}
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            <div>
+                                                <p className="text-sm text-gray-600 mb-1">Translation:</p>
+                                                <p className="text-lg font-medium text-gray-900">{translationResult.translation}</p>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
-                            ))}
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const EmergencyModal = () => {
+        if (!showEmergencyModal) return null;
+
+        return (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-xl max-w-md w-full">
+                    <div className="p-6">
+                        <div className="flex items-center justify-between mb-6">
+                            <div className="flex items-center space-x-3">
+                                <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                                    <AlertCircle className="w-6 h-6 text-red-600" />
+                                </div>
+                                <h3 className="text-xl font-semibold">Emergency Contacts</h3>
+                            </div>
+                            <button onClick={() => setShowEmergencyModal(false)} className="text-gray-400 hover:text-gray-600">
+                                <X className="w-6 h-6" />
+                            </button>
                         </div>
 
-                        <button
-                            onClick={() => sendChatMessage("Help me add a new activity to my schedule")}
-                            className="w-full border-2 border-dashed border-gray-300 rounded-lg py-3 text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors flex items-center justify-center space-x-2 mb-4"
-                        >
-                            <Plus className="w-5 h-5" />
-                            <span>Add New Activity</span>
-                        </button>
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                            <p className="text-sm text-red-800 font-medium mb-2">
+                                ⚠️ In case of emergency, call immediately
+                            </p>
+                        </div>
 
-                        <div className="flex space-x-3">
+                        <div className="space-y-3">
+                            <div className="bg-white border-2 border-red-600 rounded-lg p-4">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-sm font-medium text-gray-700">General Emergency</span>
+                                    <Phone className="w-5 h-5 text-red-600" />
+                                </div>
+                                <a
+                                    href={`tel:${localEmergency.general}`}
+                                    className="text-3xl font-bold text-red-600 hover:text-red-700"
+                                >
+                                    {localEmergency.general}
+                                </a>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-3">
+                                <div className="bg-gray-50 rounded-lg p-4 text-center">
+                                    <Phone className="w-5 h-5 text-blue-600 mx-auto mb-2" />
+                                    <p className="text-xs text-gray-600 mb-1">Police</p>
+                                    <a
+                                        href={`tel:${localEmergency.police}`}
+                                        className="text-lg font-bold text-blue-600 hover:text-blue-700"
+                                    >
+                                        {localEmergency.police}
+                                    </a>
+                                </div>
+
+                                <div className="bg-gray-50 rounded-lg p-4 text-center">
+                                    <Phone className="w-5 h-5 text-red-600 mx-auto mb-2" />
+                                    <p className="text-xs text-gray-600 mb-1">Ambulance</p>
+                                    <a
+                                        href={`tel:${localEmergency.ambulance}`}
+                                        className="text-lg font-bold text-red-600 hover:text-red-700"
+                                    >
+                                        {localEmergency.ambulance}
+                                    </a>
+                                </div>
+
+                                <div className="bg-gray-50 rounded-lg p-4 text-center">
+                                    <Phone className="w-5 h-5 text-orange-600 mx-auto mb-2" />
+                                    <p className="text-xs text-gray-600 mb-1">Fire</p>
+                                    <a
+                                        href={`tel:${localEmergency.fire}`}
+                                        className="text-lg font-bold text-orange-600 hover:text-orange-700"
+                                    >
+                                        {localEmergency.fire}
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="mt-6 space-y-3">
                             <button
-                                onClick={() => setShowScheduleEdit(false)}
-                                className="flex-1 border border-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-50"
+                                onClick={() => {
+                                    if (location) {
+                                        const mapsUrl = `https://www.google.com/maps/search/hospital/@${location.lat},${location.lng},15z`;
+                                        window.open(mapsUrl, '_blank');
+                                    }
+                                }}
+                                className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 flex items-center justify-center space-x-2"
                             >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={() => setShowScheduleEdit(false)}
-                                className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700"
-                            >
-                                Save Changes
+                                <MapPin className="w-5 h-5" />
+                                <span>Find Nearest Hospital</span>
                             </button>
                         </div>
                     </div>
@@ -4756,6 +4916,8 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
             </div>
         );
     };
+
+    // MAIN RENDER
     return (
         <div className="min-h-screen bg-gray-50">
             {/* Header */}
@@ -4775,7 +4937,6 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
                                     <span>{Math.round(weather.temperature)}°C</span>
                                     <span className="text-gray-500">•</span>
                                     <span className="text-gray-600 capitalize">{weather.description}</span>
-                                    <span className="text-gray-600">{formattedTime}•{formattedDate}</span>
                                 </div>
                             )}
                         </div>
@@ -4798,379 +4959,58 @@ const CompanionMode = ({ user, token, location, weather, nearbyPlaces, currentTr
             {/* Main Content */}
             <div className="max-w-7xl mx-auto px-4 py-6">
                 <CurrentActivity />
+                <WeatherAlert />
 
+                {/* Main Grid Layout */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div className="lg:col-span-1">
-                        <QuickTools />
+                    {/* Left Column */}
+                    <div className="lg:col-span-1 space-y-6">
+                        <TodaySchedulePanel />
+                        <UpcomingBookings />
+                        <SmartInsights />
                     </div>
-                    <div className="lg:col-span-2">
+
+                    {/* Middle Column */}
+                    <div className="lg:col-span-1">
                         <FindNearby />
                     </div>
+
+                    {/* Right Column */}
+                    <div className="lg:col-span-1 space-y-6">
+                        <QuickTools />
+                        <TripProgress />
+                        <LocalInformation />
+                        <QuickActions />
+                    </div>
+                </div>
+
+                {/* Weather Forecast Strip */}
+                <div className="mt-6">
+                    <WeatherForecast />
                 </div>
             </div>
 
-            {/* Photo ID Modal */}
-            {showPhotoModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                        <div className="p-6">
-                            <div className="flex items-center justify-between mb-6">
-                                <h3 className="text-xl font-semibold">Identify Photo</h3>
-                                <button onClick={closePhotoModal} className="text-gray-400 hover:text-gray-600">
-                                    <X className="w-6 h-6" />
-                                </button>
-                            </div>
+            {/* Modals */}
+            <PhotoModal />
+            <TranslateModal />
+            <EmergencyModal />
 
-                            {!photoPreview ? (
-                                <div className="space-y-4">
-                                    {!cameraActive ? (
-                                        <>
-                                            <button
-                                                onClick={startCamera}
-                                                className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 flex items-center justify-center space-x-2"
-                                            >
-                                                <Camera className="w-5 h-5" />
-                                                <span>Take Photo</span>
-                                            </button>
-
-                                            <div className="relative">
-                                                <input
-                                                    type="file"
-                                                    accept="image/*"
-                                                    onChange={handleFileUpload}
-                                                    className="hidden"
-                                                    id="photo-upload"
-                                                />
-                                                <label
-                                                    htmlFor="photo-upload"
-                                                    className="w-full bg-gray-100 text-gray-700 py-3 rounded-lg hover:bg-gray-200 flex items-center justify-center space-x-2 cursor-pointer"
-                                                >
-                                                    <Upload className="w-5 h-5" />
-                                                    <span>Upload Photo</span>
-                                                </label>
-                                            </div>
-                                        </>
-                                    ) : (
-                                        <div className="space-y-4">
-                                            <video
-                                                ref={videoRef}
-                                                autoPlay
-                                                playsInline
-                                                className="w-full rounded-lg"
-                                            />
-                                            <canvas ref={canvasRef} className="hidden" />
-                                            <div className="flex space-x-3">
-                                                <button
-                                                    onClick={capturePhoto}
-                                                    className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700"
-                                                >
-                                                    Capture
-                                                </button>
-                                                <button
-                                                    onClick={stopCamera}
-                                                    className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-lg hover:bg-gray-200"
-                                                >
-                                                    Cancel
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            ) : (
-                                <div className="space-y-4">
-                                    <img src={photoPreview} alt="Preview" className="w-full rounded-lg" />
-
-                                    {!photoResult ? (
-                                        <div className="flex space-x-3">
-                                            <button
-                                                onClick={identifyPhoto}
-                                                disabled={photoIdentifying}
-                                                className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center space-x-2"
-                                            >
-                                                {photoIdentifying ? (
-                                                    <>
-                                                        <Loader className="w-5 h-5 animate-spin" />
-                                                        <span>Identifying...</span>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <Send className="w-5 h-5" />
-                                                        <span>Identify</span>
-                                                    </>
-                                                )}
-                                            </button>
-                                            <button
-                                                onClick={() => {
-                                                    setPhotoPreview(null);
-                                                    setPhotoFile(null);
-                                                }}
-                                                className="px-6 bg-gray-100 text-gray-700 py-3 rounded-lg hover:bg-gray-200"
-                                            >
-                                                Retake
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <div className="bg-gray-50 rounded-lg p-4">
-                                            {photoResult.error ? (
-                                                <div className="text-red-600">
-                                                    <AlertCircle className="w-5 h-5 inline mr-2" />
-                                                    {photoResult.error}
-                                                </div>
-                                            ) : (
-                                                <div className="space-y-3">
-                                                    <h4 className="font-semibold text-lg">{photoResult.name || 'Identification Result'}</h4>
-                                                    <p className="text-gray-700">{photoResult.description}</p>
-                                                    {photoResult.landmarks && photoResult.landmarks.length > 0 && (
-                                                        <div>
-                                                            <p className="text-sm font-medium text-gray-600 mb-1">Detected Landmarks:</p>
-                                                            <ul className="list-disc list-inside text-sm text-gray-700">
-                                                                {photoResult.landmarks.map((landmark, idx) => (
-                                                                    <li key={idx}>{landmark}</li>
-                                                                ))}
-                                                            </ul>
-                                                        </div>
-                                                    )}
-                                                    {photoResult.confidence && (
-                                                        <p className="text-sm text-gray-600">
-                                                            Confidence: {(photoResult.confidence * 100).toFixed(1)}%
-                                                        </p>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Translation Modal */}
-            {showTranslateModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-xl max-w-2xl w-full">
-                        <div className="p-6">
-                            <div className="flex items-center justify-between mb-6">
-                                <h3 className="text-xl font-semibold">Live Translation</h3>
-                                <button onClick={() => setShowTranslateModal(false)} className="text-gray-400 hover:text-gray-600">
-                                    <X className="w-6 h-6" />
-                                </button>
-                            </div>
-
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Text to translate
-                                    </label>
-                                    <textarea
-                                        value={translateText}
-                                        onChange={(e) => setTranslateText(e.target.value)}
-                                        placeholder="Enter text to translate..."
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 min-h-[100px]"
-                                        disabled={translating}
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Target Language
-                                    </label>
-                                    <select
-                                        value={targetLanguage}
-                                        onChange={(e) => setTargetLanguage(e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                        disabled={translating}
-                                    >
-                                        <option value="es">Spanish</option>
-                                        <option value="fr">French</option>
-                                        <option value="de">German</option>
-                                        <option value="it">Italian</option>
-                                        <option value="pt">Portuguese</option>
-                                        <option value="ja">Japanese</option>
-                                        <option value="zh">Chinese</option>
-                                        <option value="ko">Korean</option>
-                                        <option value="ar">Arabic</option>
-                                        <option value="ru">Russian</option>
-                                        <option value="hi">Hindi</option>
-                                    </select>
-                                </div>
-
-                                <button
-                                    onClick={handleTranslate}
-                                    disabled={!translateText.trim() || translating}
-                                    className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center justify-center space-x-2"
-                                >
-                                    {translating ? (
-                                        <>
-                                            <Loader className="w-5 h-5 animate-spin" />
-                                            <span>Translating...</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Globe className="w-5 h-5" />
-                                            <span>Translate</span>
-                                        </>
-                                    )}
-                                </button>
-
-                                {translationResult && (
-                                    <div className="bg-gray-50 rounded-lg p-4">
-                                        {translationResult.error ? (
-                                            <div className="text-red-600">
-                                                <AlertCircle className="w-5 h-5 inline mr-2" />
-                                                {translationResult.error}
-                                            </div>
-                                        ) : (
-                                            <div className="space-y-3">
-                                                <div>
-                                                    <p className="text-sm text-gray-600 mb-1">Translation:</p>
-                                                    <p className="text-lg font-medium text-gray-900">{translationResult.translation}</p>
-                                                </div>
-                                                <div className="flex items-center justify-between text-sm text-gray-600">
-                                                    <span>
-                                                        {translationResult.sourceLanguage} → {translationResult.targetLanguage}
-                                                    </span>
-                                                    {translationResult.confidence && (
-                                                        <span>Confidence: {(translationResult.confidence * 100).toFixed(0)}%</span>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Emergency Contacts Modal */}
-            {showEmergencyModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-xl max-w-md w-full">
-                        <div className="p-6">
-                            <div className="flex items-center justify-between mb-6">
-                                <div className="flex items-center space-x-3">
-                                    <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                                        <AlertCircle className="w-6 h-6 text-red-600" />
-                                    </div>
-                                    <h3 className="text-xl font-semibold">Emergency Contacts</h3>
-                                </div>
-                                <button onClick={() => setShowEmergencyModal(false)} className="text-gray-400 hover:text-gray-600">
-                                    <X className="w-6 h-6" />
-                                </button>
-                            </div>
-
-                            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-                                <p className="text-sm text-red-800 font-medium mb-2">
-                                    ⚠️ In case of emergency, call immediately
-                                </p>
-                                <p className="text-xs text-red-700">
-                                    Based on your current location
-                                </p>
-                            </div>
-
-                            <div className="space-y-3">
-                                <div className="bg-white border-2 border-red-600 rounded-lg p-4">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <span className="text-sm font-medium text-gray-700">General Emergency</span>
-                                        <Phone className="w-5 h-5 text-red-600" />
-                                    </div>
-                                    <a
-                                        href={`tel:${localEmergency.general}`}
-                                        className="text-3xl font-bold text-red-600 hover:text-red-700"
-                                    >
-                                        {localEmergency.general}
-                                    </a>
-                                </div>
-
-                                <div className="grid grid-cols-3 gap-3">
-                                    <div className="bg-gray-50 rounded-lg p-4 text-center">
-                                        <Phone className="w-5 h-5 text-blue-600 mx-auto mb-2" />
-                                        <p className="text-xs text-gray-600 mb-1">Police</p>
-                                        <a
-                                            href={`tel:${localEmergency.police}`}
-                                            className="text-lg font-bold text-blue-600 hover:text-blue-700"
-                                        >
-                                            {localEmergency.police}
-                                        </a>
-                                    </div>
-
-                                    <div className="bg-gray-50 rounded-lg p-4 text-center">
-                                        <Phone className="w-5 h-5 text-red-600 mx-auto mb-2" />
-                                        <p className="text-xs text-gray-600 mb-1">Ambulance</p>
-                                        <a
-                                            href={`tel:${localEmergency.ambulance}`}
-                                            className="text-lg font-bold text-red-600 hover:text-red-700"
-                                        >
-                                            {localEmergency.ambulance}
-                                        </a>
-                                    </div>
-
-                                    <div className="bg-gray-50 rounded-lg p-4 text-center">
-                                        <Phone className="w-5 h-5 text-orange-600 mx-auto mb-2" />
-                                        <p className="text-xs text-gray-600 mb-1">Fire</p>
-                                        <a
-                                            href={`tel:${localEmergency.fire}`}
-                                            className="text-lg font-bold text-orange-600 hover:text-orange-700"
-                                        >
-                                            {localEmergency.fire}
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="mt-6 space-y-3">
-                                <button
-                                    onClick={() => {
-                                        if (location) {
-                                            const mapsUrl = `https://www.google.com/maps/search/hospital/@${location.lat},${location.lng},15z`;
-                                            window.open(mapsUrl, '_blank');
-                                        }
-                                    }}
-                                    className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 flex items-center justify-center space-x-2"
-                                >
-                                    <MapPin className="w-5 h-5" />
-                                    <span>Find Nearest Hospital</span>
-                                </button>
-
-                                <button
-                                    onClick={() => {
-                                        if (location) {
-                                            const mapsUrl = `https://www.google.com/maps/search/police+station/@${location.lat},${location.lng},15z`;
-                                            window.open(mapsUrl, '_blank');
-                                        }
-                                    }}
-                                    className="w-full bg-gray-100 text-gray-700 py-3 rounded-lg hover:bg-gray-200 flex items-center justify-center space-x-2"
-                                >
-                                    <MapPin className="w-5 h-5" />
-                                    <span>Find Nearest Police Station</span>
-                                </button>
-                            </div>
-
-                            <div className="mt-6 pt-6 border-t border-gray-200">
-                                <p className="text-xs text-gray-500 text-center">
-                                    Emergency numbers are based on international standards. Always verify local numbers when traveling.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Floating AI Assistant Button */}
+            {/* Floating AI Button */}
             <button
-                onClick={() => sendChatMessage("Hi, I need help with something")}
-                className="fixed bottom-6 right-6 bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 z-40 group"
+                onClick={() => {
+                    sendChatMessage("Hi, I need help with something");
+                    setChatOpen(true);
+                }}
+                className="fixed bottom-6 right-6 bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 z-40"
                 aria-label="Open AI Chat"
             >
-                <MessageCircle className="w-6 h-6 group-hover:scale-110 transition-transform" />
+                <MessageCircle className="w-6 h-6" />
                 <div className="absolute -top-2 -right-2 w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
             </button>
         </div>
     );
 };
+
 
 // ===================================
 // MEMORY MODE COMPONENT - FIXED

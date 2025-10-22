@@ -3779,6 +3779,10 @@ const emergencyContacts = {
     const [showEmergencyModal, setShowEmergencyModal] = useState(false);
     const [localEmergency, setLocalEmergency] = useState(emergencyContacts.default);
 
+    // Navigation states
+    const [showNavigationModal, setShowNavigationModal] = useState(false);
+    const [navigationDestination, setNavigationDestination] = useState('');
+
     // Load data on mount
     useEffect(() => {
         loadActiveTrip();
@@ -4362,13 +4366,7 @@ const emergencyContacts = {
                 title: 'Navigation',
                 description: 'Get directions',
                 color: 'from-green-500 to-green-600',
-                action: () => {
-                    if (places.length > 0) {
-                        getDirections(places[0]);
-                    } else {
-                        alert('Search for a place first');
-                    }
-                }
+                action: () => setShowNavigationModal(true)
             },
             {
                 id: 'emergency',
@@ -4917,6 +4915,100 @@ const emergencyContacts = {
         );
     };
 
+    const NavigationModal = () => {
+        if (!showNavigationModal) return null;
+
+        const handleNavigate = () => {
+            if (!navigationDestination.trim()) {
+                alert('Please enter a destination');
+                return;
+            }
+
+            let mapsUrl;
+            if (location) {
+                // If we have user's current location, provide directions
+                const origin = `${location.lat},${location.lng}`;
+                mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${encodeURIComponent(navigationDestination)}&travelmode=driving`;
+            } else {
+                // If no location, just search for the destination
+                mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(navigationDestination)}`;
+            }
+
+            window.open(mapsUrl, '_blank');
+            setShowNavigationModal(false);
+            setNavigationDestination('');
+        };
+
+        return (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-xl max-w-md w-full">
+                    <div className="p-6">
+                        <div className="flex items-center justify-between mb-6">
+                            <div className="flex items-center space-x-3">
+                                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                                    <Map className="w-6 h-6 text-green-600" />
+                                </div>
+                                <h3 className="text-xl font-semibold">Navigation</h3>
+                            </div>
+                            <button onClick={() => {
+                                setShowNavigationModal(false);
+                                setNavigationDestination('');
+                            }} className="text-gray-400 hover:text-gray-600">
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Where would you like to go?
+                                </label>
+                                <input
+                                    type="text"
+                                    value={navigationDestination}
+                                    onChange={(e) => setNavigationDestination(e.target.value)}
+                                    onKeyPress={(e) => {
+                                        if (e.key === 'Enter') {
+                                            handleNavigate();
+                                        }
+                                    }}
+                                    placeholder="Enter destination (e.g., Eiffel Tower, Paris)"
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                    autoFocus
+                                />
+                            </div>
+
+                            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                                <p className="text-sm text-green-800">
+                                    💡 <strong>Tip:</strong> Enter any address, place name, or landmark to get directions
+                                </p>
+                            </div>
+
+                            <div className="flex space-x-3">
+                                <button
+                                    onClick={() => {
+                                        setShowNavigationModal(false);
+                                        setNavigationDestination('');
+                                    }}
+                                    className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleNavigate}
+                                    className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2"
+                                >
+                                    <MapPin className="w-5 h-5" />
+                                    <span>Navigate</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     // MAIN RENDER
     return (
         <div className="min-h-screen bg-gray-50">
@@ -4993,6 +5085,7 @@ const emergencyContacts = {
             {/* Modals */}
             <PhotoModal />
             <TranslateModal />
+            <NavigationModal />
             <EmergencyModal />
 
             {/* Floating AI Button */}

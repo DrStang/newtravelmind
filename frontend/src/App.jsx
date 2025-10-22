@@ -3778,6 +3778,7 @@ const emergencyContacts = {
     // Emergency states
     const [showEmergencyModal, setShowEmergencyModal] = useState(false);
     const [localEmergency, setLocalEmergency] = useState(emergencyContacts.default);
+    const [detectedCountry, setDetectedCountry] = useState('Unknown');
 
     // Navigation states
     const [showNavigationModal, setShowNavigationModal] = useState(false);
@@ -3798,9 +3799,54 @@ const emergencyContacts = {
 
     useEffect(() => {
         if (location) {
-            setLocalEmergency(emergencyContacts.default);
+            detectCountryAndSetEmergency(location);
         }
     }, [location]);
+
+    // Detect country from coordinates and set emergency contacts
+    const detectCountryAndSetEmergency = async (coords) => {
+        try {
+            // Use reverse geocoding to detect country
+            const response = await fetch(
+                `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${coords.lat}&longitude=${coords.lng}&localityLanguage=en`
+            );
+
+            if (!response.ok) throw new Error('Geocoding failed');
+
+            const data = await response.json();
+            const countryCode = data.countryCode;
+            const countryName = data.countryName || 'Unknown';
+
+            // Map country codes to emergency contact sets
+            let emergencySet = emergencyContacts.default;
+
+            if (countryCode === 'US') {
+                emergencySet = emergencyContacts.US;
+            } else if (countryCode === 'GB') {
+                emergencySet = emergencyContacts.UK;
+            } else if (countryCode === 'AU') {
+                emergencySet = emergencyContacts.AU;
+            } else if (countryCode === 'JP') {
+                emergencySet = emergencyContacts.JP;
+            } else if (countryCode === 'CN') {
+                emergencySet = emergencyContacts.CN;
+            } else if (countryCode === 'IN') {
+                emergencySet = emergencyContacts.IN;
+            } else if (['AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE'].includes(countryCode)) {
+                // EU countries
+                emergencySet = emergencyContacts.EU;
+            }
+
+            setLocalEmergency(emergencySet);
+            setDetectedCountry(countryName);
+            console.log(`Emergency contacts set for country: ${countryCode} (${countryName})`);
+        } catch (error) {
+            console.error('Error detecting country:', error);
+            // Fallback to default emergency contacts
+            setLocalEmergency(emergencyContacts.default);
+            setDetectedCountry('Unknown');
+        }
+    };
 
     useEffect(() => {
         setPlaces(nearbyPlaces);
@@ -4649,12 +4695,16 @@ const emergencyContacts = {
                                     </>
                                 ) : (
                                     <div className="space-y-4">
-                                        <video
-                                            ref={videoRef}
-                                            autoPlay
-                                            playsInline
-                                            className="w-full rounded-lg"
-                                        />
+                                        <div className="relative bg-black rounded-lg overflow-hidden" style={{ minHeight: '300px' }}>
+                                            <video
+                                                ref={videoRef}
+                                                autoPlay
+                                                playsInline
+                                                muted
+                                                className="w-full h-full object-cover"
+                                                style={{ minHeight: '300px', maxHeight: '500px' }}
+                                            />
+                                        </div>
                                         <canvas ref={canvasRef} className="hidden" />
                                         <div className="flex space-x-3">
                                             <button
@@ -4732,29 +4782,50 @@ const emergencyContacts = {
     const TranslateModal = () => {
         if (!showTranslateModal) return null;
 
+        const handleSubmit = (e) => {
+            e.preventDefault();
+            handleTranslate();
+        };
+
+        const closeTranslateModal = () => {
+            setShowTranslateModal(false);
+            setTranslateText('');
+            setTranslationResult(null);
+        };
+
         return (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                 <div className="bg-white rounded-xl max-w-2xl w-full">
                     <div className="p-6">
                         <div className="flex items-center justify-between mb-6">
                             <h3 className="text-xl font-semibold">Live Translation</h3>
-                            <button onClick={() => setShowTranslateModal(false)} className="text-gray-400 hover:text-gray-600">
+                            <button onClick={closeTranslateModal} className="text-gray-400 hover:text-gray-600">
                                 <X className="w-6 h-6" />
                             </button>
                         </div>
 
-                        <div className="space-y-4">
+                        <form onSubmit={handleSubmit} className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                     Text to translate
                                 </label>
                                 <textarea
                                     value={translateText}
-                                    onChange={(e) => setTranslateText(e.target.value)}
+                                    onChange={(e) => {
+                                        setTranslateText(e.target.value);
+                                        setTranslationResult(null);
+                                    }}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && e.ctrlKey) {
+                                            e.preventDefault();
+                                            handleTranslate();
+                                        }
+                                    }}
                                     placeholder="Enter text to translate..."
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 min-h-[100px]"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none min-h-[100px] resize-y"
                                     disabled={translating}
                                 />
+                                <p className="text-xs text-gray-500 mt-1">Press Ctrl+Enter to translate</p>
                             </div>
 
                             <div>
@@ -4764,7 +4835,7 @@ const emergencyContacts = {
                                 <select
                                     value={targetLanguage}
                                     onChange={(e) => setTargetLanguage(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
                                     disabled={translating}
                                 >
                                     <option value="es">Spanish</option>
@@ -4779,7 +4850,7 @@ const emergencyContacts = {
                             </div>
 
                             <button
-                                onClick={handleTranslate}
+                                type="submit"
                                 disabled={!translateText.trim() || translating}
                                 className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center justify-center space-x-2"
                             >
@@ -4813,7 +4884,7 @@ const emergencyContacts = {
                                     )}
                                 </div>
                             )}
-                        </div>
+                        </form>
                     </div>
                 </div>
             </div>
@@ -4843,6 +4914,11 @@ const emergencyContacts = {
                             <p className="text-sm text-red-800 font-medium mb-2">
                                 ⚠️ In case of emergency, call immediately
                             </p>
+                            {detectedCountry !== 'Unknown' && (
+                                <p className="text-xs text-red-700">
+                                    Location: {detectedCountry}
+                                </p>
+                            )}
                         </div>
 
                         <div className="space-y-3">

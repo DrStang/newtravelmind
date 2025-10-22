@@ -57,7 +57,7 @@ class FoursquarePlacesService {
 
             const response = await fetch(url, {
                 headers: {
-                    'Authorization': this.apiKey,
+                    'Authorization': `Bearer ${this.apiKey}`,
                     'Accept': 'application/json'
                 },
                 signal: AbortSignal.timeout(10000) // 10 second timeout
@@ -117,7 +117,7 @@ class FoursquarePlacesService {
 
             const response = await fetch(url, {
                 headers: {
-                    'Authorization': this.apiKey,
+                    'Authorization': `Bearer ${this.apiKey}`,
                     'Accept': 'application/json'
                 },
                 signal: AbortSignal.timeout(10000)
@@ -154,3 +154,4 @@ class FoursquarePlacesService {
 }
 
 module.exports = { FoursquarePlacesService };
+

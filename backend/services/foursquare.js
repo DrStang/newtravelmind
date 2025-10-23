@@ -1,7 +1,7 @@
 class FoursquarePlacesService {
     constructor() {
         this.apiKey = process.env.FOURSQUARE_API_KEY;
-        this.baseUrl = 'https://api.foursquare.com/v3/places';
+        this.baseUrl = 'https://api.foursquare.com/v3';
     }
 
     async searchNearby(location, categories = null, radius = 1000, options = {}) {
@@ -53,7 +53,7 @@ class FoursquarePlacesService {
                 params.append('price', `${priceMin},${priceMax}`);
             }
 
-            const url = `${this.baseUrl}/search?${params.toString()}`;
+            const url = `${this.baseUrl}/places/search?${params.toString()}`;
 
             const response = await fetch(url, {
                 headers: {
@@ -75,6 +75,10 @@ class FoursquarePlacesService {
 
             if (!data.results || data.results.length === 0) {
                 console.log(`No Foursquare results found for ${categories} near ${location.lat},${location.lng}`);
+                return [];
+            }
+            if (response.status === 410) {
+                console.error('Foursquare API: Endpoint depreciated(410)');
                 return [];
             }
 
@@ -154,4 +158,5 @@ class FoursquarePlacesService {
 }
 
 module.exports = { FoursquarePlacesService };
+
 

@@ -58,8 +58,10 @@ class FoursquarePlacesService {
 
             const response = await fetch(url, {
                 headers: {
-                    'Authorization': `Bearer ${this.apiKey}`,
-                    'Accept': 'application/json'
+                    'accept': 'application/json'
+                    'X-Places-Api-Version': '2025-06-17',
+                    'authorization': `Bearer ${this.apiKey}`,
+                    
                 },
                 signal: AbortSignal.timeout(10000) // 10 second timeout
             });
@@ -159,6 +161,7 @@ class FoursquarePlacesService {
 }
 
 module.exports = { FoursquarePlacesService };
+
 
 
 

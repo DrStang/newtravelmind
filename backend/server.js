@@ -748,7 +748,7 @@ app.post('/api/trips/:id/bookings', authenticateToken, async (req, res) => {
         }
 
         const result = await database.pool.query(`
-            INSERT INTO trip_bookings (trip_id, booking_type, details, booking_date, confirmation_number, cost, created_at)
+            INSERT INTO bookings (trip_id, booking_type, details, booking_date, confirmation_number, cost, created_at)
             VALUES (?, ?, ?, ?, ?, ?, NOW())
         `, [
             tripId,
@@ -2448,6 +2448,7 @@ process.on('SIGTERM', async () => {
 startServer();
 
 module.exports = app;
+
 
 
 

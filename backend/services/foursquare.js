@@ -41,11 +41,12 @@ class FoursquarePlacesService {
             if (options.keyword) {
                 params.append('query', options.keyword);
             }
-            if (options.minprice || options.maxprice) {
+            if (options.minprice) {
                 // Foursquare uses price tiers 1-4
-                const priceMin = options.minprice || 1;
-                const priceMax = options.maxprice || 4;
-                params.append('price', `${priceMin},${priceMax}`);
+                params.append('min_price', options.minprice);
+            }
+            if (options.maxprice){
+                params.append('max_price', options.maxprice);
             }
             
             if (options.opennow) {
@@ -53,7 +54,7 @@ class FoursquarePlacesService {
             }
 
             const url = `${this.baseUrl}/places/search?${params.toString()}`;
-            console.log(url);
+            console.log('Foursquare API URL:', url);
 
             const response = await fetch(url, {
                 headers: {
@@ -158,6 +159,7 @@ class FoursquarePlacesService {
 }
 
 module.exports = { FoursquarePlacesService };
+
 
 
 

@@ -101,6 +101,24 @@ class DatabaseService {
             `);
 
             await this.pool.query(`
+                CREATE TABLE IF NOT EXISTS expenses (
+                                                        id INT AUTO_INCREMENT PRIMARY KEY,
+                                                        user_id INT NOT NULL,
+                                                        trip_id INT,
+                                                        title VARCHAR(255) NOT NULL,
+                    description TEXT,
+                    amount DECIMAL(10,2) NOT NULL,
+                    currency VARCHAR(3) DEFAULT 'USD',
+                    category VARCHAR(50),
+                    expense_date DATE,
+                    receipt_photos JSON,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id),
+                    FOREIGN KEY (trip_id) REFERENCES trips(id)
+                    )
+            `);
+
+            await this.pool.query(`
                 CREATE TABLE IF NOT EXISTS analytics_events (
                                                                 id INT AUTO_INCREMENT PRIMARY KEY,
                                                                 user_id INT NOT NULL,

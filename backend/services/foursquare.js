@@ -1,7 +1,7 @@
 class FoursquarePlacesService {
     constructor() {
         this.apiKey = process.env.FOURSQUARE_API_KEY;
-        this.baseUrl = 'https://api.foursquare.com/v3';
+        this.baseUrl = 'https://places-api.foursquare.com';
     }
 
     async searchNearby(location, categories = null, radius = 1000, options = {}) {
@@ -158,5 +158,6 @@ class FoursquarePlacesService {
 }
 
 module.exports = { FoursquarePlacesService };
+
 
 

@@ -41,16 +41,15 @@ class FoursquarePlacesService {
             if (options.keyword) {
                 params.append('query', options.keyword);
             }
-
-            if (options.opennow) {
-                params.append('open_now', 'true');
-            }
-
             if (options.minprice || options.maxprice) {
                 // Foursquare uses price tiers 1-4
                 const priceMin = options.minprice || 1;
                 const priceMax = options.maxprice || 4;
                 params.append('price', `${priceMin},${priceMax}`);
+            }
+            
+            if (options.opennow) {
+                params.append('open_now', 'true');
             }
 
             const url = `${this.baseUrl}/places/search?${params.toString()}`;
@@ -159,6 +158,7 @@ class FoursquarePlacesService {
 }
 
 module.exports = { FoursquarePlacesService };
+
 
 
 

@@ -94,7 +94,7 @@ class FoursquarePlacesService {
                 address: place.location?.formatted_address || place.location?.address,
                 types: place.categories?.map(cat => cat.name.toLowerCase().replace(/\s+/g, '_')) || [],
                 priceLevel: place.price || undefined,
-                openNow: undefined, // Foursquare doesn't provide this in basic search
+                openNow: place.opening_hours?.open_now,
                 photos: place.photos?.map(photo =>
                     `${photo.prefix}300x300${photo.suffix}`
                 ).slice(0, 5) || [],
@@ -120,12 +120,14 @@ class FoursquarePlacesService {
         }
 
         try {
-            const url = `${this.baseUrl}/${fsqId}`;
+            const url = `${this.baseUrl}/places/${fsqId}`;
 
             const response = await fetch(url, {
                 headers: {
-                    'Authorization': `Bearer ${this.apiKey}`,
-                    'Accept': 'application/json'
+                    'accept': 'application/json',
+                    'X-Places-Api-Version': '2025-06-17',
+                    'authorization': `Bearer ${this.apiKey}`,
+                    
                 },
                 signal: AbortSignal.timeout(10000)
             });
@@ -161,6 +163,7 @@ class FoursquarePlacesService {
 }
 
 module.exports = { FoursquarePlacesService };
+
 
 
 

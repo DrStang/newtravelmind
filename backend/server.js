@@ -789,7 +789,7 @@ app.get('/api/trips/:id/bookings', authenticateToken, async (req, res) => {
         }
 
         const bookings = await database.pool.query(`
-            SELECT * FROM trip_bookings
+            SELECT * FROM bookings
             WHERE trip_id = ?
             ORDER BY booking_date ASC
         `, [tripId]);
@@ -824,7 +824,7 @@ app.delete('/api/trips/:id/bookings/:bookingId', authenticateToken, async (req, 
         }
 
         await database.pool.query(`
-            DELETE FROM trip_bookings
+            DELETE FROM bookings
             WHERE id = ? AND trip_id = ?
         `, [bookingId, tripId]);
 
@@ -1072,7 +1072,7 @@ app.get('/api/bookings/upcoming', authenticateToken, async (req, res) => {
         const placeholders = tripIds.map(() => '?').join(',');
         const bookings = await database.pool.query(`
             SELECT tb.*, t.title as trip_title, t.destination
-            FROM trip_bookings tb
+            FROM bookings tb
                      JOIN trips t ON tb.trip_id = t.id
             WHERE tb.trip_id IN (${placeholders})
               AND tb.booking_date >= CURDATE()
@@ -2572,6 +2572,7 @@ process.on('SIGTERM', async () => {
 startServer();
 
 module.exports = app;
+
 
 
 

@@ -3784,6 +3784,38 @@ const emergencyContacts = {
     const [showNavigationModal, setShowNavigationModal] = useState(false);
     const [navigationDestination, setNavigationDestination] = useState('');
 
+    // Activity search states
+    const [showActivitySearchModal, setShowActivitySearchModal] = useState(false);
+    const [searchingActivities, setSearchingActivities] = useState(false);
+    const [activities, setActivities] = useState([]);
+
+    // Add Memory states
+    const [showAddMemoryModal, setShowAddMemoryModal] = useState(false);
+    const [memoryData, setMemoryData] = useState({
+        title: '',
+        description: '',
+        memoryType: 'experience',
+        rating: 5,
+        memoryDate: new Date().toISOString().split('T')[0]
+    });
+    const [memoryPhotos, setMemoryPhotos] = useState([]);
+    const [memoryPhotosPreviews, setMemoryPhotosPreviews] = useState([]);
+    const [savingMemory, setSavingMemory] = useState(false);
+
+    // Add Expense states
+    const [showAddExpenseModal, setShowAddExpenseModal] = useState(false);
+    const [expenseData, setExpenseData] = useState({
+        title: '',
+        description: '',
+        amount: '',
+        currency: 'USD',
+        category: 'general',
+        expenseDate: new Date().toISOString().split('T')[0]
+    });
+    const [receiptPhotos, setReceiptPhotos] = useState([]);
+    const [receiptPhotosPreviews, setReceiptPhotosPreviews] = useState([]);
+    const [savingExpense, setSavingExpense] = useState(false);
+
     // Load data on mount
     useEffect(() => {
         loadActiveTrip();
@@ -4097,6 +4129,202 @@ const emergencyContacts = {
         window.open(mapsUrl, '_blank');
     };
 
+    // Activity Search Functions
+    const searchActivities = async () => {
+        if (!location) return;
+
+        setSearchingActivities(true);
+        try {
+            const response = await fetch(
+                `${API_BASE_URL}/activities/search?latitude=${location.lat}&longitude=${location.lng}&radius=5`,
+                {
+                    headers: { Authorization: `Bearer ${token}` }
+                }
+            );
+            const data = await response.json();
+
+            if (data.success) {
+                setActivities(data.data.activities || []);
+            }
+        } catch (error) {
+            console.error('Activity search error:', error);
+        } finally {
+            setSearchingActivities(false);
+        }
+    };
+
+    const addActivityToSchedule = async (activity) => {
+        if (!activeTrip) return;
+
+        try {
+            const scheduleItem = {
+                title: activity.name,
+                type: 'activity',
+                time: '09:00',
+                duration: '2 hours',
+                location: activity.geoCode ? `${activity.geoCode.latitude}, ${activity.geoCode.longitude}` : 'Unknown',
+                status: 'upcoming',
+                date: new Date().toISOString().split('T')[0]
+            };
+
+            const response = await fetch(`${API_BASE_URL}/trips/${activeTrip.id}/schedule`, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(scheduleItem)
+            });
+
+            if (response.ok) {
+                await loadTodaySchedule();
+                setShowActivitySearchModal(false);
+            }
+        } catch (error) {
+            console.error('Add activity error:', error);
+        }
+    };
+
+    // Memory Functions
+    const handleMemoryPhotosUpload = (e) => {
+        const files = Array.from(e.target.files);
+        setMemoryPhotos(prev => [...prev, ...files]);
+
+        // Create previews
+        files.forEach(file => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                setMemoryPhotosPreviews(prev => [...prev, e.target.result]);
+            };
+            reader.readAsDataURL(file);
+        });
+    };
+
+    const removeMemoryPhoto = (index) => {
+        setMemoryPhotos(prev => prev.filter((_, i) => i !== index));
+        setMemoryPhotosPreviews(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const saveMemory = async () => {
+        if (!memoryData.title) return;
+
+        setSavingMemory(true);
+        try {
+            const formData = new FormData();
+            formData.append('title', memoryData.title);
+            formData.append('description', memoryData.description);
+            formData.append('memoryType', memoryData.memoryType);
+            formData.append('rating', memoryData.rating);
+            formData.append('memoryDate', memoryData.memoryDate);
+            if (activeTrip) {
+                formData.append('tripId', activeTrip.id);
+            }
+
+            memoryPhotos.forEach(photo => {
+                formData.append('photos', photo);
+            });
+
+            const response = await fetch(`${API_BASE_URL}/memories`, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${token}`
+                },
+                body: formData
+            });
+
+            if (response.ok) {
+                // Reset form
+                setMemoryData({
+                    title: '',
+                    description: '',
+                    memoryType: 'experience',
+                    rating: 5,
+                    memoryDate: new Date().toISOString().split('T')[0]
+                });
+                setMemoryPhotos([]);
+                setMemoryPhotosPreviews([]);
+                setShowAddMemoryModal(false);
+                alert('Memory saved successfully!');
+            }
+        } catch (error) {
+            console.error('Save memory error:', error);
+            alert('Failed to save memory');
+        } finally {
+            setSavingMemory(false);
+        }
+    };
+
+    // Expense Functions
+    const handleReceiptPhotosUpload = (e) => {
+        const files = Array.from(e.target.files);
+        setReceiptPhotos(prev => [...prev, ...files]);
+
+        // Create previews
+        files.forEach(file => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                setReceiptPhotosPreviews(prev => [...prev, e.target.result]);
+            };
+            reader.readAsDataURL(file);
+        });
+    };
+
+    const removeReceiptPhoto = (index) => {
+        setReceiptPhotos(prev => prev.filter((_, i) => i !== index));
+        setReceiptPhotosPreviews(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const saveExpense = async () => {
+        if (!expenseData.title || !expenseData.amount) return;
+
+        setSavingExpense(true);
+        try {
+            const formData = new FormData();
+            formData.append('title', expenseData.title);
+            formData.append('description', expenseData.description);
+            formData.append('amount', expenseData.amount);
+            formData.append('currency', expenseData.currency);
+            formData.append('category', expenseData.category);
+            formData.append('expenseDate', expenseData.expenseDate);
+            if (activeTrip) {
+                formData.append('tripId', activeTrip.id);
+            }
+
+            receiptPhotos.forEach(photo => {
+                formData.append('receipt_photos', photo);
+            });
+
+            const response = await fetch(`${API_BASE_URL}/expenses`, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${token}`
+                },
+                body: formData
+            });
+
+            if (response.ok) {
+                // Reset form
+                setExpenseData({
+                    title: '',
+                    description: '',
+                    amount: '',
+                    currency: 'USD',
+                    category: 'general',
+                    expenseDate: new Date().toISOString().split('T')[0]
+                });
+                setReceiptPhotos([]);
+                setReceiptPhotosPreviews([]);
+                setShowAddExpenseModal(false);
+                alert('Expense saved successfully!');
+            }
+        } catch (error) {
+            console.error('Save expense error:', error);
+            alert('Failed to save expense');
+        } finally {
+            setSavingExpense(false);
+        }
+    };
+
     // Helper functions
     const getCurrentTrip = () => {
         return activeTrip || currentTrip || {
@@ -4325,13 +4553,28 @@ const emergencyContacts = {
                 ))}
             </div>
 
-            <button
-                onClick={() => sendChatMessage("Help me add a new activity")}
-                className="w-full mt-4 border-2 border-dashed border-gray-300 rounded-lg py-3 text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors flex items-center justify-center space-x-2"
-            >
-                <Plus className="w-4 h-4" />
-                <span>Add Activity</span>
-            </button>
+            <div className="mt-4 flex space-x-2">
+                <button
+                    onClick={() => {
+                        setShowActivitySearchModal(true);
+                        searchActivities();
+                    }}
+                    className="flex-1 border-2 border-dashed border-gray-300 rounded-lg py-3 text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors flex items-center justify-center space-x-2"
+                >
+                    <MapPin className="w-4 h-4" />
+                    <span>Search Activities</span>
+                </button>
+                <button
+                    onClick={() => {
+                        sendChatMessage("Help me plan a new activity");
+                        setChatOpen(true);
+                    }}
+                    className="flex-1 border-2 border-dashed border-gray-300 rounded-lg py-3 text-gray-600 hover:border-purple-400 hover:text-purple-600 transition-colors flex items-center justify-center space-x-2"
+                >
+                    <MessageCircle className="w-4 h-4" />
+                    <span>AI Assist</span>
+                </button>
+            </div>
         </div>
     );
 
@@ -4602,21 +4845,24 @@ const emergencyContacts = {
             <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
             <div className="space-y-2">
                 <button
-                    onClick={() => sendChatMessage("Help me create a new travel memory")}
+                    onClick={() => setShowAddMemoryModal(true)}
                     className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3"
                 >
                     <Camera className="w-5 h-5 text-gray-600" />
                     <span className="text-sm">Add Memory</span>
                 </button>
                 <button
-                    onClick={() => sendChatMessage("Help me log a new expense")}
+                    onClick={() => setShowAddExpenseModal(true)}
                     className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3"
                 >
                     <DollarSign className="w-5 h-5 text-gray-600" />
                     <span className="text-sm">Log Expense</span>
                 </button>
                 <button
-                    onClick={() => sendChatMessage("I need help with something")}
+                    onClick={() => {
+                        sendChatMessage("I need help with something");
+                        setChatOpen(true);
+                    }}
                     className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3"
                 >
                     <MessageCircle className="w-5 h-5 text-gray-600" />
@@ -5085,6 +5331,492 @@ const emergencyContacts = {
         );
     };
 
+    // Schedule Edit Modal (with manual booking)
+    const ScheduleEditModal = () => {
+        if (!showScheduleEdit) return null;
+
+        const [bookingData, setBookingData] = useState({
+            type: 'activity',
+            title: '',
+            time: '09:00',
+            duration: '1 hour',
+            location: '',
+            date: new Date().toISOString().split('T')[0]
+        });
+
+        const handleAddBooking = async () => {
+            if (!bookingData.title || !activeTrip) return;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/trips/${activeTrip.id}/schedule`, {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        ...bookingData,
+                        status: 'upcoming'
+                    })
+                });
+
+                if (response.ok) {
+                    await loadTodaySchedule();
+                    setShowScheduleEdit(false);
+                    setBookingData({
+                        type: 'activity',
+                        title: '',
+                        time: '09:00',
+                        duration: '1 hour',
+                        location: '',
+                        date: new Date().toISOString().split('T')[0]
+                    });
+                }
+            } catch (error) {
+                console.error('Add booking error:', error);
+            }
+        };
+
+        return (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+                    <div className="p-6">
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-xl font-semibold">Add to Schedule</h3>
+                            <button onClick={() => setShowScheduleEdit(false)} className="text-gray-400 hover:text-gray-600">
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
+                                <select
+                                    value={bookingData.type}
+                                    onChange={(e) => setBookingData(prev => ({ ...prev, type: e.target.value }))}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                >
+                                    <option value="activity">Activity</option>
+                                    <option value="dining">Dining</option>
+                                    <option value="accommodation">Accommodation</option>
+                                    <option value="transport">Transport</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Title</label>
+                                <input
+                                    type="text"
+                                    value={bookingData.title}
+                                    onChange={(e) => setBookingData(prev => ({ ...prev, title: e.target.value }))}
+                                    placeholder="e.g., Visit Eiffel Tower"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                                    <input
+                                        type="date"
+                                        value={bookingData.date}
+                                        onChange={(e) => setBookingData(prev => ({ ...prev, date: e.target.value }))}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Time</label>
+                                    <input
+                                        type="time"
+                                        value={bookingData.time}
+                                        onChange={(e) => setBookingData(prev => ({ ...prev, time: e.target.value }))}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Duration</label>
+                                <input
+                                    type="text"
+                                    value={bookingData.duration}
+                                    onChange={(e) => setBookingData(prev => ({ ...prev, duration: e.target.value }))}
+                                    placeholder="e.g., 2 hours"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
+                                <input
+                                    type="text"
+                                    value={bookingData.location}
+                                    onChange={(e) => setBookingData(prev => ({ ...prev, location: e.target.value }))}
+                                    placeholder="Address or venue"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+
+                            <div className="flex space-x-3 pt-4">
+                                <button
+                                    onClick={() => setShowScheduleEdit(false)}
+                                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleAddBooking}
+                                    disabled={!bookingData.title}
+                                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                                >
+                                    Add to Schedule
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    // Activity Search Modal
+    const ActivitySearchModal = () => {
+        if (!showActivitySearchModal) return null;
+
+        return (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                    <div className="p-6">
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-xl font-semibold">Search Activities</h3>
+                            <button onClick={() => setShowActivitySearchModal(false)} className="text-gray-400 hover:text-gray-600">
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        {searchingActivities ? (
+                            <div className="flex items-center justify-center py-12">
+                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                                <span className="ml-3 text-gray-600">Searching for activities...</span>
+                            </div>
+                        ) : activities.length > 0 ? (
+                            <div className="space-y-3">
+                                {activities.map((activity, index) => (
+                                    <div key={index} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                                        <div className="flex justify-between items-start">
+                                            <div className="flex-1">
+                                                <h4 className="font-semibold text-gray-900">{activity.name}</h4>
+                                                {activity.shortDescription && (
+                                                    <p className="text-sm text-gray-600 mt-1">{activity.shortDescription}</p>
+                                                )}
+                                                {activity.price && (
+                                                    <p className="text-sm text-gray-500 mt-2">
+                                                        From {activity.price.amount} {activity.price.currencyCode}
+                                                    </p>
+                                                )}
+                                            </div>
+                                            <button
+                                                onClick={() => addActivityToSchedule(activity)}
+                                                className="ml-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                                            >
+                                                Add to Schedule
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-center py-12">
+                                <MapPin className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                                <p className="text-gray-500">No activities found in your area</p>
+                                <button
+                                    onClick={searchActivities}
+                                    className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                                >
+                                    Search Again
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    // Add Memory Modal
+    const AddMemoryModal = () => {
+        if (!showAddMemoryModal) return null;
+
+        return (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+                    <div className="p-6">
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-xl font-semibold">Add Memory</h3>
+                            <button onClick={() => setShowAddMemoryModal(false)} className="text-gray-400 hover:text-gray-600">
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Title</label>
+                                <input
+                                    type="text"
+                                    value={memoryData.title}
+                                    onChange={(e) => setMemoryData(prev => ({ ...prev, title: e.target.value }))}
+                                    placeholder="e.g., Amazing sunset at the beach"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                                <textarea
+                                    value={memoryData.description}
+                                    onChange={(e) => setMemoryData(prev => ({ ...prev, description: e.target.value }))}
+                                    placeholder="Describe your memory..."
+                                    rows={3}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
+                                    <select
+                                        value={memoryData.memoryType}
+                                        onChange={(e) => setMemoryData(prev => ({ ...prev, memoryType: e.target.value }))}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    >
+                                        <option value="experience">Experience</option>
+                                        <option value="photo">Photo</option>
+                                        <option value="note">Note</option>
+                                        <option value="recommendation">Recommendation</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Rating</label>
+                                    <select
+                                        value={memoryData.rating}
+                                        onChange={(e) => setMemoryData(prev => ({ ...prev, rating: parseInt(e.target.value) }))}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    >
+                                        <option value={5}>5 - Excellent</option>
+                                        <option value={4}>4 - Great</option>
+                                        <option value={3}>3 - Good</option>
+                                        <option value={2}>2 - Fair</option>
+                                        <option value={1}>1 - Poor</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                                <input
+                                    type="date"
+                                    value={memoryData.memoryDate}
+                                    onChange={(e) => setMemoryData(prev => ({ ...prev, memoryDate: e.target.value }))}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Photos</label>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    multiple
+                                    onChange={handleMemoryPhotosUpload}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                />
+                                {memoryPhotosPreviews.length > 0 && (
+                                    <div className="grid grid-cols-3 gap-2 mt-3">
+                                        {memoryPhotosPreviews.map((preview, index) => (
+                                            <div key={index} className="relative">
+                                                <img src={preview} alt={`Preview ${index + 1}`} className="w-full h-20 object-cover rounded" />
+                                                <button
+                                                    onClick={() => removeMemoryPhoto(index)}
+                                                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                                                >
+                                                    <X className="w-3 h-3" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex space-x-3 pt-4">
+                                <button
+                                    onClick={() => setShowAddMemoryModal(false)}
+                                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={saveMemory}
+                                    disabled={!memoryData.title || savingMemory}
+                                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                                >
+                                    {savingMemory ? 'Saving...' : 'Save Memory'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    // Add Expense Modal
+    const AddExpenseModal = () => {
+        if (!showAddExpenseModal) return null;
+
+        const expenseCategories = [
+            { value: 'general', label: 'General' },
+            { value: 'food', label: 'Food & Dining' },
+            { value: 'transport', label: 'Transportation' },
+            { value: 'accommodation', label: 'Accommodation' },
+            { value: 'entertainment', label: 'Entertainment' },
+            { value: 'shopping', label: 'Shopping' },
+            { value: 'other', label: 'Other' }
+        ];
+
+        return (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+                    <div className="p-6">
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-xl font-semibold">Log Expense</h3>
+                            <button onClick={() => setShowAddExpenseModal(false)} className="text-gray-400 hover:text-gray-600">
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Title</label>
+                                <input
+                                    type="text"
+                                    value={expenseData.title}
+                                    onChange={(e) => setExpenseData(prev => ({ ...prev, title: e.target.value }))}
+                                    placeholder="e.g., Lunch at cafe"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                                <textarea
+                                    value={expenseData.description}
+                                    onChange={(e) => setExpenseData(prev => ({ ...prev, description: e.target.value }))}
+                                    placeholder="Additional details..."
+                                    rows={2}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        value={expenseData.amount}
+                                        onChange={(e) => setExpenseData(prev => ({ ...prev, amount: e.target.value }))}
+                                        placeholder="0.00"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Currency</label>
+                                    <select
+                                        value={expenseData.currency}
+                                        onChange={(e) => setExpenseData(prev => ({ ...prev, currency: e.target.value }))}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    >
+                                        <option value="USD">USD</option>
+                                        <option value="EUR">EUR</option>
+                                        <option value="GBP">GBP</option>
+                                        <option value="JPY">JPY</option>
+                                        <option value="AUD">AUD</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
+                                    <select
+                                        value={expenseData.category}
+                                        onChange={(e) => setExpenseData(prev => ({ ...prev, category: e.target.value }))}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    >
+                                        {expenseCategories.map(cat => (
+                                            <option key={cat.value} value={cat.value}>{cat.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                                    <input
+                                        type="date"
+                                        value={expenseData.expenseDate}
+                                        onChange={(e) => setExpenseData(prev => ({ ...prev, expenseDate: e.target.value }))}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Receipt Photos</label>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    multiple
+                                    onChange={handleReceiptPhotosUpload}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                />
+                                {receiptPhotosPreviews.length > 0 && (
+                                    <div className="grid grid-cols-3 gap-2 mt-3">
+                                        {receiptPhotosPreviews.map((preview, index) => (
+                                            <div key={index} className="relative">
+                                                <img src={preview} alt={`Receipt ${index + 1}`} className="w-full h-20 object-cover rounded" />
+                                                <button
+                                                    onClick={() => removeReceiptPhoto(index)}
+                                                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                                                >
+                                                    <X className="w-3 h-3" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex space-x-3 pt-4">
+                                <button
+                                    onClick={() => setShowAddExpenseModal(false)}
+                                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={saveExpense}
+                                    disabled={!expenseData.title || !expenseData.amount || savingExpense}
+                                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                                >
+                                    {savingExpense ? 'Saving...' : 'Save Expense'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     // MAIN RENDER
     return (
         <div className="min-h-screen bg-gray-50">
@@ -5163,6 +5895,10 @@ const emergencyContacts = {
             <TranslateModal />
             <NavigationModal />
             <EmergencyModal />
+            <ScheduleEditModal />
+            <ActivitySearchModal />
+            <AddMemoryModal />
+            <AddExpenseModal />
 
             {/* Floating AI Button */}
             <button

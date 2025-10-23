@@ -2123,6 +2123,130 @@ app.get('/api/memories/statistics', authenticateToken, async (req, res) => {
     }
 });
 
+// ===================================
+// EXPENSE ROUTES
+// ===================================
+
+app.post('/api/expenses', authenticateToken, upload.array('receipt_photos', 5), async (req, res) => {
+    try {
+        const expenseData = req.body;
+
+        // Process uploaded receipt photos
+        const receiptPhotos = req.files ? req.files.map(file => ({
+            filename: file.filename,
+            originalName: file.originalname,
+            url: `/uploads/${file.filename}`,
+            size: file.size
+        })) : [];
+
+        // Insert expense into database
+        const result = await database.pool.query(
+            `INSERT INTO expenses (user_id, trip_id, title, description, amount, currency, category, expense_date, receipt_photos)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                req.user.id,
+                expenseData.tripId || null,
+                expenseData.title,
+                expenseData.description || null,
+                expenseData.amount,
+                expenseData.currency || 'USD',
+                expenseData.category || 'general',
+                expenseData.expenseDate || new Date().toISOString().split('T')[0],
+                JSON.stringify(receiptPhotos)
+            ]
+        );
+
+        res.json({
+            success: true,
+            data: {
+                id: Number(result.insertId),
+                ...expenseData,
+                receiptPhotos
+            }
+        });
+    } catch (error) {
+        console.error('Create expense error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to create expense'
+        });
+    }
+});
+
+app.get('/api/expenses', authenticateToken, async (req, res) => {
+    try {
+        const { tripId, category, dateFrom, dateTo, limit } = req.query;
+
+        let query = 'SELECT * FROM expenses WHERE user_id = ?';
+        const params = [req.user.id];
+
+        if (tripId) {
+            query += ' AND trip_id = ?';
+            params.push(parseInt(tripId));
+        }
+        if (category) {
+            query += ' AND category = ?';
+            params.push(category);
+        }
+        if (dateFrom) {
+            query += ' AND expense_date >= ?';
+            params.push(dateFrom);
+        }
+        if (dateTo) {
+            query += ' AND expense_date <= ?';
+            params.push(dateTo);
+        }
+
+        query += ' ORDER BY expense_date DESC, created_at DESC';
+
+        if (limit) {
+            query += ' LIMIT ?';
+            params.push(parseInt(limit));
+        }
+
+        const expenses = await database.pool.query(query, params);
+
+        // Parse JSON fields
+        const parsedExpenses = expenses.map(expense => ({
+            ...expense,
+            receiptPhotos: database.safeJsonParse(expense.receipt_photos, [])
+        }));
+
+        res.json({
+            success: true,
+            data: parsedExpenses
+        });
+    } catch (error) {
+        console.error('Get expenses error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to get expenses'
+        });
+    }
+});
+
+app.delete('/api/expenses/:id', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        await database.pool.query(
+            'DELETE FROM expenses WHERE id = ? AND user_id = ?',
+            [id, req.user.id]
+        );
+
+        res.json({
+            success: true,
+            message: 'Expense deleted successfully'
+        });
+    } catch (error) {
+        console.error('Delete expense error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to delete expense'
+        });
+    }
+});
+
 // Analytics Route
 app.get('/api/analytics/dashboard', authenticateToken, async (req, res) => {
     try {

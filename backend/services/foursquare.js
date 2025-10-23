@@ -58,7 +58,7 @@ class FoursquarePlacesService {
 
             const response = await fetch(url, {
                 headers: {
-                    'accept': 'application/json'
+                    'accept': 'application/json',
                     'X-Places-Api-Version': '2025-06-17',
                     'authorization': `Bearer ${this.apiKey}`,
                     
@@ -161,6 +161,7 @@ class FoursquarePlacesService {
 }
 
 module.exports = { FoursquarePlacesService };
+
 
 
 

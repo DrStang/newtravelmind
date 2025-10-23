@@ -54,6 +54,7 @@ class FoursquarePlacesService {
             }
 
             const url = `${this.baseUrl}/places/search?${params.toString()}`;
+            console.log(url);
 
             const response = await fetch(url, {
                 headers: {
@@ -158,6 +159,7 @@ class FoursquarePlacesService {
 }
 
 module.exports = { FoursquarePlacesService };
+
 
 
 

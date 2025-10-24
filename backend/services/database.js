@@ -264,121 +264,145 @@ class DatabaseService {
     }
 
     async getUserTrips(userId, status = null, limit = 20) {
-    let conn;
-    try {
-        console.log('🔍 getUserTrips called:', { userId, status, limit });
-        
-        // Get a dedicated connection from the pool
-        conn = await this.pool.getConnection();
-        console.log('✅ Got database connection');
-        
-        let query = 'SELECT * FROM trips WHERE user_id = ?';
-        let params = [userId];
+        try {
+            let query = `
+                SELECT t.*,
+                CASE 
+                    WHEN t.start_date IS NULL THEN 'planning'
+                    WHEN t.start_date > NOW() THEN 'upcoming'
+                    WHEN t.start_date <= NOW() AND t.end_date >= NOW() THEN 'active'
+                    ELSE 'completed'
+                END as computed_status,
+                COUNT(b.id) as booking_count,
+                COALESCE(SUM(CASE WHEN b.status != 'cancelled' THEN b.cost ELSE 0 END), 0) as total_spent
+                FROM trips t
+                LEFT JOIN bookings b ON t.id = b.trip_id
+                WHERE t.user_id = ?
+                GROUP BY t.id
+            `;
+            let params = [userId];
 
-        if (status) {
-            query += ' AND status = ?';
-            params.push(status);
-        }
-
-        query += ' ORDER BY created_at DESC LIMIT ?';
-        params.push(limit);
-
-        console.log('🔍 Executing query:', query);
-        console.log('🔍 With params:', params);
-
-        // Execute with timeout
-        const trips = await Promise.race([
-            conn.query(query, params),
-            new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Query timeout after 30s')), 30000)
-            )
-        ]);
-
-        console.log('✅ Query completed! Returned:', trips.length, 'rows');
-        console.log('✅ First trip (if any):', trips[0] ? JSON.stringify(trips[0], null, 2) : 'No trips');
-
-        // Release connection back to pool
-        conn.release();
-        console.log('✅ Connection released');
-
-        if (!trips || trips.length === 0) {
-            console.log('⚠️ No trips found for user:', userId);
-            return [];
-        }
-
-        return trips.map(trip => {
-            try {
-                let interests = [];
-                let itinerary = {};
-                
-                if (trip.interests) {
-                    interests = typeof trip.interests === 'string' 
-                        ? JSON.parse(trip.interests) 
-                        : trip.interests;
-                }
-                
-                if (trip.itinerary) {
-                    itinerary = typeof trip.itinerary === 'string' 
-                        ? JSON.parse(trip.itinerary) 
-                        : trip.itinerary;
-                }
-
-                return {
-                    ...trip,
-                    id: Number(trip.id),
-                    user_id: Number(trip.user_id),
-                    interests,
-                    itinerary
-                };
-            } catch (parseError) {
-                console.error('❌ Error parsing trip:', trip.id, parseError);
-                return {
-                    ...trip,
-                    id: Number(trip.id),
-                    user_id: Number(trip.user_id),
-                    interests: [],
-                    itinerary: {}
-                };
+            if (status) {
+                query += ` HAVING computed_status = ?`;
+                params.push(status);
             }
-        });
-    } catch (error) {
-        console.error('❌ Get user trips error:', error);
-        console.error('❌ Error stack:', error.stack);
-        
-        // Make sure to release connection even on error
-        if (conn) {
-            try {
-                conn.release();
-                console.log('✅ Connection released after error');
-            } catch (releaseError) {
-                console.error('❌ Error releasing connection:', releaseError);
-            }
+
+            query += ' ORDER BY t.created_at DESC LIMIT ?';
+            params.push(limit);
+
+            const trips = await this.pool.query(query, params);
+
+            return trips.map(trip => ({
+                ...trip,
+                status: trip.computed_status,
+                interests: JSON.parse(trip.interests || '[]'),
+                itinerary: JSON.parse(trip.itinerary || '{}'),
+                bookingCount: trip.booking_count,
+                totalSpent: parseFloat(trip.total_spent),
+                remainingBudget: (trip.budget || 0) - parseFloat(trip.total_spent)
+            }));
+        } catch (error) {
+            console.error('Get user trips error:', error);
+            throw error;
         }
-        
-        throw error;
     }
-}
+    async getActiveTrips(userId) {
+        try {
+            const trips = await this.pool.query(`
+                SELECT t.*,
+                COUNT(b.id) as booking_count,
+                COALESCE(SUM(CASE WHEN b.status != 'cancelled' THEN b.cost ELSE 0 END), 0) as total_spent
+                FROM trips t
+                LEFT JOIN bookings b ON t.id = b.trip_id
+                WHERE t.user_id = ? 
+                AND t.start_date IS NOT NULL
+                AND t.start_date <= NOW() 
+                AND t.end_date >= NOW()
+                GROUP BY t.id
+                ORDER BY t.start_date DESC
+            `, [userId]);
+
+            return trips.map(trip => ({
+                ...trip,
+                status: 'active',
+                interests: JSON.parse(trip.interests || '[]'),
+                itinerary: JSON.parse(trip.itinerary || '{}'),
+                bookingCount: trip.booking_count,
+                totalSpent: parseFloat(trip.total_spent),
+                remainingBudget: (trip.budget || 0) - parseFloat(trip.total_spent)
+            }));
+        } catch (error) {
+            console.error('Get active trips error:', error);
+            throw error;
+        }
+    }
+
+    async getUpcomingTrips(userId) {
+        try {
+            const trips = await this.pool.query(`
+                SELECT t.*,
+                COUNT(b.id) as booking_count,
+                COALESCE(SUM(CASE WHEN b.status != 'cancelled' THEN b.cost ELSE 0 END), 0) as total_spent
+                FROM trips t
+                LEFT JOIN bookings b ON t.id = b.trip_id
+                WHERE t.user_id = ? 
+                AND t.start_date IS NOT NULL 
+                AND t.start_date > NOW()
+                AND t.end_date IS NOT NULL
+                GROUP BY t.id
+                ORDER BY t.start_date ASC
+            `, [userId]);
+
+            return trips.map(trip => ({
+                ...trip,
+                status: 'upcoming',
+                interests: JSON.parse(trip.interests || '[]'),
+                itinerary: JSON.parse(trip.itinerary || '{}'),
+                bookingCount: trip.booking_count,
+                totalSpent: parseFloat(trip.total_spent),
+                remainingBudget: (trip.budget || 0) - parseFloat(trip.total_spent)
+            }));
+        } catch (error) {
+            console.error('Get upcoming trips error:', error);
+            throw error;
+        }
+    }
     async getTripById(tripId, userId) {
         try {
-            const rows = await this.pool.query(
-                'SELECT * FROM trips WHERE id = ? AND user_id = ?',
-                [tripId, userId]
-            );
+            const rows = await this.pool.query(`
+                SELECT t.*,
+                CASE 
+                    WHEN t.start_date IS NULL THEN 'planning'
+                    WHEN t.start_date > NOW() THEN 'upcoming'
+                    WHEN t.start_date <= NOW() AND t.end_date >= NOW() THEN 'active'
+                    ELSE 'completed'
+                END as computed_status,
+                COUNT(b.id) as booking_count,
+                COALESCE(SUM(CASE WHEN b.status != 'cancelled' THEN b.cost ELSE 0 END), 0) as total_spent
+                FROM trips t
+                LEFT JOIN bookings b ON t.id = b.trip_id
+                WHERE t.id = ? AND t.user_id = ?
+                GROUP BY t.id
+            `, [tripId, userId]);
+
             const trip = rows[0];
 
             if (!trip) return null;
 
-            return this.convertBigIntToNumber({
+            return {
                 ...trip,
-                interests: this.safeJsonParse(trip.interests, []),
-                itinerary: this.safeJsonParse(trip.itinerary, {})
-            });
+                status: trip.computed_status,
+                interests: JSON.parse(trip.interests || '[]'),
+                itinerary: JSON.parse(trip.itinerary || '{}'),
+                bookingCount: trip.booking_count,
+                totalSpent: parseFloat(trip.total_spent),
+                remainingBudget: (trip.budget || 0) - parseFloat(trip.total_spent)
+            };
         } catch (error) {
             console.error('Get trip by ID error:', error);
             throw error;
         }
     }
-
     async updateTrip(tripId, userId, updates) {
         try {
             const updateFields = [];
@@ -464,6 +488,139 @@ class DatabaseService {
             return Number(result.insertId);
         } catch (error) {
             console.error('Create trip flight error:', error);
+            throw error;
+        }
+    }
+    async getTripBookings(tripId, userId) {
+        try {
+            // Verify trip belongs to user
+            const trip = await this.getTripById(tripId, userId);
+            if (!trip) {
+                throw new Error('Trip not found');
+            }
+
+            const bookings = await this.pool.query(`
+                SELECT * FROM bookings 
+                WHERE trip_id = ? 
+                ORDER BY booking_date ASC, booking_time ASC
+            `, [tripId]);
+
+            return bookings;
+        } catch (error) {
+            console.error('Get trip bookings error:', error);
+            throw error;
+        }
+    }
+
+    async createBooking(userId, tripId, bookingData) {
+        try {
+            // Verify trip belongs to user
+            const trip = await this.getTripById(tripId, userId);
+            if (!trip) {
+                throw new Error('Trip not found');
+            }
+
+            const result = await this.pool.query(`
+                INSERT INTO bookings (
+                    user_id, trip_id, booking_type, title, confirmation_number,
+                    provider, status, booking_date, booking_time, location,
+                    cost, currency, details, alert_message, alert_time, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            `, [
+                userId,
+                tripId,
+                bookingData.type || 'other',
+                bookingData.title,
+                bookingData.confirmationNumber || null,
+                bookingData.provider || null,
+                bookingData.status || 'confirmed',
+                bookingData.bookingDate || null,
+                bookingData.bookingTime || null,
+                bookingData.location || null,
+                bookingData.cost || null,
+                bookingData.currency || 'USD',
+                bookingData.details || null,
+                bookingData.alertMessage || null,
+                bookingData.alertTime || null
+            ]);
+
+            return result.insertId;
+        } catch (error) {
+            console.error('Create booking error:', error);
+            throw error;
+        }
+    }
+
+    async getBookingById(bookingId, userId) {
+        try {
+            const rows = await this.pool.query(`
+                SELECT b.* FROM bookings b
+                INNER JOIN trips t ON b.trip_id = t.id
+                WHERE b.id = ? AND t.user_id = ?
+            `, [bookingId, userId]);
+
+            return rows[0] || null;
+        } catch (error) {
+            console.error('Get booking by ID error:', error);
+            throw error;
+        }
+    }
+
+    async updateBooking(bookingId, userId, updates) {
+        try {
+            // Verify booking belongs to user's trip
+            const booking = await this.getBookingById(bookingId, userId);
+            if (!booking) {
+                throw new Error('Booking not found');
+            }
+
+            const updateFields = [];
+            const updateValues = [];
+
+            // Map of allowed fields
+            const allowedFields = [
+                'booking_type', 'title', 'confirmation_number', 'provider',
+                'status', 'booking_date', 'booking_time', 'location',
+                'cost', 'currency', 'details', 'alert_message', 'alert_time'
+            ];
+
+            Object.keys(updates).forEach(key => {
+                if (updates[key] !== undefined && allowedFields.includes(key)) {
+                    updateFields.push(`${key} = ?`);
+                    updateValues.push(updates[key]);
+                }
+            });
+
+            if (updateFields.length > 0) {
+                updateValues.push(bookingId);
+                await this.pool.query(`
+                    UPDATE bookings 
+                    SET ${updateFields.join(', ')}, updated_at = NOW()
+                    WHERE id = ?
+                `, updateValues);
+            }
+
+            // Return updated booking
+            return await this.getBookingById(bookingId, userId);
+        } catch (error) {
+            console.error('Update booking error:', error);
+            throw error;
+        }
+    }
+
+    async deleteBooking(bookingId, userId) {
+        try {
+            // Verify booking belongs to user's trip
+            const booking = await this.getBookingById(bookingId, userId);
+            if (!booking) {
+                throw new Error('Booking not found');
+            }
+
+            await this.pool.query('DELETE FROM bookings WHERE id = ?', [bookingId]);
+            return true;
+        } catch (error) {
+            console.error('Delete booking error:', error);
             throw error;
         }
     }
@@ -666,6 +823,5 @@ class DatabaseService {
 }
 
 module.exports = { DatabaseService };
-
 
 

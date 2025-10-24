@@ -781,11 +781,11 @@ class DatabaseService {
             `, [userId]);
 
             const [bookingStats] = await this.pool.query(`
-                SELECT 
+                SELECT
                     COUNT(*) as total_bookings,
-                    COUNT(CASE WHEN status = 'confirmed' THEN 1 END) as confirmed_bookings,
-                    COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_bookings,
-                    COALESCE(SUM(CASE WHEN status != 'cancelled' THEN cost ELSE 0 END), 0) as total_spent
+                    COUNT(CASE WHEN b.status = 'confirmed' THEN 1 END) as confirmed_bookings,
+                    COUNT(CASE WHEN b.status = 'pending' THEN 1 END) as pending_bookings,
+                    COALESCE(SUM(CASE WHEN b.status != 'cancelled' THEN cost ELSE 0 END), 0) as total_spent
                 FROM bookings b
                 INNER JOIN trips t ON b.trip_id = t.id
                 WHERE t.user_id = ?

@@ -153,6 +153,34 @@ class DatabaseService {
                     )
             `);
 
+            await this.pool.query(`
+                CREATE TABLE IF NOT EXISTS bookings (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    user_id INT NOT NULL,
+                    trip_id INT NOT NULL,
+                    booking_type ENUM('flight', 'hotel', 'activity', 'transport', 'other') DEFAULT 'other',
+                    title VARCHAR(255) NOT NULL,
+                    confirmation_number VARCHAR(100),
+                    provider VARCHAR(255),
+                    status VARCHAR(50) DEFAULT 'confirmed',
+                    booking_date DATE,
+                    booking_time TIME,
+                    location VARCHAR(255),
+                    cost DECIMAL(10,2),
+                    currency VARCHAR(3) DEFAULT 'USD',
+                    details TEXT,
+                    alert_message VARCHAR(255),
+                    alert_time DATETIME,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                    FOREIGN KEY (trip_id) REFERENCES trips(id) ON DELETE CASCADE,
+                    INDEX idx_trip_id (trip_id),
+                    INDEX idx_user_id (user_id),
+                    INDEX idx_booking_date (booking_date)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            `);
+
             console.log('✅ Database tables created/verified');
         } catch (error) {
             console.error('❌ Table creation failed:', error);

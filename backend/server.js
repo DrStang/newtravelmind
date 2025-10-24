@@ -1936,6 +1936,29 @@ app.get('/api/analytics/events', authenticateToken, async (req, res) => {
     }
 });
 
+// Get all trips for a user (with optional status filter)
+app.get('/api/trips', authenticateToken, async (req, res) => {
+    try {
+        const { status, limit = 20 } = req.query;
+        console.log('📊 Getting trips for user:', req.user.id);
+        console.log('📊 With filters:', { status, limit });
+
+        const trips = await database.getUserTrips(req.user.id, status, parseInt(limit));
+        console.log('✅ getUserTrips returned:', trips ? trips.length : 0, 'trips');
+
+        res.json({
+            success: true,
+            data: trips
+        });
+    } catch (error) {
+        console.error('Get trips error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to get trips'
+        });
+    }
+});
+
 app.get('/api/trips/upcoming', authenticateToken, async (req, res) => {
     try {
         const { status, limit = 20 } = req.query;

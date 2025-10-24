@@ -1,5 +1,5 @@
 // ===================================
-// backend/server.js - Main Express Server 
+// backend/server.js - Main Express Server
 // ===================================
 const express = require('express');
 const cors = require('cors');
@@ -406,7 +406,8 @@ app.get('/health', async (req, res) => {
             version: '2.0.0',
             services: {
                 database: dbStatus ? 'connected' : 'disconnected',
-                redis: redisStatus ? 'connected' : 'disconnected (optional)',
+                redis: redisStatus ? 'connected' : 'disconnected',
+                ollama: ollamaStatus ? 'connected' : 'disconnected',
                 googleMaps: !!process.env.GOOGLE_MAPS_API_KEY,
                 amadeus: !!(process.env.AMADEUS_API_KEY && process.env.AMADEUS_API_SECRET)
             },
@@ -762,44 +763,13 @@ app.post('/api/trips/:id/bookings', authenticateToken, async (req, res) => {
         res.json({
             success: true,
             data: {
-                id: result.insertId,
-                ...bookingData
+                tripId: tripId,
+                itinerary,
+                tripData: {
+                    ...tripData,
+                    id: tripId
+                }
             }
-        });
-    } catch (error) {
-        console.error('Add booking error:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to add booking'
-        });
-    }
-});
-
-app.get('/api/trips/:id/bookings', authenticateToken, async (req, res) => {
-    try {
-        const { id } = req.params;
-
-        // Verify trip belongs to user
-        const trip = await database.getTripById(id, req.user.id);
-        if (!trip) {
-            return res.status(404).json({
-                success: false,
-                error: 'Trip not found'
-            });
-        }
-
-        const bookings = await database.pool.query(`
-            SELECT * FROM bookings
-            WHERE trip_id = ?
-            ORDER BY booking_date ASC
-        `, [tripId]);
-
-        res.json({
-            success: true,
-            data: bookings.map(booking => ({
-                ...booking,
-                details: JSON.parse(booking.details || '{}')
-            }))
         });
     } catch (error) {
         console.error('Get bookings error:', error);
@@ -1965,8 +1935,8 @@ app.get('/api/analytics/events', authenticateToken, async (req, res) => {
         });
     }
 });
-// Trip Routes
-app.get('/api/trips', authenticateToken, async (req, res) => {
+
+app.get('/api/trips/upcoming', authenticateToken, async (req, res) => {
     try {
         const { status, limit = 20 } = req.query;
         console.log('📊 Getting trips for user:', req.user.id);
@@ -1977,16 +1947,13 @@ app.get('/api/trips', authenticateToken, async (req, res) => {
         // Even if empty, return success
         res.json({
             success: true,
-            data: trips || [],
-            count: trips ? trips.length : 0
+            data: trips
         });
     } catch (error) {
-        console.error('❌ Get trips endpoint error:', error);
-        console.error('❌ Error stack:', error.stack);
+        console.error('Get upcoming trips error:', error);
         res.status(500).json({
             success: false,
-            error: 'Failed to get trips',
-            details: process.env.NODE_ENV === 'development' ? error.message : undefined
+            error: 'Failed to get upcoming trips'
         });
     }
 });
@@ -2015,27 +1982,151 @@ app.get('/api/trips/:id', authenticateToken, async (req, res) => {
         });
     }
 });
-// Add this route after the existing /api/trips route
-app.get('/api/trips/debug', authenticateToken, async (req, res) => {
-    try {
-        const rows = await database.pool.query(
-            'SELECT id, title, destination, duration, status, created_at FROM trips WHERE user_id = ? ORDER BY created_at DESC',
-            [req.user.id]
-        );
 
-        console.log('📊 Debug - Found trips:', rows.length);
-        console.log('📊 Trip data:', JSON.stringify(rows, null, 2));
+// NEW: Schedule a trip with dates
+app.patch('/api/trips/:id/schedule', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { startDate, endDate } = req.body;
+
+        if (!startDate || !endDate) {
+            return res.status(400).json({
+                success: false,
+                error: 'Both start and end dates required to schedule trip'
+            });
+        }
+
+        if (new Date(startDate) > new Date(endDate)) {
+            return res.status(400).json({
+                success: false,
+                error: 'End date must be after start date'
+            });
+        }
+
+        await database.updateTrip(id, req.user.id, {
+            start_date: startDate,
+            end_date: endDate
+        });
+
+        // Get updated trip
+        const trip = await database.getTripById(id, req.user.id);
 
         res.json({
             success: true,
-            count: rows.length,
-            trips: rows
+            data: trip
         });
     } catch (error) {
-        console.error('Debug trips error:', error);
+        console.error('Schedule trip error:', error);
         res.status(500).json({
             success: false,
-            error: error.message
+            error: 'Failed to schedule trip'
+        });
+    }
+});
+
+// Get bookings for a trip
+app.get('/api/trips/:id/bookings', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const bookings = await database.getTripBookings(id, req.user.id);
+
+        res.json({
+            success: true,
+            data: bookings
+        });
+    } catch (error) {
+        console.error('Get bookings error:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Failed to get bookings'
+        });
+    }
+});
+
+// Add booking to any trip
+app.post('/api/trips/:id/bookings', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const bookingData = req.body;
+
+        if (!bookingData.title) {
+            return res.status(400).json({
+                success: false,
+                error: 'Booking title is required'
+            });
+        }
+
+        const bookingId = await database.createBooking(req.user.id, id, bookingData);
+
+        // Get the created booking
+        const booking = await database.getBookingById(bookingId, req.user.id);
+
+        // Get updated trip with new totals
+        const trip = await database.getTripById(id, req.user.id);
+
+        res.json({
+            success: true,
+            data: {
+                booking,
+                totalSpent: trip.totalSpent,
+                remainingBudget: trip.remainingBudget,
+                bookingCount: trip.bookingCount
+            }
+        });
+    } catch (error) {
+        console.error('Add booking error:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Failed to add booking'
+        });
+    }
+});
+
+// Update a booking
+app.patch('/api/trips/:id/bookings/:bookingId', authenticateToken, async (req, res) => {
+    try {
+        const { bookingId } = req.params;
+        const updates = req.body;
+
+        const booking = await database.updateBooking(bookingId, req.user.id, updates);
+
+        res.json({
+            success: true,
+            data: { booking }
+        });
+    } catch (error) {
+        console.error('Update booking error:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Failed to update booking'
+        });
+    }
+});
+
+// Delete a booking
+app.delete('/api/trips/:id/bookings/:bookingId', authenticateToken, async (req, res) => {
+    try {
+        const { id, bookingId } = req.params;
+
+        await database.deleteBooking(bookingId, req.user.id);
+
+        // Get updated trip totals
+        const trip = await database.getTripById(id, req.user.id);
+
+        res.json({
+            success: true,
+            data: {
+                totalSpent: trip.totalSpent,
+                remainingBudget: trip.remainingBudget,
+                bookingCount: trip.bookingCount
+            }
+        });
+    } catch (error) {
+        console.error('Delete booking error:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Failed to delete booking'
         });
     }
 });
@@ -2446,14 +2537,25 @@ app.get('/api', (req, res) => {
             'Travel analytics and insights',
             'Socket.IO real-time communication',
             'Redis caching',
-            'MariaDB database'
+            'MariaDB database',
+            'Smart trip status system (planning, upcoming, active, completed)',
+            'Bookings management for all trips'
         ],
         endpoints: {
             auth: ['POST /api/auth/register', 'POST /api/auth/login'],
             ai: ['POST /api/ai/chat', 'POST /api/ai/generate-itinerary', 'POST /api/ai/translate'],
             places: ['GET /api/places/nearby', 'GET /api/places/:placeId'],
             travel: ['GET /api/flights/search', 'GET /api/hotels/search', 'GET /api/weather'],
-            trips: ['GET /api/trips', 'GET /api/trips/:id'],
+            trips: [
+                'GET /api/trips',
+                'GET /api/trips/active',
+                'GET /api/trips/upcoming',
+                'GET /api/trips/:id',
+                'PATCH /api/trips/:id/schedule',
+                'POST /api/trips/:id/bookings',
+                'PATCH /api/trips/:id/bookings/:bookingId',
+                'DELETE /api/trips/:id/bookings/:bookingId'
+            ],
             memories: ['POST /api/memories', 'GET /api/memories', 'GET /api/memories/story/:tripId?'],
             analytics: ['GET /api/analytics/dashboard']
         }
@@ -2582,6 +2684,7 @@ process.on('SIGTERM', async () => {
 startServer();
 
 module.exports = app;
+
 
 
 

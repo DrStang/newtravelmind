@@ -231,6 +231,30 @@ Include specific venue names, addresses, and booking recommendations where possi
             generatedAt: response.timestamp
         };
     }
+
+    async translateWithContext(text, targetLanguage, sourceLanguage = 'auto', context = {}) {
+        const prompt = `Translate the following text from ${sourceLanguage} to ${targetLanguage}.
+Provide a natural, contextually appropriate translation suitable for travel situations.
+
+Text to translate: "${text}"
+
+Provide only the translation, without explanations or additional text.`;
+
+        const translationContext = {
+            ...context,
+            mode: 'translation'
+        };
+
+        const response = await this.chat(prompt, translationContext, 'translation');
+
+        return {
+            translatedText: response.message.trim(),
+            sourceLanguage: sourceLanguage,
+            targetLanguage: targetLanguage,
+            model: response.model,
+            timestamp: response.timestamp
+        };
+    }
     // ===================================
 // ADD THESE METHODS TO OllamaService CLASS IN ollama.js
 // Add after the generateDetailedItinerary method

@@ -4763,7 +4763,7 @@ const emergencyContacts = {
                     <span className="ml-3 text-gray-600">Finding places...</span>
                 </div>
             ) : places.length > 0 ? (
-                <div className="space-y-3 max-h-96 overflow-y-auto">
+                <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
                     {places.map((place, index) => (
                         <div key={place.id || index} className="border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow">
                             <div className="flex space-x-3">
@@ -4775,7 +4775,7 @@ const emergencyContacts = {
                                         <img
                                             src={place.photos[0]}
                                             alt={place.name}
-                                            className="w-20 h-20 rounded-lg object-cover"
+                                            className="w-20 h-20 rounded-lg object-cover flex-shrink-0"
                                         />
                                     )}
                                     <div className="flex-1 min-w-0">
@@ -4788,7 +4788,7 @@ const emergencyContacts = {
                                                 </div>
                                             )}
                                         </div>
-                                        <p className="text-xs text-gray-600 mt-1">{place.address}</p>
+                                        <p className="text-xs text-gray-600 mt-1 line-clamp-2">{place.address}</p>
                                     </div>
                                 </div>
                                 <button
@@ -6955,8 +6955,8 @@ const AIChat = ({isOpen, onClose, messages, onSendMessage, currentMode, connecte
                 </div>
 
                 {/* Input */}
-                <div className="p-4 border-t bg-gray-50 rounded-b-xl">
-                    <div className="flex space-x-2">
+                <div className="p-4 border-t bg-gray-50 rounded-b-xl flex-shrink-0">
+                    <form onSubmit={handleSubmit} className="flex space-x-2">
                         <input
                             type="text"
                             value={input}
@@ -6968,16 +6968,17 @@ const AIChat = ({isOpen, onClose, messages, onSendMessage, currentMode, connecte
                                 }
                             }}
                             placeholder="Ask me anything..."
-                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none text-sm"
+                            autoComplete="off"
                         />
                         <button
-                            onClick={handleSubmit}
+                            type="submit"
                             disabled={!input.trim()}
-                            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
                         >
                             Send
                         </button>
-                    </div>
+                    </form>
 
                     {quickActions[currentMode] && (
                         <div className="flex flex-wrap gap-1 mt-2">

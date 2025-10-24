@@ -1669,8 +1669,18 @@ app.get('/api/places/:placeId', async (req, res) => {
         const { placeId } = req.params;
         const { fields } = req.query;
 
-        const fieldsList = fields ? fields.split(',') : undefined;
-        const details = await googlePlaces.getPlaceDetails(placeId, fieldsList);
+        let details;
+
+        // Check if this is a Foursquare ID (starts with 'fsq_')
+        if (placeId.startsWith('fsq_')) {
+            // Extract the actual Foursquare ID (remove 'fsq_' prefix)
+            const fsqId = placeId.substring(4);
+            details = await foursquare.getPlaceDetails(fsqId);
+        } else {
+            // Use Google Places for all other IDs
+            const fieldsList = fields ? fields.split(',') : undefined;
+            details = await googlePlaces.getPlaceDetails(placeId, fieldsList);
+        }
 
         res.json({
             success: true,

@@ -2417,62 +2417,42 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
         loadTrips();
     };
 
-    const handleTripActivate = async (tripId) => {
+    // Schedule trip by setting start and end dates
+    // Status is automatically calculated based on dates
+    const handleTripSchedule = async (tripId, startDate, endDate) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/trips/${tripId}/activate`, {
+            const response = await fetch(`${API_BASE_URL}/trips/${tripId}/schedule`, {
                 method: 'PATCH',
                 headers: {
-                    'Authorization': `Bearer ${token}`
-                }
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ startDate, endDate })
             });
 
-            const data = await response.json();
-
-            if (data.success) {
-                // Update local state
-                setTrips(prev => prev.map(trip => ({
-                    ...trip,
-                    status: trip.id === tripId ? 'active' : (trip.status === 'active' ? 'planning' : trip.status)
-                })));
-
-                const activatedTrip = trips.find(t => t.id === tripId);
-                if (activatedTrip) {
-                    setCurrentTrip({ ...activatedTrip, status: 'active' });
-                    setSelectedTrip({ ...activatedTrip, status: 'active' });
-                }
+            if (!response.ok) {
+                const errorData = await response.json();
+                return { success: false, error: errorData.error || 'Failed to schedule trip' };
             }
-        } catch (error) {
-            console.error('Activate trip error:', error);
-        }
-    };
-
-    const handleTripDeactivate = async (tripId) => {
-        try {
-            const response = await fetch(`${API_BASE_URL}/trips/${tripId}/deactivate`, {
-                method: 'PATCH',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
 
             const data = await response.json();
 
             if (data.success) {
-                // Update local state
-                setTrips(prev => prev.map(trip => ({
-                    ...trip,
-                    status: trip.id === tripId ? 'planning' : trip.status
-                })));
+                // Reload trips to get updated auto-calculated status
+                await loadTrips();
 
-                if (currentTrip?.id === tripId) {
-                    setCurrentTrip(null);
-                }
+                // Update selected trip if it's the one we just scheduled
                 if (selectedTrip?.id === tripId) {
-                    setSelectedTrip(prev => ({ ...prev, status: 'planning' }));
+                    setSelectedTrip(data.data);
                 }
+
+                return { success: true, trip: data.data };
             }
+
+            return { success: false, error: 'Unknown error' };
         } catch (error) {
-            console.error('Deactivate trip error:', error);
+            console.error('Schedule trip error:', error);
+            return { success: false, error: error.message };
         }
     };
     const handleCreateTrip = async (e) => {
@@ -2813,18 +2793,14 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                                     <span>${tripToShow.budget} budget</span>
                                 </span>
                             )}
-                            {!activeTrip && (
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleTripActivate(tripToShow.id);
-                                        setView('manage');
-                                    }}
-                                    className="text-xs text-blue-600 hover:text-blue-700"
-                                >
-                                    Make Active
-                                </button>
-                            )}
+                            <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
+                                tripToShow.status === 'active' ? 'bg-green-100 text-green-700' :
+                                tripToShow.status === 'upcoming' ? 'bg-blue-100 text-blue-700' :
+                                tripToShow.status === 'completed' ? 'bg-gray-100 text-gray-700' :
+                                'bg-purple-100 text-purple-700'
+                            }`}>
+                                {tripToShow.status ? tripToShow.status.toUpperCase() : 'PLANNING'}
+                            </span>
                         </div>
                     </div>
                     <button
@@ -3257,8 +3233,80 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
         );
     }
 
-    // TRIPS LIST VIEW
+    // TRIPS LIST VIEW - Organized by Status
     if (view === 'trips') {
+        // Organize trips by status
+        const activeTrips = trips.filter(t => t.status === 'active');
+        const upcomingTrips = trips.filter(t => t.status === 'upcoming');
+        const planningTrips = trips.filter(t => t.status === 'planning');
+        const completedTrips = trips.filter(t => t.status === 'completed');
+
+        const TripCard = ({ trip }) => (
+            <div
+                key={trip.id}
+                className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+                onClick={() => {
+                    setSelectedTripId(trip.id);
+                    setSelectedTrip(trip);
+                    setView('itinerary');
+                }}
+            >
+                <div className={`h-32 flex items-center justify-center ${
+                    trip.status === 'active' ? 'bg-gradient-to-r from-green-500 to-emerald-600' :
+                    trip.status === 'upcoming' ? 'bg-gradient-to-r from-blue-500 to-indigo-600' :
+                    trip.status === 'completed' ? 'bg-gradient-to-r from-gray-400 to-gray-500' :
+                    'bg-gradient-to-r from-purple-500 to-pink-600'
+                }`}>
+                    <Plane className="w-16 h-16 text-white opacity-20" />
+                </div>
+                <div className="p-6">
+                    <div className="flex items-center justify-between mb-2">
+                        <h3 className="font-bold text-lg text-gray-900">
+                            {trip.title || `${trip.destination} Trip`}
+                        </h3>
+                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
+                            trip.status === 'active' ? 'bg-green-100 text-green-700' :
+                            trip.status === 'upcoming' ? 'bg-blue-100 text-blue-700' :
+                            trip.status === 'completed' ? 'bg-gray-100 text-gray-700' :
+                            'bg-purple-100 text-purple-700'
+                        }`}>
+                            {trip.status.toUpperCase()}
+                        </span>
+                    </div>
+                    <p className="text-gray-600 text-sm mb-3">{trip.destination}</p>
+
+                    {(trip.start_date || trip.startDate) && (
+                        <p className="text-xs text-gray-500 mb-3">
+                            {new Date(trip.start_date || trip.startDate).toLocaleDateString()} -
+                            {new Date(trip.end_date || trip.endDate).toLocaleDateString()}
+                        </p>
+                    )}
+
+                    <div className="flex items-center justify-between text-sm text-gray-500 mb-3">
+                        <span className="flex items-center">
+                            <Calendar className="w-4 h-4 mr-1" />
+                            {trip.duration} days
+                        </span>
+                        {trip.budget && (
+                            <span className="flex items-center">
+                                <DollarSign className="w-4 h-4 mr-1" />
+                                {trip.budget}
+                            </span>
+                        )}
+                    </div>
+
+                    {(trip.bookingCount > 0 || trip.totalSpent > 0) && (
+                        <div className="border-t pt-3 mt-3">
+                            <div className="flex items-center justify-between text-xs text-gray-600">
+                                <span>{trip.bookingCount || 0} bookings</span>
+                                <span className="font-semibold">${trip.totalSpent || 0} spent</span>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+
         return (
             <div className="max-w-7xl mx-auto px-4 py-8">
                 <div className="mb-8">
@@ -3270,63 +3318,62 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                         <span>Back to Create New Trip</span>
                     </button>
                     <h2 className="text-3xl font-bold text-gray-900 mb-2">Your Trips</h2>
-                    <p className="text-gray-600">View and manage your planned trips</p>
+                    <p className="text-gray-600">View and manage your trips organized by status</p>
                 </div>
 
                 {trips.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {trips.map(trip => (
-                            <div
-                                key={trip.id}
-                                className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
-                                onClick={() => {
-                                    setSelectedTripId(trip.id);
-                                    setSelectedTrip(trip);
-                                    setView('itinerary');
-                                }}
-                            >
-                                <div className="bg-gradient-to-r from-blue-500 to-purple-600 h-32 flex items-center justify-center">
-                                    <Plane className="w-16 h-16 text-white opacity-20" />
-                                </div>
-                                <div className="p-6">
-                                    <div className="flex items-center space-x-2 mb-2">
-                                        <h3 className="font-bold text-lg text-gray-900">
-                                            {trip.title || `${trip.destination} Trip`}
-                                        </h3>
-                                        {trip.status === 'active' && (
-                                            <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-semibold">
-                                                ACTIVE
-                                            </span>
-                                        )}
-                                    </div>
-                                    <p className="text-gray-600 text-sm mb-4">{trip.destination}</p>
-                                    <div className="flex items-center justify-between text-sm text-gray-500 mb-3">
-                                        <span>{trip.duration} days</span>
-                                        {trip.budget && <span>${trip.budget}</span>}
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className={`inline-block px-3 py-1 rounded-full text-xs ${
-                                            trip.status === 'active' ? 'bg-green-100 text-green-700' :
-                                                trip.status === 'completed' ? 'bg-blue-100 text-blue-700' :
-                                                    'bg-gray-100 text-gray-700'
-                                        }`}>
-                                            {trip.status}
-                                        </span>
-                                        {trip.status !== 'active' && (
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleTripActivate(trip.id);
-                                                }}
-                                                className="text-xs text-blue-600 hover:text-blue-700"
-                                            >
-                                                Make Active
-                                            </button>
-                                        )}
-                                    </div>
+                    <div className="space-y-8">
+                        {/* Active Trips */}
+                        {activeTrips.length > 0 && (
+                            <div>
+                                <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                                    <div className="w-2 h-8 bg-green-500 rounded mr-3"></div>
+                                    Active Trips ({activeTrips.length})
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {activeTrips.map(trip => <TripCard key={trip.id} trip={trip} />)}
                                 </div>
                             </div>
-                        ))}
+                        )}
+
+                        {/* Upcoming Trips */}
+                        {upcomingTrips.length > 0 && (
+                            <div>
+                                <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                                    <div className="w-2 h-8 bg-blue-500 rounded mr-3"></div>
+                                    Upcoming Trips ({upcomingTrips.length})
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {upcomingTrips.map(trip => <TripCard key={trip.id} trip={trip} />)}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Planning Trips */}
+                        {planningTrips.length > 0 && (
+                            <div>
+                                <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                                    <div className="w-2 h-8 bg-purple-500 rounded mr-3"></div>
+                                    Planning ({planningTrips.length})
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {planningTrips.map(trip => <TripCard key={trip.id} trip={trip} />)}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Completed Trips */}
+                        {completedTrips.length > 0 && (
+                            <div>
+                                <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                                    <div className="w-2 h-8 bg-gray-400 rounded mr-3"></div>
+                                    Completed Trips ({completedTrips.length})
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {completedTrips.map(trip => <TripCard key={trip.id} trip={trip} />)}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 ) : (
                     <div className="text-center py-12 bg-white rounded-xl shadow-lg">
@@ -3365,8 +3412,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                 <TripManager
                     trip={tripToShow}
                     onUpdate={handleTripUpdate}
-                    onActivate={handleTripActivate}
-                    onDeactivate={handleTripDeactivate}
+                    onSchedule={handleTripSchedule}
                     token={token}
                     sendChatMessage={sendChatMessage}
                     setChatOpen={setChatOpen}

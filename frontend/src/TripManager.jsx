@@ -5,14 +5,19 @@ import {
   Save, ChevronDown, ChevronUp, AlertCircle, MessageCircle
 } from 'lucide-react';
 
-const TripManager = ({ trip, onUpdate, onActivate, onDeactivate, token, sendChatMessage, setChatOpen }) => {
+const TripManager = ({ trip, onUpdate, onSchedule, token, sendChatMessage, setChatOpen }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedItinerary, setEditedItinerary] = useState(trip?.itinerary || '');
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [showReminderModal, setShowReminderModal] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [expandedDay, setExpandedDay] = useState(null);
   const [viewMode, setViewMode] = useState('cards'); // 'cards' or 'text'
   const [editingDay, setEditingDay] = useState(null);
+  const [scheduleData, setScheduleData] = useState({
+    startDate: trip?.start_date || trip?.startDate || '',
+    endDate: trip?.end_date || trip?.endDate || ''
+  });
 
   const isActive = trip?.status === 'active';
   const bookings = trip?.booking_data ? JSON.parse(trip.booking_data) : [];
@@ -133,17 +138,19 @@ const TripManager = ({ trip, onUpdate, onActivate, onDeactivate, token, sendChat
   };
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
 
-  const handleActivate = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/trips/${trip.id}/activate`, {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (response.ok) {
-        onActivate(trip.id);
-      }
-    } catch (error) {
-      console.error('Activation error:', error);
+  const handleScheduleTrip = async () => {
+    if (!scheduleData.startDate || !scheduleData.endDate) {
+      alert('Please select both start and end dates');
+      return;
+    }
+
+    const result = await onSchedule(trip.id, scheduleData.startDate, scheduleData.endDate);
+
+    if (result.success) {
+      setShowScheduleModal(false);
+      // Trip status will auto-update based on dates
+    } else {
+      alert(result.error || 'Failed to schedule trip');
     }
   };
 
@@ -619,6 +626,76 @@ const TripManager = ({ trip, onUpdate, onActivate, onDeactivate, token, sendChat
     );
   };
 
+  const ScheduleTripModal = () => {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-xl max-w-md w-full p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-semibold">Schedule Trip</h3>
+            <button onClick={() => setShowScheduleModal(false)} className="text-gray-400 hover:text-gray-600">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm text-blue-800">
+                <AlertCircle className="w-4 h-4 inline mr-1" />
+                Trip status will automatically update based on these dates
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+              <input
+                type="date"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                value={scheduleData.startDate}
+                onChange={(e) => setScheduleData(prev => ({ ...prev, startDate: e.target.value }))}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">End Date</label>
+              <input
+                type="date"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                value={scheduleData.endDate}
+                onChange={(e) => setScheduleData(prev => ({ ...prev, endDate: e.target.value }))}
+                min={scheduleData.startDate}
+              />
+            </div>
+
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm text-gray-600">
+              <strong>Status will be:</strong>
+              <ul className="mt-2 space-y-1">
+                <li>• <span className="text-blue-600 font-semibold">Upcoming</span> - if start date is in the future</li>
+                <li>• <span className="text-green-600 font-semibold">Active</span> - during the trip dates</li>
+                <li>• <span className="text-gray-600 font-semibold">Completed</span> - after the end date</li>
+              </ul>
+            </div>
+
+            <div className="flex space-x-3 pt-4">
+              <button
+                onClick={() => setShowScheduleModal(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleScheduleTrip}
+                disabled={!scheduleData.startDate || !scheduleData.endDate}
+                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+              >
+                Schedule Trip
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   if (!trip) return null;
 
   const days = parseItinerary(trip.itinerary);
@@ -713,16 +790,12 @@ const TripManager = ({ trip, onUpdate, onActivate, onDeactivate, token, sendChat
               <Bell className="w-4 h-4" />
               <span>Add Reminder</span>
             </button>
-            {trip.status === 'active' && (
+            {trip.status === 'planning' && (
                     <button
-                        onClick={() => {
-                            if (confirm('Deactivate this trip?')) {
-                                onDeactivate(trip.id);
-                            }
-                        }}
-                        className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                        onClick={() => setShowScheduleModal(true)}
+                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
                     >
-                        Deactivate Trip
+                        Schedule Trip
                     </button>
                 )}
           </div>
@@ -1006,6 +1079,7 @@ const TripManager = ({ trip, onUpdate, onActivate, onDeactivate, token, sendChat
       {/* Modals */}
       {showBookingModal && <AddBookingModal />}
       {showReminderModal && <AddReminderModal />}
+      {showScheduleModal && <ScheduleTripModal />}
       {editingDay && (
         <DayEditor
           day={editingDay}

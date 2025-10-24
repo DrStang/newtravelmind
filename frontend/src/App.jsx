@@ -3816,6 +3816,12 @@ const emergencyContacts = {
     const [receiptPhotosPreviews, setReceiptPhotosPreviews] = useState([]);
     const [savingExpense, setSavingExpense] = useState(false);
 
+    // Place Details Modal states
+    const [showPlaceDetailsModal, setShowPlaceDetailsModal] = useState(false);
+    const [selectedPlace, setSelectedPlace] = useState(null);
+    const [placeDetails, setPlaceDetails] = useState(null);
+    const [loadingPlaceDetails, setLoadingPlaceDetails] = useState(false);
+
     // Load data on mount
     useEffect(() => {
         loadActiveTrip();
@@ -3987,6 +3993,26 @@ const emergencyContacts = {
             console.error('Places search error:', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchPlaceDetails = async (place) => {
+        setSelectedPlace(place);
+        setShowPlaceDetailsModal(true);
+        setLoadingPlaceDetails(true);
+        setPlaceDetails(null);
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/places/${place.id}`);
+            const data = await response.json();
+
+            if (data.success) {
+                setPlaceDetails(data.data);
+            }
+        } catch (error) {
+            console.error('Place details error:', error);
+        } finally {
+            setLoadingPlaceDetails(false);
         }
     };
 
@@ -4741,28 +4767,34 @@ const emergencyContacts = {
                     {places.map((place, index) => (
                         <div key={place.id || index} className="border border-gray-200 rounded-lg p-3 hover:shadow-md transition-shadow">
                             <div className="flex space-x-3">
-                                {place.photos && place.photos.length > 0 && (
-                                    <img
-                                        src={place.photos[0]}
-                                        alt={place.name}
-                                        className="w-20 h-20 rounded-lg object-cover"
-                                    />
-                                )}
-                                <div className="flex-1 min-w-0">
-                                    <h4 className="font-semibold text-gray-900 truncate">{place.name}</h4>
-                                    <div className="flex items-center space-x-2 mt-1">
-                                        {place.rating && (
-                                            <div className="flex items-center space-x-1">
-                                                <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                                                <span className="text-sm text-gray-700">{place.rating}</span>
-                                            </div>
-                                        )}
+                                <div
+                                    className="flex space-x-3 flex-1 cursor-pointer"
+                                    onClick={() => fetchPlaceDetails(place)}
+                                >
+                                    {place.photos && place.photos.length > 0 && (
+                                        <img
+                                            src={place.photos[0]}
+                                            alt={place.name}
+                                            className="w-20 h-20 rounded-lg object-cover"
+                                        />
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                        <h4 className="font-semibold text-gray-900 truncate">{place.name}</h4>
+                                        <div className="flex items-center space-x-2 mt-1">
+                                            {place.rating && (
+                                                <div className="flex items-center space-x-1">
+                                                    <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                                                    <span className="text-sm text-gray-700">{place.rating}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <p className="text-xs text-gray-600 mt-1">{place.address}</p>
                                     </div>
-                                    <p className="text-xs text-gray-600 mt-1">{place.address}</p>
                                 </div>
                                 <button
                                     onClick={() => getDirections(place)}
-                                    className="text-blue-600 hover:text-blue-700"
+                                    className="text-blue-600 hover:text-blue-700 flex-shrink-0"
+                                    title="Get Directions"
                                 >
                                     <Navigation className="w-5 h-5" />
                                 </button>
@@ -5325,6 +5357,210 @@ const emergencyContacts = {
                                 </button>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    // Place Details Modal
+    const PlaceDetailsModal = () => {
+        if (!showPlaceDetailsModal) return null;
+
+        const formatHours = (hours) => {
+            if (!hours || !hours.display || hours.display.length === 0) {
+                return 'Hours not available';
+            }
+            return hours.display.join('\n');
+        };
+
+        return (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                    {/* Header with close button */}
+                    <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-purple-600 p-6 rounded-t-xl">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h2 className="text-2xl font-bold text-white">{selectedPlace?.name}</h2>
+                                {selectedPlace?.rating && (
+                                    <div className="flex items-center space-x-2 mt-2">
+                                        <div className="flex items-center space-x-1">
+                                            <Star className="w-5 h-5 text-yellow-300 fill-current" />
+                                            <span className="text-white font-semibold">{selectedPlace.rating}</span>
+                                        </div>
+                                        {selectedPlace.userRatingsTotal && (
+                                            <span className="text-blue-100 text-sm">
+                                                ({selectedPlace.userRatingsTotal} reviews)
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setShowPlaceDetailsModal(false);
+                                    setSelectedPlace(null);
+                                    setPlaceDetails(null);
+                                }}
+                                className="text-white hover:bg-white/20 rounded-full p-2 transition-colors"
+                            >
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Content */}
+                    <div className="p-6">
+                        {loadingPlaceDetails ? (
+                            <div className="flex items-center justify-center py-12">
+                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                                <span className="ml-3 text-gray-600">Loading details...</span>
+                            </div>
+                        ) : placeDetails ? (
+                            <div className="space-y-6">
+                                {/* Photos Gallery */}
+                                {placeDetails.photos && placeDetails.photos.length > 0 && (
+                                    <div className="space-y-3">
+                                        <h3 className="font-semibold text-gray-900 text-lg">Photos</h3>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            {placeDetails.photos.slice(0, 4).map((photo, index) => (
+                                                <img
+                                                    key={index}
+                                                    src={photo}
+                                                    alt={`${selectedPlace.name} photo ${index + 1}`}
+                                                    className="w-full h-48 object-cover rounded-lg"
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Description */}
+                                {placeDetails.description && (
+                                    <div className="space-y-2">
+                                        <h3 className="font-semibold text-gray-900 text-lg flex items-center space-x-2">
+                                            <Info className="w-5 h-5 text-blue-600" />
+                                            <span>About</span>
+                                        </h3>
+                                        <p className="text-gray-700">{placeDetails.description}</p>
+                                    </div>
+                                )}
+
+                                {/* Categories */}
+                                {placeDetails.categories && placeDetails.categories.length > 0 && (
+                                    <div className="space-y-2">
+                                        <h3 className="font-semibold text-gray-900 text-lg">Categories</h3>
+                                        <div className="flex flex-wrap gap-2">
+                                            {placeDetails.categories.map((category, index) => (
+                                                <span
+                                                    key={index}
+                                                    className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm"
+                                                >
+                                                    {category}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Contact Information */}
+                                <div className="space-y-3 bg-gray-50 rounded-lg p-4">
+                                    <h3 className="font-semibold text-gray-900 text-lg">Contact & Location</h3>
+
+                                    {/* Address */}
+                                    {placeDetails.address && (
+                                        <div className="flex items-start space-x-3">
+                                            <MapPin className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                                            <div>
+                                                <p className="text-sm font-medium text-gray-700">Address</p>
+                                                <p className="text-gray-900">{placeDetails.address}</p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Phone */}
+                                    {placeDetails.phone && (
+                                        <div className="flex items-start space-x-3">
+                                            <Phone className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                                            <div>
+                                                <p className="text-sm font-medium text-gray-700">Phone</p>
+                                                <a
+                                                    href={`tel:${placeDetails.phone}`}
+                                                    className="text-blue-600 hover:text-blue-700 font-medium"
+                                                >
+                                                    {placeDetails.phone}
+                                                </a>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Website */}
+                                    {placeDetails.website && (
+                                        <div className="flex items-start space-x-3">
+                                            <Globe className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                                            <div>
+                                                <p className="text-sm font-medium text-gray-700">Website</p>
+                                                <a
+                                                    href={placeDetails.website}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-600 hover:text-blue-700 font-medium truncate block"
+                                                >
+                                                    Visit Website
+                                                </a>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Hours */}
+                                    {placeDetails.hours && (
+                                        <div className="flex items-start space-x-3">
+                                            <Clock className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                                            <div className="flex-1">
+                                                <p className="text-sm font-medium text-gray-700 mb-2">Hours</p>
+                                                <div className="text-gray-900 text-sm whitespace-pre-line">
+                                                    {formatHours(placeDetails.hours)}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Tips */}
+                                {placeDetails.tips && placeDetails.tips.length > 0 && (
+                                    <div className="space-y-3">
+                                        <h3 className="font-semibold text-gray-900 text-lg">Tips from Visitors</h3>
+                                        <div className="space-y-2">
+                                            {placeDetails.tips.slice(0, 3).map((tip, index) => (
+                                                <div key={index} className="bg-yellow-50 border-l-4 border-yellow-400 p-3 rounded">
+                                                    <p className="text-sm text-gray-800">{tip.text || tip}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="text-center py-12">
+                                <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                                <p className="text-gray-500">Failed to load place details</p>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Footer with actions */}
+                    <div className="sticky bottom-0 bg-gray-50 border-t px-6 py-4 rounded-b-xl">
+                        <button
+                            onClick={() => {
+                                if (selectedPlace) {
+                                    getDirections(selectedPlace);
+                                }
+                            }}
+                            className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2 font-medium"
+                        >
+                            <Navigation className="w-5 h-5" />
+                            <span>Get Directions</span>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -5895,6 +6131,7 @@ const emergencyContacts = {
             <TranslateModal />
             <NavigationModal />
             <EmergencyModal />
+            <PlaceDetailsModal />
             <ScheduleEditModal />
             <ActivitySearchModal />
             <AddMemoryModal />

@@ -16,7 +16,7 @@ class DatabaseService {
                 port: process.env.DB_PORT || 3306,
                 user: process.env.DB_USER || 'travelmind',
                 password: process.env.DB_PASSWORD,
-                database: process.env.DB_NAME || 'travelmind_db',
+                database: process.env.DB_NAME || 'travelmind',
                 connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT) || 10,
                 //ssl: { rejectUnauthorized: true, minVersion: 'TLSv1.2' },
                 acquireTimeout: 30000,
@@ -294,7 +294,9 @@ class DatabaseService {
     async getUserTrips(userId, status = null, limit = 20) {
         try {
             let query = `
-                SELECT t.*,
+                SELECT t.id, t.user_id, t.title, t.destination, t.start_date, t.end_date, 
+                       t.duration, t.budget, t.travel_style, t.interests, t.itinerary, 
+                       t.status as old_status, t.created_at, t.updated_at,
                 CASE 
                     WHEN t.start_date IS NULL THEN 'planning'
                     WHEN t.start_date > NOW() THEN 'upcoming'
@@ -337,7 +339,9 @@ class DatabaseService {
     async getActiveTrips(userId) {
         try {
             const trips = await this.pool.query(`
-                SELECT t.*,
+                SELECT t.id, t.user_id, t.title, t.destination, t.start_date, t.end_date, 
+                       t.duration, t.budget, t.travel_style, t.interests, t.itinerary, 
+                       t.status as old_status, t.created_at, t.updated_at,
                 COUNT(b.id) as booking_count,
                 COALESCE(SUM(CASE WHEN b.status != 'cancelled' THEN b.cost ELSE 0 END), 0) as total_spent
                 FROM trips t
@@ -368,7 +372,9 @@ class DatabaseService {
     async getUpcomingTrips(userId) {
         try {
             const trips = await this.pool.query(`
-                SELECT t.*,
+                SELECT t.id, t.user_id, t.title, t.destination, t.start_date, t.end_date, 
+                       t.duration, t.budget, t.travel_style, t.interests, t.itinerary, 
+                       t.status as old_status, t.created_at, t.updated_at,
                 COUNT(b.id) as booking_count,
                 COALESCE(SUM(CASE WHEN b.status != 'cancelled' THEN b.cost ELSE 0 END), 0) as total_spent
                 FROM trips t
@@ -398,7 +404,9 @@ class DatabaseService {
     async getTripById(tripId, userId) {
         try {
             const rows = await this.pool.query(`
-                SELECT t.*,
+                SELECT t.id, t.user_id, t.title, t.destination, t.start_date, t.end_date, 
+                       t.duration, t.budget, t.travel_style, t.interests, t.itinerary, 
+                       t.status as old_status, t.created_at, t.updated_at,
                 CASE 
                     WHEN t.start_date IS NULL THEN 'planning'
                     WHEN t.start_date > NOW() THEN 'upcoming'
@@ -528,8 +536,8 @@ class DatabaseService {
             }
 
             const bookings = await this.pool.query(`
-                SELECT * FROM bookings 
-                WHERE trip_id = ? 
+                SELECT * FROM bookings
+                WHERE trip_id = ?
                 ORDER BY booking_date ASC, booking_time ASC
             `, [tripId]);
 
@@ -623,7 +631,7 @@ class DatabaseService {
             if (updateFields.length > 0) {
                 updateValues.push(bookingId);
                 await this.pool.query(`
-                    UPDATE bookings 
+                    UPDATE bookings
                     SET ${updateFields.join(', ')}, updated_at = NOW()
                     WHERE id = ?
                 `, updateValues);
@@ -762,39 +770,58 @@ class DatabaseService {
             const [tripStats] = await this.pool.query(`
                 SELECT
                     COUNT(*) as total_trips,
-                    COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_trips,
-                    COUNT(CASE WHEN status = 'active' THEN 1 END) as active_trips,
+                    COUNT(CASE WHEN start_date IS NULL THEN 1 END) as planning_trips,
+                    COUNT(CASE WHEN start_date > NOW() THEN 1 END) as upcoming_trips,
+                    COUNT(CASE WHEN start_date <= NOW() AND end_date >= NOW() THEN 1 END) as active_trips,
+                    COUNT(CASE WHEN end_date < NOW() THEN 1 END) as completed_trips,
                     AVG(budget) as avg_budget,
                     SUM(budget) as total_budget
-                FROM trips
+                FROM trips 
                 WHERE user_id = ?
             `, [userId]);
 
+            const [bookingStats] = await this.pool.query(`
+                SELECT 
+                    COUNT(*) as total_bookings,
+                    COUNT(CASE WHEN status = 'confirmed' THEN 1 END) as confirmed_bookings,
+                    COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_bookings,
+                    COALESCE(SUM(CASE WHEN status != 'cancelled' THEN cost ELSE 0 END), 0) as total_spent
+                FROM bookings b
+                INNER JOIN trips t ON b.trip_id = t.id
+                WHERE t.user_id = ?
+            `, [userId]);
+
             const [memoryStats] = await this.pool.query(`
-                SELECT
+                SELECT 
                     COUNT(*) as total_memories,
                     AVG(rating) as avg_rating,
                     COUNT(DISTINCT DATE(memory_date)) as active_days
-                FROM memories
+                FROM memories 
                 WHERE user_id = ? AND rating IS NOT NULL
             `, [userId]);
 
             const recentActivity = await this.pool.query(`
-                SELECT 'memory' as type, title as activity, created_at
+                SELECT 'memory' as type, title as activity, created_at 
                 FROM memories WHERE user_id = ?
                 UNION ALL
-                SELECT 'trip' as type, title as activity, created_at
+                SELECT 'trip' as type, title as activity, created_at 
                 FROM trips WHERE user_id = ?
-                ORDER BY created_at DESC
-                    LIMIT 10
-            `, [userId, userId]);
+                UNION ALL
+                SELECT 'booking' as type, title as activity, created_at 
+                FROM bookings b
+                INNER JOIN trips t ON b.trip_id = t.id
+                WHERE t.user_id = ?
+                ORDER BY created_at DESC 
+                LIMIT 10
+            `, [userId, userId, userId]);
 
-            return this.convertBigIntToNumber({
-                trips: tripStats || {},
-                memories: memoryStats || {},
-                recentActivity: recentActivity || [],
+            return {
+                trips: tripStats,
+                bookings: bookingStats,
+                memories: memoryStats,
+                recentActivity,
                 generatedAt: new Date().toISOString()
-            });
+            };
         } catch (error) {
             console.error('Dashboard analytics error:', error);
             throw error;
@@ -851,5 +878,4 @@ class DatabaseService {
 }
 
 module.exports = { DatabaseService };
-
 

@@ -86,26 +86,29 @@ class FoursquarePlacesService {
             }
 
             // Transform Foursquare results to match Google Places format
-            return data.results.map(place => ({
-                id: `fsq_${place.fsq_id}`,
-                name: place.name,
-                rating: place.rating ? place.rating / 2 : undefined, // Foursquare uses 0-10 scale, convert to 0-5
-                userRatingsTotal: place.stats?.total_ratings || undefined,
-                address: place.location?.formatted_address || place.location?.address,
-                types: place.categories?.map(cat => cat.name.toLowerCase().replace(/\s+/g, '_')) || [],
-                priceLevel: place.price || undefined,
-                openNow: place.opening_hours?.open_now,
-                photos: place.photos?.map(photo =>
-                    `${photo.prefix}300x300${photo.suffix}`
-                ).slice(0, 5) || [],
-                location: {
-                    lat: place.geocodes?.main?.latitude || location.lat,
-                    lng: place.geocodes?.main?.longitude || location.lng
-                },
-                source: 'foursquare',
-                distance: place.distance,
-                categories: place.categories?.map(cat => cat.name) || []
-            }));
+            // Filter out places without valid IDs
+            return data.results
+                .filter(place => place.fsq_id) // Only include places with valid fsq_id
+                .map(place => ({
+                    id: `fsq_${place.fsq_id}`,
+                    name: place.name,
+                    rating: place.rating ? place.rating / 2 : undefined, // Foursquare uses 0-10 scale, convert to 0-5
+                    userRatingsTotal: place.stats?.total_ratings || undefined,
+                    address: place.location?.formatted_address || place.location?.address,
+                    types: place.categories?.map(cat => cat.name.toLowerCase().replace(/\s+/g, '_')) || [],
+                    priceLevel: place.price || undefined,
+                    openNow: place.opening_hours?.open_now,
+                    photos: place.photos?.map(photo =>
+                        `${photo.prefix}300x300${photo.suffix}`
+                    ).slice(0, 5) || [],
+                    location: {
+                        lat: place.geocodes?.main?.latitude || location.lat,
+                        lng: place.geocodes?.main?.longitude || location.lng
+                    },
+                    source: 'foursquare',
+                    distance: place.distance,
+                    categories: place.categories?.map(cat => cat.name) || []
+                }));
 
         } catch (error) {
             console.error('Foursquare Places search error:', error);

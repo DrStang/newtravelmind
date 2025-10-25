@@ -325,8 +325,8 @@ class DatabaseService {
             return trips.map(trip => ({
                 ...trip,
                 status: trip.computed_status,
-                interests: JSON.parse(trip.interests || '[]'),
-                itinerary: JSON.parse(trip.itinerary || '{}'),
+                interests: this.safeJsonParse(trip.interests || '[]'),
+                itinerary: this.safeJsonParse(trip.itinerary || '{}'),
                 bookingCount: trip.booking_count,
                 totalSpent: parseFloat(trip.total_spent),
                 remainingBudget: (trip.budget || 0) - parseFloat(trip.total_spent)
@@ -357,8 +357,8 @@ class DatabaseService {
             return trips.map(trip => ({
                 ...trip,
                 status: 'active',
-                interests: JSON.parse(trip.interests || '[]'),
-                itinerary: JSON.parse(trip.itinerary || '{}'),
+                interests: this.safeJsonParse(trip.interests || '[]'),
+                itinerary: this.safeJsonParse(trip.itinerary || '{}'),
                 bookingCount: trip.booking_count,
                 totalSpent: parseFloat(trip.total_spent),
                 remainingBudget: (trip.budget || 0) - parseFloat(trip.total_spent)
@@ -390,8 +390,8 @@ class DatabaseService {
             return trips.map(trip => ({
                 ...trip,
                 status: 'upcoming',
-                interests: JSON.parse(trip.interests || '[]'),
-                itinerary: JSON.parse(trip.itinerary || '{}'),
+                interests: this.safeJsonParse(trip.interests || '[]'),
+                itinerary: this.safeJsonParse(trip.itinerary || '{}'),
                 bookingCount: trip.booking_count,
                 totalSpent: parseFloat(trip.total_spent),
                 remainingBudget: (trip.budget || 0) - parseFloat(trip.total_spent)
@@ -428,8 +428,8 @@ class DatabaseService {
             return {
                 ...trip,
                 status: trip.computed_status,
-                interests: JSON.parse(trip.interests || '[]'),
-                itinerary: JSON.parse(trip.itinerary || '{}'),
+                interests: this.safeJsonParse(trip.interests || '[]'),
+                itinerary: this.safeJsonParse(trip.itinerary || '{}'),
                 bookingCount: trip.booking_count,
                 totalSpent: parseFloat(trip.total_spent),
                 remainingBudget: (trip.budget || 0) - parseFloat(trip.total_spent)
@@ -861,7 +861,7 @@ class DatabaseService {
 
             return events.map(event => ({
                 ...event,
-                event_data: JSON.parse(event.event_data || '{}')
+                event_data: this.safeJsonParse(event.event_data || '{}')
             }));
         } catch (error) {
             console.error('Get analytics events error:', error);
@@ -878,6 +878,7 @@ class DatabaseService {
 }
 
 module.exports = { DatabaseService };
+
 
 
 

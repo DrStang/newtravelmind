@@ -2749,7 +2749,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
         setMapModalOpen(true);
     };
 
-     // ITINERARY VIEW
+      // ITINERARY VIEW
     if (view === 'itinerary' && (selectedTrip || selectedTripId)) {
         const tripToShow = selectedTrip || trips.find(t => t.id === selectedTripId);
 
@@ -2782,7 +2782,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                 <TripManager
                     trip={tripToShow}
                     onUpdate={handleTripUpdate}
-                    onSchedule={scheduleTrip}
+                    onSchedule={handleTripSchedule}
                     token={token}
                     sendChatMessage={sendChatMessage}
                     setChatOpen={setChatOpen}
@@ -2820,8 +2820,7 @@ const PlanningMode = ({ user, token, trips, setTrips, setCurrentTrip, sendChatMe
                 </div>
             </div>
         );
-    }
-    // ACTIVITIES VIEW
+    }    // ACTIVITIES VIEW
     if (view === 'activities' && (selectedTrip || selectedTripId)) {
         const tripToShow = selectedTrip || trips.find(t => t.id === selectedTripId);
 

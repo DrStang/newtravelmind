@@ -20,6 +20,9 @@ const TripManager = ({ trip, onUpdate, onSchedule, token, sendChatMessage, setCh
   });
 
   const isActive = trip?.status === 'active';
+  const isPlanning = trip?.status === 'planning';
+  const isUpcoming = trip?.status === 'upcoming';
+  const canManage = isActive || isPlanning || isUpcoming; // Allow management for active, planning, and upcoming trips
   const bookings = trip?.booking_data ? JSON.parse(trip.booking_data) : [];
   const reminders = trip?.reminders ? JSON.parse(trip.reminders) : [];
 
@@ -737,13 +740,13 @@ const TripManager = ({ trip, onUpdate, onSchedule, token, sendChatMessage, setCh
           </div>
 
           <div className="flex items-center space-x-2">
-            {!isActive && (
+            {isPlanning && (
               <button
-                onClick={handleActivate}
+                onClick={() => setShowScheduleModal(true)}
                 className="bg-white text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors font-medium flex items-center space-x-2"
               >
-                <Check className="w-4 h-4" />
-                <span>Make Active</span>
+                <Calendar className="w-4 h-4" />
+                <span>Schedule Trip</span>
               </button>
             )}
           </div>
@@ -751,7 +754,7 @@ const TripManager = ({ trip, onUpdate, onSchedule, token, sendChatMessage, setCh
       </div>
 
       {/* Action Buttons */}
-      {isActive && (
+      {canManage && (
         <div className="border-b border-gray-200 p-4 bg-gray-50">
           <div className="flex flex-wrap gap-2">
             <button
@@ -790,7 +793,7 @@ const TripManager = ({ trip, onUpdate, onSchedule, token, sendChatMessage, setCh
               <Bell className="w-4 h-4" />
               <span>Add Reminder</span>
             </button>
-            {trip.status === 'planning' && (
+            {isPlanning && (
                     <button
                         onClick={() => setShowScheduleModal(true)}
                         className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
@@ -803,7 +806,7 @@ const TripManager = ({ trip, onUpdate, onSchedule, token, sendChatMessage, setCh
       )}
 
       {/* Bookings Section */}
-      {isActive && bookings.length > 0 && (
+      {canManage && bookings.length > 0 && (
         <div className="p-6 border-b border-gray-200">
           <h4 className="text-lg font-semibold mb-4 flex items-center">
             <Calendar className="w-5 h-5 mr-2 text-blue-600" />
@@ -870,7 +873,7 @@ const TripManager = ({ trip, onUpdate, onSchedule, token, sendChatMessage, setCh
       )}
 
       {/* Reminders Section */}
-      {isActive && reminders.length > 0 && (
+      {canManage && reminders.length > 0 && (
         <div className="p-6 border-b border-gray-200">
           <h4 className="text-lg font-semibold mb-4 flex items-center">
             <Bell className="w-5 h-5 mr-2 text-purple-600" />
@@ -1009,7 +1012,7 @@ const TripManager = ({ trip, onUpdate, onSchedule, token, sendChatMessage, setCh
                     </div>
 
                     {/* Day Footer */}
-                    {isActive && (
+                    {canManage && (
                       <div className="border-t border-gray-100 px-6 py-3 bg-gray-50 flex items-center justify-between">
                         <button
                           onClick={() => {

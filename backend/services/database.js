@@ -801,17 +801,17 @@ class DatabaseService {
             `, [userId]);
 
             const recentActivity = await this.pool.query(`
-                SELECT 'memory' as type, title as activity, created_at 
+                SELECT 'memory' as type, title as activity, created_at
                 FROM memories WHERE user_id = ?
                 UNION ALL
-                SELECT 'trip' as type, title as activity, created_at 
+                SELECT 'trip' as type, title as activity, created_at
                 FROM trips WHERE user_id = ?
                 UNION ALL
-                SELECT 'booking' as type, title as activity, created_at 
+                SELECT 'booking' as type, b.title as activity, b.created_at
                 FROM bookings b
                 INNER JOIN trips t ON b.trip_id = t.id
                 WHERE t.user_id = ?
-                ORDER BY created_at DESC 
+                ORDER BY created_at DESC
                 LIMIT 10
             `, [userId, userId, userId]);
 

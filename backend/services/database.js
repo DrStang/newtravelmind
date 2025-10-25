@@ -2,7 +2,7 @@ const mariadb = require('mariadb');
 
 class DatabaseService {
     constructor() {
-        this.pool = null;
+        this.pool = null; 
     }
 
     async initialize() {
@@ -878,4 +878,5 @@ class DatabaseService {
 }
 
 module.exports = { DatabaseService };
+
 

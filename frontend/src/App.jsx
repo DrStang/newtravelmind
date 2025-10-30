@@ -3601,8 +3601,14 @@ const emergencyContacts = {
         setPlaces(nearbyPlaces);
     }, [nearbyPlaces]);
 
+    // Use refs to hold values without triggering callback recreation
+    const searchRadiusRef = useRef(searchRadius);
+    const selectedPlaceTypeRef = useRef(selectedPlaceType);
+    
     // Memoize searchNearbyPlaces to prevent unnecessary re-renders
-    const searchNearbyPlaces = useCallback(async (type = selectedPlaceType) => {
+    const searchNearbyPlaces = useCallback(async () => {
+        const type = selectedPlaceTypeRef.current;
+        const radius = searchRadiusRef.current;
         if (!location) return;
 
         setLoading(true);
@@ -3621,8 +3627,14 @@ const emergencyContacts = {
         } finally {
             setLoading(false);
         }
-    }, [location, searchRadius, selectedPlaceType]);
-
+    }, [location]);
+    useEffect(() => {
+        const timeoutId = setTimeout(() => {
+            searchNearbyPlaces();
+        }, 300);
+        return () => clearTimeout(timeoutId);
+    }, [searchRadius, selectedPlaceType, location, searchNearbyPlaces]);
+    
     useEffect(() => {
         if (location) {
             searchNearbyPlaces();
@@ -4458,7 +4470,12 @@ const emergencyContacts = {
                 </h3>
                 <select
                     value={searchRadius}
-                    onChange={(e) => setSearchRadius(parseInt(e.target.value))}
+                    onChange={(e) => {
+                        e.stopPropagation();
+                        setSearchRadius(parseInt(e.target.value));
+                    }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
                     className="text-sm border border-gray-300 rounded-lg px-2 py-1"
                 >
                     <option value={500}>500m</option>
@@ -4930,18 +4947,26 @@ const emergencyContacts = {
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                     Text to translate
                                 </label>
-                                <textarea
-                                    value={translateText}
-                                    onChange={(e) => {
-                                        setTranslateText(e.target.value);
-                                        setTranslationResult(null);
-                                    }}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter' && e.ctrlKey) {
-                                            e.preventDefault();
-                                            handleTranslate();
-                                        }
-                                    }}
+                                <div onMouseDown={handleBackdropClick}>
+                                    <div onMouseDown={(e) => e.stopPropagation()}>
+                                        <textarea
+                                            autoFocus
+                                            onChange={(e) => {
+                                                e.stopPropagation();
+                                                setTranslateText(e.target.value);
+                                                setTranslationResult(null);
+                                            }}
+                                            onClick={(e) => e.stopPropagation()}
+                                            onMouseDown={(e) => e.stopPropagation()}
+                                            onKeyDown={(e) => {
+                                                e.stopPropagation();
+                                                if (e.key === 'Enter' && e.ctrlKey) {
+                                                    e.preventDefault();
+                                                    handleTranslate();
+                                                }}
+                                        />
+                                    </div>
+                                </div>
                                     placeholder="Enter text to translate..."
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none min-h-[100px] resize-y"
                                     disabled={translating}

@@ -24,6 +24,7 @@ const { AmadeusService } = require('./services/amadeus');
 const { MemoryService } = require('./services/memory');
 const { DatabaseService } = require('./services/database');
 const { RedisService } = require('./services/redis');
+const { NotificationScheduler } = require('./services/notificationScheduler');
 
 const app = express();
 const httpServer = createServer(app);
@@ -38,6 +39,7 @@ const foursquare = new FoursquarePlacesService();
 const amadeus = new AmadeusService();
 const database = new DatabaseService();
 const redis = new RedisService();
+const notificationScheduler = new NotificationScheduler();
 
 console.log('🔍 Environment Debug:');
 console.log('NODE_ENV:', process.env.NODE_ENV);
@@ -2653,6 +2655,11 @@ async function startServer() {
             console.warn('⚠️  Redis initialization failed (non-blocking):', err.message);
         });
 
+        // Initialize notification scheduler
+        console.log('🔔 Initializing notification scheduler...');
+        await notificationScheduler.initialize();
+        notificationScheduler.start();
+
         // Start server
         httpServer.listen(PORT, '0.0.0.0', () => {
             console.log(`🚀 TravelMind.ai API Server running on port ${PORT}`);
@@ -2677,6 +2684,7 @@ async function startServer() {
             console.log('  ✅ Redis caching');
             console.log('  ✅ MariaDB database with full schema');
             console.log(`  ${redis.isAvailable() ? '✅' : '⚠️ '} Redis caching ${redis.isAvailable() ? '' : '(disabled)'}`);
+            console.log('  ✅ Smart notifications (Booking reminders, Check-in alerts, Weather, Flight tracking)');
 
         });
     } catch (error) {
@@ -2691,6 +2699,7 @@ process.on('SIGTERM', async () => {
     console.log('🛑 Received SIGTERM, shutting down gracefully...');
 
     try {
+        notificationScheduler.stop();
         await database.close();
         await redis.close();
         httpServer.close(() => {

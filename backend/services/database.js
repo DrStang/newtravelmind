@@ -171,6 +171,7 @@ class DatabaseService {
                     details TEXT,
                     alert_message VARCHAR(255),
                     alert_time DATETIME,
+                    flight_number VARCHAR(50),
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -178,6 +179,31 @@ class DatabaseService {
                     INDEX idx_trip_id (trip_id),
                     INDEX idx_user_id (user_id),
                     INDEX idx_booking_date (booking_date)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            `);
+
+            await this.pool.query(`
+                CREATE TABLE IF NOT EXISTS notifications (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    user_id INT NOT NULL,
+                    trip_id INT,
+                    booking_id INT,
+                    type ENUM('booking_reminder', 'checkin_reminder', 'weather_alert', 'flight_delay', 'flight_update', 'general') DEFAULT 'general',
+                    title VARCHAR(255) NOT NULL,
+                    message TEXT NOT NULL,
+                    priority ENUM('low', 'medium', 'high', 'urgent') DEFAULT 'medium',
+                    dismissed BOOLEAN DEFAULT FALSE,
+                    read_at TIMESTAMP NULL,
+                    action_url VARCHAR(500),
+                    metadata JSON,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                    FOREIGN KEY (trip_id) REFERENCES trips(id) ON DELETE CASCADE,
+                    FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE CASCADE,
+                    INDEX idx_user_id (user_id),
+                    INDEX idx_dismissed (dismissed),
+                    INDEX idx_created_at (created_at),
+                    INDEX idx_type (type)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             `);
 
@@ -866,6 +892,118 @@ class DatabaseService {
         } catch (error) {
             console.error('Get analytics events error:', error);
             return [];
+        }
+    }
+
+    // Notification methods
+    async createNotification(userId, notificationData) {
+        try {
+            const result = await this.pool.query(`
+                INSERT INTO notifications (
+                    user_id, trip_id, booking_id, type, title, message,
+                    priority, action_url, metadata, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            `, [
+                userId,
+                notificationData.tripId || null,
+                notificationData.bookingId || null,
+                notificationData.type || 'general',
+                notificationData.title,
+                notificationData.message,
+                notificationData.priority || 'medium',
+                notificationData.actionUrl || null,
+                JSON.stringify(notificationData.metadata || {})
+            ]);
+
+            return Number(result.insertId);
+        } catch (error) {
+            console.error('Create notification error:', error);
+            throw error;
+        }
+    }
+
+    async getUserNotifications(userId, limit = 10) {
+        try {
+            const notifications = await this.pool.query(`
+                SELECT n.*, t.title as trip_title, b.title as booking_title
+                FROM notifications n
+                LEFT JOIN trips t ON n.trip_id = t.id
+                LEFT JOIN bookings b ON n.booking_id = b.id
+                WHERE n.user_id = ? AND n.dismissed = FALSE
+                ORDER BY
+                    CASE n.priority
+                        WHEN 'urgent' THEN 1
+                        WHEN 'high' THEN 2
+                        WHEN 'medium' THEN 3
+                        WHEN 'low' THEN 4
+                    END,
+                    n.created_at DESC
+                LIMIT ?
+            `, [userId, limit]);
+
+            return notifications.map(n => ({
+                ...n,
+                metadata: this.safeJsonParse(n.metadata, {})
+            }));
+        } catch (error) {
+            console.error('Get user notifications error:', error);
+            throw error;
+        }
+    }
+
+    async dismissNotification(notificationId, userId) {
+        try {
+            await this.pool.query(`
+                UPDATE notifications
+                SET dismissed = TRUE
+                WHERE id = ? AND user_id = ?
+            `, [notificationId, userId]);
+        } catch (error) {
+            console.error('Dismiss notification error:', error);
+            throw error;
+        }
+    }
+
+    async getUpcomingBookings(userId, daysAhead = 7) {
+        try {
+            const bookings = await this.pool.query(`
+                SELECT b.*, t.title as trip_title, t.destination
+                FROM bookings b
+                INNER JOIN trips t ON b.trip_id = t.id
+                WHERE b.user_id = ?
+                AND b.booking_date >= CURDATE()
+                AND b.booking_date <= DATE_ADD(CURDATE(), INTERVAL ? DAY)
+                AND b.status != 'cancelled'
+                ORDER BY b.booking_date ASC, b.booking_time ASC
+            `, [userId, daysAhead]);
+
+            return bookings;
+        } catch (error) {
+            console.error('Get upcoming bookings error:', error);
+            throw error;
+        }
+    }
+
+    async getFlightBookings(userId, daysAhead = 2) {
+        try {
+            const flights = await this.pool.query(`
+                SELECT b.*, t.title as trip_title, t.destination
+                FROM bookings b
+                INNER JOIN trips t ON b.trip_id = t.id
+                WHERE b.user_id = ?
+                AND b.booking_type = 'flight'
+                AND b.booking_date >= CURDATE()
+                AND b.booking_date <= DATE_ADD(CURDATE(), INTERVAL ? DAY)
+                AND b.status != 'cancelled'
+                AND b.flight_number IS NOT NULL
+                ORDER BY b.booking_date ASC, b.booking_time ASC
+            `, [userId, daysAhead]);
+
+            return flights;
+        } catch (error) {
+            console.error('Get flight bookings error:', error);
+            throw error;
         }
     }
 

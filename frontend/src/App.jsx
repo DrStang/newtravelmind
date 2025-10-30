@@ -3530,6 +3530,9 @@ const emergencyContacts = {
     const [placeDetails, setPlaceDetails] = useState(null);
     const [loadingPlaceDetails, setLoadingPlaceDetails] = useState(false);
 
+    // Notification panel state
+    const [showNotifications, setShowNotifications] = useState(false);
+
     // Load data on mount
     useEffect(() => {
         loadActiveTrip();
@@ -3598,11 +3601,33 @@ const emergencyContacts = {
         setPlaces(nearbyPlaces);
     }, [nearbyPlaces]);
 
+    // Memoize searchNearbyPlaces to prevent unnecessary re-renders
+    const searchNearbyPlaces = useCallback(async (type = selectedPlaceType) => {
+        if (!location) return;
+
+        setLoading(true);
+        try {
+            const searchType = type === 'all' ? 'tourist_attraction' : type;
+            const response = await fetch(
+                `${API_BASE_URL}/places/nearby?lat=${location.lat}&lng=${location.lng}&type=${searchType}&radius=${searchRadius}`
+            );
+            const data = await response.json();
+
+            if (data.success) {
+                setPlaces(data.data);
+            }
+        } catch (error) {
+            console.error('Places search error:', error);
+        } finally {
+            setLoading(false);
+        }
+    }, [location, searchRadius, selectedPlaceType]);
+
     useEffect(() => {
         if (location) {
             searchNearbyPlaces();
         }
-    }, [selectedPlaceType, searchRadius, location]);
+    }, [location, searchNearbyPlaces]);
 
     useEffect(() => {
         const timerId = setInterval(() => {
@@ -3669,6 +3694,22 @@ const emergencyContacts = {
         }
     };
 
+    const dismissNotification = async (notificationId) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/notifications/${notificationId}/dismiss`, {
+                method: 'PATCH',
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const data = await response.json();
+            if (data.success) {
+                // Remove notification from state
+                setNotifications(prev => prev.filter(n => n.id !== notificationId));
+            }
+        } catch (error) {
+            console.error('Dismiss notification error:', error);
+        }
+    };
+
     const loadUpcomingBookings = async () => {
         try {
             const response = await fetch(`${API_BASE_URL}/bookings/upcoming`, {
@@ -3680,27 +3721,6 @@ const emergencyContacts = {
             }
         } catch (error) {
             console.error('Load bookings error:', error);
-        }
-    };
-
-    const searchNearbyPlaces = async (type = selectedPlaceType) => {
-        if (!location) return;
-
-        setLoading(true);
-        try {
-            const searchType = type === 'all' ? 'tourist_attraction' : type;
-            const response = await fetch(
-                `${API_BASE_URL}/places/nearby?lat=${location.lat}&lng=${location.lng}&type=${searchType}&radius=${searchRadius}`
-            );
-            const data = await response.json();
-
-            if (data.success) {
-                setPlaces(data.data);
-            }
-        } catch (error) {
-            console.error('Places search error:', error);
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -4448,7 +4468,7 @@ const emergencyContacts = {
                 </select>
             </div>
 
-            <div className="flex overflow-x-auto space-x-2 mb-4 pb-2">
+            <div className="flex overflow-x-auto space-x-2 mb-4 pb-2 scrollbar-hide" style={{ scrollBehavior: 'smooth' }}>
                 {placeCategories.map(cat => (
                     <button
                         key={cat.value}
@@ -4636,6 +4656,115 @@ const emergencyContacts = {
     );
 
     // MODALS
+    // Notification Panel Component
+    const NotificationPanel = () => {
+        if (!showNotifications) return null;
+
+        const getNotificationIcon = (type) => {
+            switch (type) {
+                case 'flight_delay':
+                case 'flight_update':
+                    return <Clock className="w-5 h-5 text-orange-500" />;
+                case 'weather_alert':
+                    return <Cloud className="w-5 h-5 text-blue-500" />;
+                case 'checkin_reminder':
+                    return <Plane className="w-5 h-5 text-green-500" />;
+                case 'booking_reminder':
+                    return <Bell className="w-5 h-5 text-purple-500" />;
+                default:
+                    return <AlertTriangle className="w-5 h-5 text-gray-500" />;
+            }
+        };
+
+        const getPriorityColor = (priority) => {
+            switch (priority) {
+                case 'urgent':
+                    return 'border-l-4 border-red-500 bg-red-50';
+                case 'high':
+                    return 'border-l-4 border-orange-500 bg-orange-50';
+                case 'medium':
+                    return 'border-l-4 border-blue-500 bg-blue-50';
+                case 'low':
+                    return 'border-l-4 border-gray-500 bg-gray-50';
+                default:
+                    return 'border-l-4 border-gray-300 bg-white';
+            }
+        };
+
+        return (
+            <div className="fixed top-20 right-4 w-96 max-h-[600px] bg-white rounded-lg shadow-2xl z-50 overflow-hidden">
+                <div className="p-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white flex justify-between items-center">
+                    <h3 className="font-semibold text-lg">Notifications</h3>
+                    <button
+                        onClick={() => setShowNotifications(false)}
+                        className="p-1 hover:bg-white/20 rounded"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+
+                <div className="overflow-y-auto max-h-[500px]">
+                    {notifications.length === 0 ? (
+                        <div className="p-8 text-center text-gray-500">
+                            <Bell className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                            <p>No new notifications</p>
+                        </div>
+                    ) : (
+                        <div className="divide-y">
+                            {notifications.map((notification) => (
+                                <div
+                                    key={notification.id}
+                                    className={`p-4 ${getPriorityColor(notification.priority)} hover:bg-opacity-80 transition-colors`}
+                                >
+                                    <div className="flex items-start space-x-3">
+                                        <div className="flex-shrink-0 mt-1">
+                                            {getNotificationIcon(notification.type)}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="font-semibold text-gray-900 mb-1">
+                                                {notification.title}
+                                            </p>
+                                            <p className="text-sm text-gray-700 mb-2">
+                                                {notification.message}
+                                            </p>
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs text-gray-500">
+                                                    {new Date(notification.created_at).toLocaleString()}
+                                                </span>
+                                                <button
+                                                    onClick={() => dismissNotification(notification.id)}
+                                                    className="text-xs text-gray-600 hover:text-gray-900 font-medium"
+                                                >
+                                                    Dismiss
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {notifications.length > 0 && (
+                    <div className="p-3 bg-gray-50 border-t text-center">
+                        <button
+                            onClick={async () => {
+                                // Dismiss all notifications
+                                for (const notification of notifications) {
+                                    await dismissNotification(notification.id);
+                                }
+                            }}
+                            className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                        >
+                            Clear All
+                        </button>
+                    </div>
+                )}
+            </div>
+        );
+    };
+
     const PhotoModal = () => {
         if (!showPhotoModal) return null;
 
@@ -4780,8 +4909,14 @@ const emergencyContacts = {
         };
 
         return (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-xl max-w-2xl w-full">
+            <div
+                className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+                onClick={closeTranslateModal}
+            >
+                <div
+                    className="bg-white rounded-xl max-w-2xl w-full"
+                    onClick={(e) => e.stopPropagation()}
+                >
                     <div className="p-6">
                         <div className="flex items-center justify-between mb-6">
                             <h3 className="text-xl font-semibold">Live Translation</h3>
@@ -5789,10 +5924,13 @@ const emergencyContacts = {
                             <div className="hidden md:block text-sm text-gray-600">
                                 Day {tripData?.currentDay || 1} of {tripData?.duration || 7}
                             </div>
-                            <button className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg">
+                            <button
+                                onClick={() => setShowNotifications(!showNotifications)}
+                                className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+                            >
                                 <Bell className="w-5 h-5" />
                                 {notifications.length > 0 && (
-                                    <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                                    <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
                                 )}
                             </button>
                         </div>
@@ -5835,6 +5973,7 @@ const emergencyContacts = {
             </div>
 
             {/* Modals */}
+            <NotificationPanel />
             <PhotoModal />
             <TranslateModal />
             <NavigationModal />

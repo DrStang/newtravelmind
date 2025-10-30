@@ -3601,11 +3601,33 @@ const emergencyContacts = {
         setPlaces(nearbyPlaces);
     }, [nearbyPlaces]);
 
+    // Memoize searchNearbyPlaces to prevent unnecessary re-renders
+    const searchNearbyPlaces = useCallback(async (type = selectedPlaceType) => {
+        if (!location) return;
+
+        setLoading(true);
+        try {
+            const searchType = type === 'all' ? 'tourist_attraction' : type;
+            const response = await fetch(
+                `${API_BASE_URL}/places/nearby?lat=${location.lat}&lng=${location.lng}&type=${searchType}&radius=${searchRadius}`
+            );
+            const data = await response.json();
+
+            if (data.success) {
+                setPlaces(data.data);
+            }
+        } catch (error) {
+            console.error('Places search error:', error);
+        } finally {
+            setLoading(false);
+        }
+    }, [location, searchRadius, selectedPlaceType]);
+
     useEffect(() => {
         if (location) {
             searchNearbyPlaces();
         }
-    }, [selectedPlaceType, searchRadius, location]);
+    }, [location, searchNearbyPlaces]);
 
     useEffect(() => {
         const timerId = setInterval(() => {
@@ -3699,27 +3721,6 @@ const emergencyContacts = {
             }
         } catch (error) {
             console.error('Load bookings error:', error);
-        }
-    };
-
-    const searchNearbyPlaces = async (type = selectedPlaceType) => {
-        if (!location) return;
-
-        setLoading(true);
-        try {
-            const searchType = type === 'all' ? 'tourist_attraction' : type;
-            const response = await fetch(
-                `${API_BASE_URL}/places/nearby?lat=${location.lat}&lng=${location.lng}&type=${searchType}&radius=${searchRadius}`
-            );
-            const data = await response.json();
-
-            if (data.success) {
-                setPlaces(data.data);
-            }
-        } catch (error) {
-            console.error('Places search error:', error);
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -4467,7 +4468,7 @@ const emergencyContacts = {
                 </select>
             </div>
 
-            <div className="flex overflow-x-auto space-x-2 mb-4 pb-2">
+            <div className="flex overflow-x-auto space-x-2 mb-4 pb-2 scrollbar-hide" style={{ scrollBehavior: 'smooth' }}>
                 {placeCategories.map(cat => (
                     <button
                         key={cat.value}
@@ -4908,8 +4909,14 @@ const emergencyContacts = {
         };
 
         return (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-xl max-w-2xl w-full">
+            <div
+                className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+                onClick={closeTranslateModal}
+            >
+                <div
+                    className="bg-white rounded-xl max-w-2xl w-full"
+                    onClick={(e) => e.stopPropagation()}
+                >
                     <div className="p-6">
                         <div className="flex items-center justify-between mb-6">
                             <h3 className="text-xl font-semibold">Live Translation</h3>

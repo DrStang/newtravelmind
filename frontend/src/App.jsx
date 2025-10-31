@@ -3601,21 +3601,29 @@ const emergencyContacts = {
         setPlaces(nearbyPlaces);
     }, [nearbyPlaces]);
 
-    // Use refs to hold values without triggering callback recreation
+    // Use refs to get latest values without triggering re-renders
     const searchRadiusRef = useRef(searchRadius);
     const selectedPlaceTypeRef = useRef(selectedPlaceType);
-    
-    // Memoize searchNearbyPlaces to prevent unnecessary re-renders
+
+    useEffect(() => {
+        searchRadiusRef.current = searchRadius;
+    }, [searchRadius]);
+
+    useEffect(() => {
+        selectedPlaceTypeRef.current = selectedPlaceType;
+    }, [selectedPlaceType]);
+
+    // Memoize searchNearbyPlaces without radius/type in dependencies
     const searchNearbyPlaces = useCallback(async () => {
-        const type = selectedPlaceTypeRef.current;
-        const radius = searchRadiusRef.current;
         if (!location) return;
 
         setLoading(true);
         try {
+            const type = selectedPlaceTypeRef.current;
+            const radius = searchRadiusRef.current;
             const searchType = type === 'all' ? 'tourist_attraction' : type;
             const response = await fetch(
-                `${API_BASE_URL}/places/nearby?lat=${location.lat}&lng=${location.lng}&type=${searchType}&radius=${searchRadius}`
+                `${API_BASE_URL}/places/nearby?lat=${location.lat}&lng=${location.lng}&type=${searchType}&radius=${radius}`
             );
             const data = await response.json();
 
@@ -3628,18 +3636,17 @@ const emergencyContacts = {
             setLoading(false);
         }
     }, [location]);
+
+    // Debounce the search when radius or type changes
     useEffect(() => {
+        if (!location) return;
+
         const timeoutId = setTimeout(() => {
             searchNearbyPlaces();
-        }, 300);
+        }, 300); // 300ms debounce
+
         return () => clearTimeout(timeoutId);
     }, [searchRadius, selectedPlaceType, location, searchNearbyPlaces]);
-    
-    useEffect(() => {
-        if (location) {
-            searchNearbyPlaces();
-        }
-    }, [location, searchNearbyPlaces]);
 
     useEffect(() => {
         const timerId = setInterval(() => {
@@ -4485,11 +4492,15 @@ const emergencyContacts = {
                 </select>
             </div>
 
-            <div className="flex overflow-x-auto space-x-2 mb-4 pb-2 scrollbar-hide" style={{ scrollBehavior: 'smooth' }}>
+            <div className="flex overflow-x-auto space-x-2 mb-4 pb-2 scrollbar-hide" style={{ scrollBehavior: 'smooth', WebkitOverflowScrolling: 'touch' }}>
                 {placeCategories.map(cat => (
                     <button
                         key={cat.value}
-                        onClick={() => setSelectedPlaceType(cat.value)}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedPlaceType(cat.value);
+                        }}
+                        onMouseDown={(e) => e.stopPropagation()}
                         className={`flex-shrink-0 px-3 py-2 rounded-full text-sm transition-colors ${
                             selectedPlaceType === cat.value
                                 ? 'bg-blue-600 text-white'
@@ -4925,14 +4936,21 @@ const emergencyContacts = {
             setTranslationResult(null);
         };
 
+        const handleBackdropClick = (e) => {
+            // Only close if clicking the backdrop itself, not its children
+            if (e.target === e.currentTarget) {
+                closeTranslateModal();
+            }
+        };
+
         return (
             <div
                 className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-                onClick={closeTranslateModal}
+                onMouseDown={handleBackdropClick}
             >
                 <div
                     className="bg-white rounded-xl max-w-2xl w-full"
-                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
                 >
                     <div className="p-6">
                         <div className="flex items-center justify-between mb-6">
@@ -4947,26 +4965,23 @@ const emergencyContacts = {
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                     Text to translate
                                 </label>
-                                <div onMouseDown={handleBackdropClick}>
-                                    <div onMouseDown={(e) => e.stopPropagation()}>
-                                        <textarea
-                                            autoFocus
-                                            onChange={(e) => {
-                                                e.stopPropagation();
-                                                setTranslateText(e.target.value);
-                                                setTranslationResult(null);
-                                            }}
-                                            onClick={(e) => e.stopPropagation()}
-                                            onMouseDown={(e) => e.stopPropagation()}
-                                            onKeyDown={(e) => {
-                                                e.stopPropagation();
-                                                if (e.key === 'Enter' && e.ctrlKey) {
-                                                    e.preventDefault();
-                                                    handleTranslate();
-                                                }}
-                                        />
-                                    </div>
-                                </div>
+                                <textarea
+                                    autoFocus
+                                    value={translateText}
+                                    onChange={(e) => {
+                                        e.stopPropagation();
+                                        setTranslateText(e.target.value);
+                                        setTranslationResult(null);
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                    onKeyDown={(e) => {
+                                        e.stopPropagation();
+                                        if (e.key === 'Enter' && e.ctrlKey) {
+                                            e.preventDefault();
+                                            handleTranslate();
+                                        }
+                                    }}
                                     placeholder="Enter text to translate..."
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none min-h-[100px] resize-y"
                                     disabled={translating}

@@ -7,7 +7,7 @@ import {
     Navigation, Cloud, Sun, CloudRain, Settings, User,
     TrendingUp, Clock, Heart, Globe, Zap, Book, X, Check, Bell, Phone, AlertTriangle,
     ChevronRight, DollarSign, Utensils, Hotel, CheckCircle, Search, ScanLine,
-    Languages, Map, Shield, Info, RefreshCw, Edit, Plus, Upload, AlertCircle
+    Languages, Map, Shield, Info, RefreshCw, Edit, Plus, Upload, AlertCircle, Loader
 } from 'lucide-react';
 import io from 'socket.io-client';
 import TripManager from './TripManager';

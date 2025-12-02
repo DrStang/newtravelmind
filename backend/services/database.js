@@ -13,7 +13,7 @@ class DatabaseService {
             }
             this.pool = mariadb.createPool({
                 host: process.env.DB_HOST || 'localhost',
-                //port: process.env.DB_PORT || 3306,
+                port: process.env.DB_PORT || 3306,
                 user: process.env.DB_USER || 'travelmind',
                 password: process.env.DB_PASSWORD,
                 database: process.env.DB_NAME || 'travelmind',
@@ -1016,6 +1016,7 @@ class DatabaseService {
 }
 
 module.exports = { DatabaseService };
+
 
 
 
